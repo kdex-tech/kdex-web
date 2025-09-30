@@ -162,9 +162,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	hostStore := store.New()
+
 	if err := (&controller.MicroFrontEndHostReconciler{
 		Client:    mgr.GetClient(),
-		HostStore: store.New(),
+		HostStore: hostStore,
 		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MicroFrontEndHost")
@@ -183,7 +185,7 @@ func main() {
 
 	go func() {
 		setupLog.Info("starting web server")
-		if err := server.New("8080").ListenAndServe(); err != nil {
+		if err := server.New("8080", hostStore).ListenAndServe(); err != nil {
 			setupLog.Error(err, "problem running web server")
 		}
 	}()
