@@ -8,4 +8,9 @@ layout:
 - go.kubebuilder.io/v4
 projectName: kdex-web
 repo: kdex.dev/web
+resources:
+- controller: true
+  domain: kdex.dev
+  kind: MicroFrontEndHost
+  version: v1alpha1
 version: "3"
