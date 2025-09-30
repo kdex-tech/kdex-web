@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"kdex.dev/web/internal/controller"
+	"kdex.dev/web/internal/web/server"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -177,6 +178,13 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+
+	go func() {
+		setupLog.Info("starting web server")
+		if err := server.New("8080").ListenAndServe(); err != nil {
+			setupLog.Error(err, "problem running web server")
+		}
+	}()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
