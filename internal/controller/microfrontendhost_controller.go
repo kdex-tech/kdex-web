@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -45,7 +46,13 @@ type MicroFrontEndHostReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
 func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+	log := logf.FromContext(ctx)
+
+	var host kdexv1alpha1.MicroFrontEndHost
+	if err := r.Get(ctx, req.NamespacedName, &host); err != nil {
+		log.Error(err, "unable to fetch MicroFrontEndHost")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
 	// TODO(user): your logic here
 
