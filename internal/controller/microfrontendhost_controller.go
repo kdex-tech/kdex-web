@@ -21,15 +21,18 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/web/internal/store"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // MicroFrontEndHostReconciler reconciles a MicroFrontEndHost object
 type MicroFrontEndHostReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	HostStore *store.HostStore
+	Scheme    *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhosts,verbs=get;list;watch;create;update;patch;delete
@@ -54,7 +57,26 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// TODO(user): your logic here
+	hostFinalizerName := "kdex.dev/web-host-finalizer"
+
+	if host.ObjectMeta.DeletionTimestamp.IsZero() {
+		r.HostStore.Set(store.TrackedHost{Host: host})
+		if !controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
+			controllerutil.AddFinalizer(&host, hostFinalizerName)
+			if err := r.Update(ctx, &host); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		if controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
+			r.HostStore.Delete(host.Name)
+
+			controllerutil.RemoveFinalizer(&host, hostFinalizerName)
+			if err := r.Update(ctx, &host); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	}
 
 	return ctrl.Result{}, nil
 }

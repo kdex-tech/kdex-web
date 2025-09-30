@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"kdex.dev/web/internal/controller"
+	"kdex.dev/web/internal/store"
 	"kdex.dev/web/internal/web/server"
 	// +kubebuilder:scaffold:imports
 )
@@ -162,8 +163,9 @@ func main() {
 	}
 
 	if err := (&controller.MicroFrontEndHostReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:    mgr.GetClient(),
+		HostStore: store.New(),
+		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MicroFrontEndHost")
 		os.Exit(1)
