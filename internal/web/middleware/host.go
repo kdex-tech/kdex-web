@@ -26,7 +26,7 @@ func WithHost(store *store.HostStore) func(http.Handler) http.Handler {
 			for _, trackedHost := range hosts {
 				for _, domain := range trackedHost.Host.Spec.Domains {
 					if domain == hostHeader {
-						ctx := context.WithValue(r.Context(), HostKey, trackedHost.Host)
+						ctx := context.WithValue(r.Context(), HostKey, trackedHost)
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
