@@ -7,7 +7,16 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
+  - microfrontendhost
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kdex.dev
+  resources:
   - microfrontendhosts
+  - microfrontendrenderpages
   verbs:
   - create
   - delete
@@ -20,12 +29,14 @@ rules:
   - kdex.dev
   resources:
   - microfrontendhosts/finalizers
+  - microfrontendrenderpages/finalizers
   verbs:
   - update
 - apiGroups:
   - kdex.dev
   resources:
   - microfrontendhosts/status
+  - microfrontendrenderpages/status
   verbs:
   - get
   - patch

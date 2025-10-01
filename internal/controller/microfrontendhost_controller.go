@@ -28,6 +28,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const hostFinalizerName = "kdex.dev/web-host-finalizer"
+
 // MicroFrontEndHostReconciler reconciles a MicroFrontEndHost object
 type MicroFrontEndHostReconciler struct {
 	client.Client
@@ -57,10 +59,11 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	hostFinalizerName := "kdex.dev/web-host-finalizer"
-
 	if host.ObjectMeta.DeletionTimestamp.IsZero() {
-		r.HostStore.Set(store.TrackedHost{Host: host})
+		r.HostStore.Set(store.TrackedHost{
+			Host:        host,
+			RenderPages: store.NewRenderPageStore(),
+		})
 		if !controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
 			controllerutil.AddFinalizer(&host, hostFinalizerName)
 			if err := r.Update(ctx, &host); err != nil {
@@ -70,7 +73,6 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	} else {
 		if controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
 			r.HostStore.Delete(host.Name)
-
 			controllerutil.RemoveFinalizer(&host, hostFinalizerName)
 			if err := r.Update(ctx, &host); err != nil {
 				return ctrl.Result{}, err

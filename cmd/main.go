@@ -162,7 +162,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	hostStore := store.New()
+	hostStore := store.NewHostStore()
 
 	if err := (&controller.MicroFrontEndHostReconciler{
 		Client:    mgr.GetClient(),
