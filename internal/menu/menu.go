@@ -7,7 +7,7 @@ import (
 )
 
 func ToMenuEntries(
-	items []kdexv1alpha1.MicroFrontEndPageBinding,
+	items []kdexv1alpha1.MicroFrontEndRenderPage,
 ) map[string]MenuEntry {
 	menuEntries := make(map[string]MenuEntry)
 
@@ -16,7 +16,7 @@ func ToMenuEntries(
 			continue
 		}
 
-		label := item.Spec.Label
+		label := item.Spec.PageComponents.Title
 		menuEntry := MenuEntry{
 			Icon:   item.Spec.NavigationHints.Icon,
 			Path:   item.Spec.Path,
