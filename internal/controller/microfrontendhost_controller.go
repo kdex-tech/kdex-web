@@ -60,10 +60,7 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if host.ObjectMeta.DeletionTimestamp.IsZero() {
-		r.HostStore.Set(store.TrackedHost{
-			Host:        host,
-			RenderPages: store.NewRenderPageStore(),
-		})
+		r.HostStore.Set(store.NewTrackedHost(host))
 		if !controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
 			controllerutil.AddFinalizer(&host, hostFinalizerName)
 			if err := r.Update(ctx, &host); err != nil {
