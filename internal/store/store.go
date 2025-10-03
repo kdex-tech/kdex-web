@@ -6,6 +6,7 @@ import (
 	"time"
 
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	kdexhttp "kdex.dev/web/internal/http"
 	"kdex.dev/web/internal/menu"
 	"kdex.dev/web/internal/render"
 )
@@ -40,11 +41,11 @@ func (th *TrackedHost) RebuildMux() {
 		page := pages[i]
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			lang := r.PathValue("lang")
-
-			if lang != "" {
-				lang = "en" // TODO: use the Hosts DefaultLang property
-			}
+			lang := kdexhttp.GetParam(
+				"lang",
+				"en", // TODO: use the Hosts DefaultLang property
+				r,
+			)
 
 			renderer := render.Renderer{
 				Context:      r.Context(),
