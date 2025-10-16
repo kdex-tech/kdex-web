@@ -1,14 +1,13 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 
 	store_ "kdex.dev/web/internal/store"
 	"kdex.dev/web/internal/web/middleware"
 )
 
-func New(port string, store *store_.HostStore) *http.Server {
+func New(address string, store *store_.HostStore) *http.Server {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		trackedHost, ok := r.Context().Value(middleware.HostKey).(*store_.TrackedHost)
 		if !ok {
@@ -22,7 +21,7 @@ func New(port string, store *store_.HostStore) *http.Server {
 	hostHandler := middleware.WithHost(store)(handler)
 
 	return &http.Server{
-		Addr:    fmt.Sprintf(":%s", port),
+		Addr:    address,
 		Handler: hostHandler,
 	}
 }
