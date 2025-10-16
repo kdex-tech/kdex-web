@@ -59,7 +59,7 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if host.ObjectMeta.DeletionTimestamp.IsZero() {
+	if host.DeletionTimestamp.IsZero() {
 		r.HostStore.Set(store.NewTrackedHost(host))
 		if !controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
 			controllerutil.AddFinalizer(&host, hostFinalizerName)

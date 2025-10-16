@@ -86,7 +86,7 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
 
-	if renderPage.ObjectMeta.DeletionTimestamp.IsZero() {
+	if renderPage.DeletionTimestamp.IsZero() {
 		trackedHost.RenderPages.Set(renderPage)
 		if !controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {
 			controllerutil.AddFinalizer(&renderPage, renderPageFinalizerName)

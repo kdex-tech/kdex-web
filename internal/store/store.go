@@ -134,7 +134,7 @@ func (s *HostStore) Get(name string) (*TrackedHost, bool) {
 func (s *HostStore) List() []*TrackedHost {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	var hosts []*TrackedHost
+	hosts := []*TrackedHost{}
 	for _, host := range s.hosts {
 		hosts = append(hosts, host)
 	}
@@ -172,7 +172,7 @@ func (s *RenderPageStore) Get(name string) (kdexv1alpha1.MicroFrontEndRenderPage
 func (s *RenderPageStore) List() []kdexv1alpha1.MicroFrontEndRenderPage {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	var pages []kdexv1alpha1.MicroFrontEndRenderPage
+	pages := []kdexv1alpha1.MicroFrontEndRenderPage{}
 	for _, page := range s.pages {
 		pages = append(pages, page)
 	}
