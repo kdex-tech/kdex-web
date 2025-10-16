@@ -48,7 +48,9 @@ jobs:
           version: v2.3.0
 
       - name: Run Unit Tests
-        run: make test
+        run: |
+          go mod tidy
+          make test
 
       - name: Publish Docker Image
         if: ${{ env.PUBLISH == 'true' }}
