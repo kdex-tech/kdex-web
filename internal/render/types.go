@@ -29,10 +29,10 @@ type Values struct {
 	Header       template.HTML
 	HeadScript   template.HTML
 	Lang         string
+	MenuEntries  map[string]*menu.MenuEntry
 	Meta         template.HTML
-	MenuEntries  map[string]menu.MenuEntry
 	Navigation   map[string]template.HTML
 	Organization string
-	Title        string
 	Stylesheet   template.HTML
+	Title        string
 }

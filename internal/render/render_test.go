@@ -35,7 +35,7 @@ func TestRenderAll(t *testing.T) {
 		FootScript:   "<script>foot</script>",
 		HeadScript:   "<script>head</script>",
 		Lang:         "en",
-		MenuEntries:  map[string]menu.MenuEntry{"home": {Path: "/"}},
+		MenuEntries:  &map[string]*menu.MenuEntry{"home": {Path: "/"}},
 		Meta:         `<meta name="description" content="test">`,
 		Organization: "Test Inc.",
 		Stylesheet:   "<style>body{}</style>",

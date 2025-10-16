@@ -36,6 +36,10 @@ func (th *TrackedHost) RebuildMux() {
 	defer th.mu.Unlock()
 
 	mux := http.NewServeMux()
+
+	rootEntry := &menu.MenuEntry{}
+	th.RenderPages.BuildMenuEntries(rootEntry, nil)
+
 	pages := th.RenderPages.List()
 	for i := range pages {
 		page := pages[i]
@@ -47,14 +51,19 @@ func (th *TrackedHost) RebuildMux() {
 				r,
 			)
 
+			menuEntries := &map[string]*menu.MenuEntry{}
+			if rootEntry.Children != nil {
+				menuEntries = rootEntry.Children
+			}
+
 			renderer := render.Renderer{
 				Context:      r.Context(),
 				Date:         time.Now(),
 				FootScript:   "",
 				HeadScript:   "",
 				Lang:         lang,
-				MenuEntries:  menu.ToMenuEntries(pages),
-				Meta:         *th.Host.Spec.BaseMeta,
+				MenuEntries:  menuEntries,
+				Meta:         th.Host.Spec.BaseMeta,
 				Organization: th.Host.Spec.Organization,
 				Request:      r,
 				Stylesheet:   th.Host.Spec.Stylesheet,
@@ -176,5 +185,37 @@ func (s *RenderPageStore) Set(page kdexv1alpha1.MicroFrontEndRenderPage) {
 	s.mu.Unlock()
 	if s.onUpdate != nil {
 		s.onUpdate()
+	}
+}
+
+func (s *RenderPageStore) BuildMenuEntries(
+	entry *menu.MenuEntry,
+	parent *kdexv1alpha1.MicroFrontEndRenderPage,
+) {
+	for _, item := range s.List() {
+		if (parent == nil && item.Spec.ParentPageRef == nil) ||
+			(parent != nil && item.Spec.ParentPageRef != nil &&
+				parent.Name == item.Spec.ParentPageRef.Name) {
+
+			if entry.Children == nil {
+				entry.Children = &map[string]*menu.MenuEntry{}
+			}
+
+			label := item.Spec.PageComponents.Title
+
+			menuEntry := menu.MenuEntry{
+				Name: item.Name,
+				Path: item.Spec.Path,
+			}
+
+			if item.Spec.NavigationHints != nil {
+				menuEntry.Icon = item.Spec.NavigationHints.Icon
+				menuEntry.Weight = item.Spec.NavigationHints.Weight
+			}
+
+			(*entry.Children)[label] = &menuEntry
+
+			s.BuildMenuEntries(&menuEntry, &item)
+		}
 	}
 }

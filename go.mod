@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.24.5
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.5.0
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.5.1
 
 require (
 	github.com/onsi/ginkgo/v2 v2.26.0

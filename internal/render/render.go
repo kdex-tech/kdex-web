@@ -17,7 +17,7 @@ type Renderer struct {
 	FootScript   string
 	HeadScript   string
 	Lang         string
-	MenuEntries  map[string]menu.MenuEntry
+	MenuEntries  *map[string]*menu.MenuEntry
 	Meta         string
 	Organization string
 	Request      *http.Request
@@ -30,13 +30,18 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 		date = time.Now()
 	}
 
+	menuEntries := &map[string]*menu.MenuEntry{}
+	if r.MenuEntries != nil {
+		menuEntries = r.MenuEntries
+	}
+
 	templateData := TemplateData{
 		Values: Values{
 			Date:         date,
 			FootScript:   template.HTML(r.FootScript),
 			HeadScript:   template.HTML(r.HeadScript),
 			Lang:         r.Lang,
-			MenuEntries:  r.MenuEntries,
+			MenuEntries:  *menuEntries,
 			Meta:         template.HTML(r.Meta),
 			Organization: r.Organization,
 			Stylesheet:   template.HTML(r.Stylesheet),
