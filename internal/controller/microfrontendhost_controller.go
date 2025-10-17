@@ -19,6 +19,8 @@ package controller
 import (
 	"context"
 
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal/store"
@@ -66,6 +68,19 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			if err := r.Update(ctx, &host); err != nil {
 				return ctrl.Result{}, err
 			}
+		}
+
+		apimeta.SetStatusCondition(
+			&host.Status.Conditions,
+			*kdexv1alpha1.NewCondition(
+				kdexv1alpha1.ConditionTypeReady,
+				metav1.ConditionTrue,
+				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				"all references resolved successfully",
+			),
+		)
+		if err := r.Status().Update(ctx, &host); err != nil {
+			return ctrl.Result{}, err
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&host, hostFinalizerName) {

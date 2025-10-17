@@ -128,7 +128,7 @@ func (r *MicroFrontEndRenderPageReconciler) findRenderPagesForHost(
 	if err := r.List(ctx, &renderPageList, &client.ListOptions{
 		Namespace: host.GetNamespace(),
 	}); err != nil {
-		log.Error(err, "unable to list MicroFrontEndRenderPage for host %s", host.GetName())
+		log.Error(err, "unable to list MicroFrontEndRenderPage for host", "name", host.GetName())
 		return []reconcile.Request{}
 	}
 

@@ -17,11 +17,26 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("MicroFrontEndRenderPage Controller", func() {
 	Context("When reconciling a resource", func() {
+		const namespace = "default"
+		const resourceName = "test-resource"
+
+		ctx := context.Background()
+
+		AfterEach(func() {
+			By("Cleanup all the test resource instances")
+			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.MicroFrontEndHost{}, client.InNamespace(namespace))).To(Succeed())
+			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.MicroFrontEndRenderPage{}, client.InNamespace(namespace))).To(Succeed())
+		})
 
 		It("should successfully reconcile the resource", func() {
 
