@@ -10,8 +10,12 @@ import (
 
 func TestRenderOne(t *testing.T) {
 	r := &Renderer{}
-	templateContent := "Hello, {{.Name}}!"
-	data := struct{ Name string }{Name: "World"}
+	templateContent := "Hello, {{.Values.Title}}!"
+	data := TemplateData{
+		Values: Values{
+			Title: "World",
+		},
+	}
 	expected := "Hello, World!"
 	actual, err := r.RenderOne("test", templateContent, data)
 	assert.NoError(t, err)
@@ -21,7 +25,11 @@ func TestRenderOne(t *testing.T) {
 func TestRenderOne_InvalidTemplate(t *testing.T) {
 	r := &Renderer{}
 	templateContent := "Hello, {{.Invalid}}!"
-	data := struct{ Name string }{Name: "World"}
+	data := TemplateData{
+		Values: Values{
+			Title: "World",
+		},
+	}
 	_, err := r.RenderOne("test", templateContent, data)
 	assert.Error(t, err)
 }

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	kdexhttp "kdex.dev/web/internal/http"
 	"kdex.dev/web/internal/menu"
@@ -16,6 +18,7 @@ type HostHandler struct {
 	Host           kdexv1alpha1.MicroFrontEndHost
 	Mux            *http.ServeMux
 	RenderPages    *RenderPageStore
+	Translations   *catalog.Builder
 	defaultLang    string
 	mu             sync.RWMutex
 	supportedLangs []language.Tag
@@ -101,7 +104,7 @@ func (th *HostHandler) L10nRenders(
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, lang := range th.Host.Spec.SupportedLangs {
-		rendered, err := th.L10nRender(page, lang, children)
+		rendered, err := th.L10nRender(page, children, lang)
 		if err != nil {
 			// log something here...
 			continue
@@ -113,18 +116,24 @@ func (th *HostHandler) L10nRenders(
 
 func (th *HostHandler) L10nRender(
 	page kdexv1alpha1.MicroFrontEndRenderPage,
-	lang string,
 	menuEntries *map[string]*menu.MenuEntry,
+	lang string,
 ) (string, error) {
+	messagePrinter := message.NewPrinter(
+		language.Make(lang),
+		message.Catalog(th.Translations),
+	)
+
 	renderer := render.Renderer{
-		Date:         time.Now(),
-		FootScript:   "",
-		HeadScript:   "",
-		Lang:         lang,
-		MenuEntries:  menuEntries,
-		Meta:         th.Host.Spec.BaseMeta,
-		Organization: th.Host.Spec.Organization,
-		Stylesheet:   th.Host.Spec.Stylesheet,
+		Date:           time.Now(),
+		FootScript:     "",
+		HeadScript:     "",
+		Lang:           lang,
+		MenuEntries:    menuEntries,
+		MessagePrinter: messagePrinter,
+		Meta:           th.Host.Spec.BaseMeta,
+		Organization:   th.Host.Spec.Organization,
+		Stylesheet:     th.Host.Spec.Stylesheet,
 	}
 
 	return renderer.RenderPage(render.Page{

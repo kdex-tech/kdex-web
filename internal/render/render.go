@@ -6,18 +6,20 @@ import (
 	"html/template"
 	"time"
 
+	"golang.org/x/text/message"
 	"kdex.dev/web/internal/menu"
 )
 
 type Renderer struct {
-	Date         time.Time
-	FootScript   string
-	HeadScript   string
-	Lang         string
-	MenuEntries  *map[string]*menu.MenuEntry
-	Meta         string
-	Organization string
-	Stylesheet   string
+	Date           time.Time
+	FootScript     string
+	HeadScript     string
+	Lang           string
+	MenuEntries    *map[string]*menu.MenuEntry
+	MessagePrinter *message.Printer
+	Meta           string
+	Organization   string
+	Stylesheet     string
 }
 
 func (r *Renderer) RenderPage(page Page) (string, error) {
@@ -85,8 +87,21 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 	return r.RenderOne(page.TemplateName, page.TemplateContent, templateData)
 }
 
-func (r *Renderer) RenderOne(templateName string, templateContent string, data any) (string, error) {
-	instance, err := template.New(templateName).Parse(templateContent)
+func (r *Renderer) RenderOne(
+	templateName string,
+	templateContent string,
+	data TemplateData,
+) (string, error) {
+	funcs := template.FuncMap{
+		"l10n": func(key string, args ...string) string {
+			if r.MessagePrinter == nil {
+				return key
+			}
+			return r.MessagePrinter.Sprintf(key, args)
+		},
+	}
+
+	instance, err := template.New(templateName).Funcs(funcs).Parse(templateContent)
 	if err != nil {
 		return "", err
 	}
