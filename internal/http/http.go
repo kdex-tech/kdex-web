@@ -65,11 +65,13 @@ func GetLang(r *http.Request, defaultLang string, supportedLangs []language.Tag)
 
 	matcher := language.NewMatcher(supportedLangs)
 
-	tag, _, _ := matcher.Match(preferences...)
+	_, index, _ := matcher.Match(preferences...)
 
-	if tag.IsRoot() {
+	matchedTag := supportedLangs[index]
+
+	if matchedTag.IsRoot() {
 		return language.Make(defaultLang)
 	}
 
-	return tag
+	return matchedTag
 }
