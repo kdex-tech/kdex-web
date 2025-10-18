@@ -90,6 +90,12 @@ test-e2e: setup-test-e2e manifests generate fmt vet ## Run the e2e tests. Expect
 cleanup-test-e2e: ## Tear down the Kind cluster used for e2e tests
 	@$(KIND) delete cluster --name $(KIND_CLUSTER)
 
+.PHONY: coverage
+coverage: test ## Generate and view test coverage report.
+	@echo "--> Generating coverage report"
+	go tool cover -html=cover.out -o cover.html
+	@echo "--> Coverage report generated at file:./cover.html"
+
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
 	$(GOLANGCI_LINT) run
