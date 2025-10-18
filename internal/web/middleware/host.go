@@ -23,7 +23,7 @@ func WithHost(store *store_.HostStore) func(http.Handler) http.Handler {
 
 			hosts := store.List()
 
-			var bestMatchHost *store_.TrackedHost
+			var bestMatchHost *store_.HostHandler
 			var bestMatchLength = -1
 
 			for _, host := range hosts {

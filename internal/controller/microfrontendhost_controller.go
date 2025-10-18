@@ -64,7 +64,7 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if host.DeletionTimestamp.IsZero() {
-		r.HostStore.Set(store.NewTrackedHost(host))
+		r.HostStore.Set(store.NewHostHandler(host))
 		apimeta.SetStatusCondition(
 			&host.Status.Conditions,
 			*kdexv1alpha1.NewCondition(

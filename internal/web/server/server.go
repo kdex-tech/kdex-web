@@ -9,7 +9,7 @@ import (
 
 func New(address string, store *store_.HostStore) *http.Server {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		trackedHost, ok := r.Context().Value(middleware.HostKey).(*store_.TrackedHost)
+		trackedHost, ok := r.Context().Value(middleware.HostKey).(*store_.HostHandler)
 		if !ok {
 			http.NotFound(w, r)
 			return
