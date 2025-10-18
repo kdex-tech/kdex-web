@@ -65,13 +65,6 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	if host.DeletionTimestamp.IsZero() {
 		r.HostStore.Set(store.NewTrackedHost(host))
-		if !controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
-			controllerutil.AddFinalizer(&host, hostFinalizerName)
-			if err := r.Update(ctx, &host); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-
 		apimeta.SetStatusCondition(
 			&host.Status.Conditions,
 			*kdexv1alpha1.NewCondition(
@@ -81,8 +74,16 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 				"all references resolved successfully",
 			),
 		)
+
 		if err := r.Status().Update(ctx, &host); err != nil {
 			return ctrl.Result{}, err
+		}
+
+		if !controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
+			controllerutil.AddFinalizer(&host, hostFinalizerName)
+			if err := r.Update(ctx, &host); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&host, hostFinalizerName) {

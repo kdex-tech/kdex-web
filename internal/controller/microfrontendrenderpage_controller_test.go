@@ -21,8 +21,37 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	primaryTemplate = `<!DOCTYPE html>
+<html lang="{{ .Values.Lang }}">
+	<head>
+	{{ .Values.Meta }}
+	{{ .Values.Title }}
+	{{ .Values.Stylesheet }}
+	{{ .Values.HeadScript }}
+	</head>
+	<body>
+	<header>
+		{{ .Values.Header }}
+	</header>
+	<nav>
+		{{ .Values.Navigation["main"] }}
+	</nav>
+	<main>
+		{{ .Values.Content["main"] }}
+	</main>
+	<footer>
+		{{ .Values.Footer }}
+	</footer>
+	{{ .Values.FootScript }}
+	</body>
+</html>`
 )
 
 var _ = Describe("MicroFrontEndRenderPage Controller", func() {
@@ -39,9 +68,56 @@ var _ = Describe("MicroFrontEndRenderPage Controller", func() {
 		})
 
 		It("should successfully reconcile the resource", func() {
+			resource := &kdexv1alpha1.MicroFrontEndRenderPage{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: namespace,
+				},
+				Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+					HostRef: corev1.LocalObjectReference{
+						Name: "test-host",
+					},
+					PageComponents: kdexv1alpha1.PageComponents{
+						Contents: map[string]string{
+							"main": "MAIN",
+						},
+						Footer: "FOOTER",
+						Header: "HEADER",
+						Navigations: map[string]string{
+							"main": "NAV",
+						},
+						PrimaryTemplate: primaryTemplate,
+						Title:           "TITLE",
+					},
+					Path: "/",
+				},
+			}
 
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+			assertResourceReady(
+				ctx, k8sClient, resourceName, namespace,
+				&kdexv1alpha1.MicroFrontEndRenderPage{}, false)
+
+			hostResource := &kdexv1alpha1.MicroFrontEndHost{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-host",
+					Namespace: namespace,
+				},
+				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+					AppPolicy: kdexv1alpha1.NonStrictAppPolicy,
+					Domains: []string{
+						"foo.bar.dev",
+					},
+					Organization: "KDex Tech Inc.",
+				},
+			}
+
+			Expect(k8sClient.Create(ctx, hostResource)).To(Succeed())
+
+			assertResourceReady(
+				ctx, k8sClient, resourceName, namespace,
+				&kdexv1alpha1.MicroFrontEndRenderPage{}, true)
 		})
 	})
 })

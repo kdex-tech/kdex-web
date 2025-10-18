@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -64,31 +65,60 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 
 	var renderPage kdexv1alpha1.MicroFrontEndRenderPage
 	if err := r.Get(ctx, req.NamespacedName, &renderPage); err != nil {
-		log.Error(err, "unable to fetch MicroFrontEndHost")
+		log.Error(err, "unable to fetch MicroFrontEndRenderPage")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	var host kdexv1alpha1.MicroFrontEndHost
+	hostName := types.NamespacedName{
+		Name:      renderPage.Spec.HostRef.Name,
+		Namespace: renderPage.Namespace,
+	}
+	if err := r.Get(ctx, hostName, &host); err != nil {
+		if errors.IsNotFound(err) {
+			log.Error(err, "referenced MicroFrontEndHost not found", "name", renderPage.Spec.HostRef.Name)
+			apimeta.SetStatusCondition(
+				&renderPage.Status.Conditions,
+				*kdexv1alpha1.NewCondition(
+					kdexv1alpha1.ConditionTypeReady,
+					metav1.ConditionFalse,
+					kdexv1alpha1.ConditionReasonReconcileError,
+					fmt.Sprintf("referenced MicroFrontEndHost %s not found", renderPage.Spec.HostRef.Name),
+				),
+			)
+			if err := r.Status().Update(ctx, &renderPage); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		}
+
+		log.Error(err, "unable to fetch MicroFrontEndHost", "name", renderPage.Spec.HostRef.Name)
+		return ctrl.Result{}, err
 	}
 
 	trackedHost, ok := r.HostStore.Get(renderPage.Spec.HostRef.Name)
 
 	if !ok {
-		apimeta.SetStatusCondition(
-			&renderPage.Status.Conditions,
-			*kdexv1alpha1.NewCondition(
-				kdexv1alpha1.ConditionTypeReady,
-				metav1.ConditionFalse,
-				kdexv1alpha1.ConditionReasonReconcileError,
-				fmt.Sprintf("referenced MicroFrontEndHost %s not found", renderPage.Spec.HostRef.Name),
-			),
-		)
-		if err := r.Status().Update(ctx, &renderPage); err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
 	if renderPage.DeletionTimestamp.IsZero() {
 		trackedHost.RenderPages.Set(renderPage)
+		apimeta.SetStatusCondition(
+			&renderPage.Status.Conditions,
+			*kdexv1alpha1.NewCondition(
+				kdexv1alpha1.ConditionTypeReady,
+				metav1.ConditionTrue,
+				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				"all references resolved successfully",
+			),
+		)
+
+		if err := r.Status().Update(ctx, &renderPage); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		if !controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {
 			controllerutil.AddFinalizer(&renderPage, renderPageFinalizerName)
 			if err := r.Update(ctx, &renderPage); err != nil {
