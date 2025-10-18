@@ -2,17 +2,14 @@ package render
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"html/template"
-	"net/http"
 	"time"
 
 	"kdex.dev/web/internal/menu"
 )
 
 type Renderer struct {
-	Context      context.Context
 	Date         time.Time
 	FootScript   string
 	HeadScript   string
@@ -20,7 +17,6 @@ type Renderer struct {
 	MenuEntries  *map[string]*menu.MenuEntry
 	Meta         string
 	Organization string
-	Request      *http.Request
 	Stylesheet   string
 }
 

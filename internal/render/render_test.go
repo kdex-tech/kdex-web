@@ -1,7 +1,6 @@
 package render
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -30,7 +29,6 @@ func TestRenderOne_InvalidTemplate(t *testing.T) {
 func TestRenderAll(t *testing.T) {
 	testDate, _ := time.Parse("2006-01-02", "2025-09-20")
 	r := &Renderer{
-		Context:      context.Background(),
 		Date:         testDate,
 		FootScript:   "<script>foot</script>",
 		HeadScript:   "<script>head</script>",
