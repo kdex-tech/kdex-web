@@ -120,18 +120,20 @@ var _ = BeforeSuite(func() {
 	hostStore := store.NewHostStore()
 
 	hostReconciler := &MicroFrontEndHostReconciler{
-		Client:    k8sManager.GetClient(),
-		HostStore: hostStore,
-		Scheme:    k8sManager.GetScheme(),
+		Client:       k8sManager.GetClient(),
+		HostStore:    hostStore,
+		RequeueDelay: 0,
+		Scheme:       k8sManager.GetScheme(),
 	}
 
 	err = hostReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	renderPageReconciler := &MicroFrontEndRenderPageReconciler{
-		Client:    k8sClient,
-		HostStore: hostStore,
-		Scheme:    k8sClient.Scheme(),
+		Client:       k8sClient,
+		HostStore:    hostStore,
+		RequeueDelay: 0,
+		Scheme:       k8sClient.Scheme(),
 	}
 
 	err = renderPageReconciler.SetupWithManager(k8sManager)

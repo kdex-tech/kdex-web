@@ -40,8 +40,9 @@ const renderPageFinalizerName = "kdex.dev/web-render-page-finalizer"
 // MicroFrontEndRenderPageReconciler reconciles a MicroFrontEndRenderPage object
 type MicroFrontEndRenderPageReconciler struct {
 	client.Client
-	HostStore *store.HostStore
-	Scheme    *runtime.Scheme
+	HostStore    *store.HostStore
+	RequeueDelay time.Duration
+	Scheme       *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhost,verbs=get;list;watch

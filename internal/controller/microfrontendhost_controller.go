@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,8 +36,9 @@ const hostFinalizerName = "kdex.dev/web-host-finalizer"
 // MicroFrontEndHostReconciler reconciles a MicroFrontEndHost object
 type MicroFrontEndHostReconciler struct {
 	client.Client
-	HostStore *store.HostStore
-	Scheme    *runtime.Scheme
+	HostStore    *store.HostStore
+	RequeueDelay time.Duration
+	Scheme       *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhosts,verbs=get;list;watch;create;update;patch;delete
