@@ -15,13 +15,14 @@ import (
 )
 
 type HostHandler struct {
-	Host           kdexv1alpha1.MicroFrontEndHost
-	Mux            *http.ServeMux
-	RenderPages    *RenderPageStore
-	Translations   *catalog.Builder
-	defaultLang    string
-	mu             sync.RWMutex
-	supportedLangs []language.Tag
+	Host                 kdexv1alpha1.MicroFrontEndHost
+	Mux                  *http.ServeMux
+	RenderPages          *RenderPageStore
+	Translations         *catalog.Builder
+	defaultLang          string
+	mu                   sync.RWMutex
+	supportedLangs       []language.Tag
+	translationResources map[string]kdexv1alpha1.MicroFrontEndTranslation
 }
 
 func NewHostHandler(
@@ -44,9 +45,10 @@ func NewHostHandler(
 	}
 
 	th := &HostHandler{
-		Host:           host,
-		defaultLang:    defaultLang,
-		supportedLangs: supportedLangs,
+		Host:                 host,
+		defaultLang:          defaultLang,
+		supportedLangs:       supportedLangs,
+		translationResources: make(map[string]kdexv1alpha1.MicroFrontEndTranslation),
 	}
 	rps := &RenderPageStore{
 		host:     host,
@@ -56,6 +58,34 @@ func NewHostHandler(
 	th.RenderPages = rps
 	th.RebuildMux()
 	return th
+}
+
+func (th *HostHandler) AddOrUpdateTranslation(translation kdexv1alpha1.MicroFrontEndTranslation) {
+	th.mu.Lock()
+	defer th.mu.Unlock()
+	th.translationResources[translation.Name] = translation
+	th.rebuildTranslations()
+}
+
+func (th *HostHandler) RemoveTranslation(translation kdexv1alpha1.MicroFrontEndTranslation) {
+	th.mu.Lock()
+	defer th.mu.Unlock()
+	delete(th.translationResources, translation.Name)
+	th.rebuildTranslations()
+}
+
+func (th *HostHandler) rebuildTranslations() {
+	catalogBuilder := catalog.NewBuilder()
+
+	for _, translation := range th.translationResources {
+		for _, tr := range translation.Spec.Translations {
+			for key, value := range tr.KeysAndValues {
+				catalogBuilder.SetString(language.Make(tr.Lang), key, value)
+			}
+		}
+	}
+
+	th.SetTranslations(catalogBuilder)
 }
 
 func (th *HostHandler) SetTranslations(translations *catalog.Builder) {

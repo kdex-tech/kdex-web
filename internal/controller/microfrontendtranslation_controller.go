@@ -37,6 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const translationFinalizerName = "kdex.dev/web-translation-finalizer"
+
 // MicroFrontEndTranslationReconciler reconciles a MicroFrontEndTranslation object
 type MicroFrontEndTranslationReconciler struct {
 	client.Client
@@ -102,10 +104,7 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 	}
 
 	if translation.DeletionTimestamp.IsZero() {
-		// build the translations
-		catalog := catalog.NewBuilder()
-		// populate the catalog from translations
-		trackedHost.SetTranslations(catalog)
+		trackedHost.AddOrUpdateTranslation(translation)
 
 		apimeta.SetStatusCondition(
 			&translation.Status.Conditions,
@@ -121,20 +120,17 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 			return ctrl.Result{}, err
 		}
 
-		if !controllerutil.ContainsFinalizer(&translation, renderPageFinalizerName) {
-			controllerutil.AddFinalizer(&translation, renderPageFinalizerName)
+		if !controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
+			controllerutil.AddFinalizer(&translation, translationFinalizerName)
 			if err := r.Update(ctx, &translation); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
-		if controllerutil.ContainsFinalizer(&translation, renderPageFinalizerName) {
-			// build the translations
-			catalog := catalog.NewBuilder()
-			// populate the catalog from current translations
-			trackedHost.SetTranslations(catalog)
+		if controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
+			trackedHost.RemoveTranslation(translation)
 
-			controllerutil.RemoveFinalizer(&translation, renderPageFinalizerName)
+			controllerutil.RemoveFinalizer(&translation, translationFinalizerName)
 			if err := r.Update(ctx, &translation); err != nil {
 				return ctrl.Result{}, err
 			}
