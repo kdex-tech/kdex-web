@@ -59,7 +59,6 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	var host kdexv1alpha1.MicroFrontEndHost
 	if err := r.Get(ctx, req.NamespacedName, &host); err != nil {
-		log.Error(err, "unable to fetch MicroFrontEndHost")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 

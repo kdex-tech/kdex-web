@@ -65,7 +65,6 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 
 	var renderPage kdexv1alpha1.MicroFrontEndRenderPage
 	if err := r.Get(ctx, req.NamespacedName, &renderPage); err != nil {
-		log.Error(err, "unable to fetch MicroFrontEndRenderPage")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 

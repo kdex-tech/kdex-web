@@ -65,7 +65,6 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 
 	var translation kdexv1alpha1.MicroFrontEndTranslation
 	if err := r.Get(ctx, req.NamespacedName, &translation); err != nil {
-		log.Error(err, "unable to fetch MicroFrontEndTranslation")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
