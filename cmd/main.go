@@ -188,6 +188,15 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "MicroFrontEndRenderPage")
 		os.Exit(1)
 	}
+	if err := (&controller.MicroFrontEndTranslationReconciler{
+		Client:       mgr.GetClient(),
+		HostStore:    hostStore,
+		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
+		Scheme:       mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "MicroFrontEndTranslation")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
