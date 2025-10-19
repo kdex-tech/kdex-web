@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const renderPageFinalizerName = "kdex.dev/kdex-web/render-page-finalizer"
+const renderPageFinalizerName = "kdex.dev/kdex-web-render-page-finalizer"
 
 // MicroFrontEndRenderPageReconciler reconciles a MicroFrontEndRenderPage object
 type MicroFrontEndRenderPageReconciler struct {

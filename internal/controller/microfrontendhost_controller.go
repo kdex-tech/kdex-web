@@ -31,7 +31,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const hostFinalizerName = "kdex.dev/kdex-web/host-finalizer"
+const hostFinalizerName = "kdex.dev/kdex-web-host-finalizer"
 
 // MicroFrontEndHostReconciler reconciles a MicroFrontEndHost object
 type MicroFrontEndHostReconciler struct {

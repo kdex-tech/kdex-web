@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const translationFinalizerName = "kdex.dev/kdex-web/translation-finalizer"
+const translationFinalizerName = "kdex.dev/kdex-web-translation-finalizer"
 
 // MicroFrontEndTranslationReconciler reconciles a MicroFrontEndTranslation object
 type MicroFrontEndTranslationReconciler struct {
