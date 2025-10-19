@@ -183,6 +183,7 @@ func main() {
 	}
 	if err := (&controller.MicroFrontEndRenderPageReconciler{
 		Client:       mgr.GetClient(),
+		HostStore:    hostStore,
 		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
 		Scheme:       mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
