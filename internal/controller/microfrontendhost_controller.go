@@ -64,7 +64,15 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if host.DeletionTimestamp.IsZero() {
-		r.HostStore.Set(store.NewHostHandler(host))
+		if trackedHost, ok := r.HostStore.Get(host.Name); !ok {
+			log.Info("tracking new host")
+			newTrackedHost := store.NewHostHandler(host, log.WithName("host-handler").WithValues("host", host.Name))
+			r.HostStore.Set(newTrackedHost)
+		} else {
+			log.Info("updating existing host")
+			trackedHost.SetHost(host)
+		}
+
 		apimeta.SetStatusCondition(
 			&host.Status.Conditions,
 			*kdexv1alpha1.NewCondition(

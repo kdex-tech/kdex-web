@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-logr/logr"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"golang.org/x/text/message/catalog"
@@ -20,6 +21,7 @@ type HostHandler struct {
 	RenderPages          *RenderPageStore
 	Translations         *catalog.Builder
 	defaultLang          string
+	log                  logr.Logger
 	mu                   sync.RWMutex
 	supportedLangs       []language.Tag
 	translationResources map[string]kdexv1alpha1.MicroFrontEndTranslation
@@ -27,29 +29,14 @@ type HostHandler struct {
 
 func NewHostHandler(
 	host kdexv1alpha1.MicroFrontEndHost,
+	log logr.Logger,
 ) *HostHandler {
-	defaultLang := "en"
-
-	if host.Spec.DefaultLang != "" {
-		defaultLang = host.Spec.DefaultLang
-	}
-
-	supportedLangs := []language.Tag{}
-
-	if len(host.Spec.SupportedLangs) > 0 {
-		for _, lang := range host.Spec.SupportedLangs {
-			supportedLangs = append(supportedLangs, language.Make(lang))
-		}
-	} else {
-		supportedLangs = append(supportedLangs, language.Make(defaultLang))
-	}
-
 	th := &HostHandler{
 		Host:                 host,
-		defaultLang:          defaultLang,
-		supportedLangs:       supportedLangs,
+		log:                  log,
 		translationResources: make(map[string]kdexv1alpha1.MicroFrontEndTranslation),
 	}
+	th.updateHostDependentFields()
 	rps := &RenderPageStore{
 		host:     host,
 		pages:    make(map[string]kdexv1alpha1.MicroFrontEndRenderPage),
@@ -62,43 +49,87 @@ func NewHostHandler(
 
 func (th *HostHandler) AddOrUpdateTranslation(translation kdexv1alpha1.MicroFrontEndTranslation) {
 	th.mu.Lock()
-	defer th.mu.Unlock()
 	th.translationResources[translation.Name] = translation
-	th.rebuildTranslations()
+	th.rebuildTranslationsLocked()
+	th.mu.Unlock()
+
+	th.RebuildMux() // Called after lock is released
 }
 
 func (th *HostHandler) RemoveTranslation(translation kdexv1alpha1.MicroFrontEndTranslation) {
 	th.mu.Lock()
-	defer th.mu.Unlock()
 	delete(th.translationResources, translation.Name)
-	th.rebuildTranslations()
+	th.rebuildTranslationsLocked()
+	th.mu.Unlock()
+
+	th.RebuildMux() // Called after lock is released
 }
 
-func (th *HostHandler) rebuildTranslations() {
+// rebuildTranslationsLocked must be called with a write lock held.
+// It does not acquire any locks itself.
+func (th *HostHandler) rebuildTranslationsLocked() {
 	catalogBuilder := catalog.NewBuilder()
 
 	for _, translation := range th.translationResources {
 		for _, tr := range translation.Spec.Translations {
 			for key, value := range tr.KeysAndValues {
 				if err := catalogBuilder.SetString(language.Make(tr.Lang), key, value); err != nil {
-					// log something here...
+					th.log.Error(err, "failed to set translation string", "translation", translation.Name, "lang", tr.Lang, "key", key)
 					continue
 				}
 			}
 		}
 	}
-
-	th.SetTranslations(catalogBuilder)
+	th.setTranslationsLocked(catalogBuilder)
 }
 
+// setTranslationsLocked must be called with a write lock held.
+// It does not acquire any locks itself.
+func (th *HostHandler) setTranslationsLocked(translations *catalog.Builder) {
+	if translations == nil {
+		return
+	}
+	th.Translations = translations
+}
+
+func (th *HostHandler) SetHost(host kdexv1alpha1.MicroFrontEndHost) {
+	th.mu.Lock()
+	th.Host = host
+	th.updateHostDependentFields()
+	th.mu.Unlock() // <-- Release lock BEFORE calling RebuildMux
+
+	th.RebuildMux()
+}
+
+// The public SetTranslations method should not be used internally anymore
+// if it's called from a locked context.
 func (th *HostHandler) SetTranslations(translations *catalog.Builder) {
 	if translations == nil {
 		return
 	}
 	th.mu.Lock()
-	th.Translations = translations
+	th.setTranslationsLocked(translations)
 	th.mu.Unlock()
+
 	th.RebuildMux()
+}
+
+func (th *HostHandler) updateHostDependentFields() {
+	defaultLang := "en"
+	if th.Host.Spec.DefaultLang != "" {
+		defaultLang = th.Host.Spec.DefaultLang
+	}
+	th.defaultLang = defaultLang
+
+	supportedLangs := []language.Tag{}
+	if len(th.Host.Spec.SupportedLangs) > 0 {
+		for _, lang := range th.Host.Spec.SupportedLangs {
+			supportedLangs = append(supportedLangs, language.Make(lang))
+		}
+	} else {
+		supportedLangs = append(supportedLangs, language.Make(defaultLang))
+	}
+	th.supportedLangs = supportedLangs
 }
 
 func (th *HostHandler) RebuildMux() {
@@ -188,7 +219,7 @@ func (th *HostHandler) L10nRenders(
 	for _, lang := range th.Host.Spec.SupportedLangs {
 		rendered, err := th.L10nRender(page, children, lang)
 		if err != nil {
-			// log something here...
+			th.log.Error(err, "failed to render page for language", "page", page.Name, "lang", lang)
 			continue
 		}
 		l10nRenders[lang] = rendered

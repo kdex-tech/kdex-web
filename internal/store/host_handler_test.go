@@ -3,6 +3,7 @@ package store_test
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
 	G "github.com/onsi/gomega"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message/catalog"
@@ -176,7 +177,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := store.NewHostHandler(tt.host)
+			th := store.NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
 			got, gotErr := th.L10nRender(tt.page, &map[string]*menu.MenuEntry{}, tt.lang)
 
@@ -253,7 +254,7 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := store.NewHostHandler(tt.host)
+			th := store.NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
 			got := th.L10nRenders(tt.page, tt.langs, &map[string]*menu.MenuEntry{})
 
