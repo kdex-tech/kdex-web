@@ -17,6 +17,7 @@ rules:
   resources:
   - microfrontendhosts
   - microfrontendrenderpages
+  - microfrontendtranslations
   verbs:
   - create
   - delete
@@ -30,6 +31,7 @@ rules:
   resources:
   - microfrontendhosts/finalizers
   - microfrontendrenderpages/finalizers
+  - microfrontendtranslations/finalizers
   verbs:
   - update
 - apiGroups:
@@ -37,6 +39,7 @@ rules:
   resources:
   - microfrontendhosts/status
   - microfrontendrenderpages/status
+  - microfrontendtranslations/status
   verbs:
   - get
   - patch
