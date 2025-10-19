@@ -58,8 +58,15 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
+TEST_PKGS ?= $(shell go list ./... | grep -v /e2e)
+TEST_ARGS ?=
+
 test: manifests generate fmt vet setup-envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+ifeq ($(DEBUG),true)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" dlv test $(TEST_PKGS) --headless --listen=:2345 --api-version=2 -- $(TEST_ARGS)
+else
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(TEST_PKGS) -coverprofile cover.out $(TEST_ARGS)
+endif
 
 # TODO(user): To use a different vendor for e2e tests, modify the setup under 'tests/e2e'.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
