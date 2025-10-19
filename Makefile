@@ -160,19 +160,41 @@ endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+	CRD_VERSION=$$(awk '/replace/ {print $$NF}' go.mod); \
+	echo "CRD_VERSION=$${CRD_VERSION}"; \
+	$(KUBECTL) apply \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendapps.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendhosts.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagearchetypes.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagebindings.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagefooters.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpageheaders.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagenavigations.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendrenderpages.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendtranslations.yaml
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+	CRD_VERSION=$$(awk '/replace/ {print $$NF}' go.mod); \
+	echo "CRD_VERSION=$${CRD_VERSION}"; \
+	$(KUBECTL) delete \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendapps.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendhosts.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagearchetypes.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagebindings.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagefooters.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpageheaders.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagenavigations.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendrenderpages.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendtranslations.yaml
 
 .PHONY: deploy
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: manifests kustomize install ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
 .PHONY: undeploy
-undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+undeploy: kustomize uninstall ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Dependencies
