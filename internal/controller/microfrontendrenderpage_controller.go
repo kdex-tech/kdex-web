@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const renderPageFinalizerName = "kdex.dev/web-render-page-finalizer"
+const renderPageFinalizerName = "kdex.dev/kdex-web/render-page-finalizer"
 
 // MicroFrontEndRenderPageReconciler reconciles a MicroFrontEndRenderPage object
 type MicroFrontEndRenderPageReconciler struct {
@@ -104,6 +104,14 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 	}
 
 	if renderPage.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {
+			controllerutil.AddFinalizer(&renderPage, renderPageFinalizerName)
+			if err := r.Update(ctx, &renderPage); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{Requeue: true}, nil
+		}
+
 		trackedHost.RenderPages.Set(renderPage)
 		apimeta.SetStatusCondition(
 			&renderPage.Status.Conditions,
@@ -117,13 +125,6 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 
 		if err := r.Status().Update(ctx, &renderPage); err != nil {
 			return ctrl.Result{}, err
-		}
-
-		if !controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {
-			controllerutil.AddFinalizer(&renderPage, renderPageFinalizerName)
-			if err := r.Update(ctx, &renderPage); err != nil {
-				return ctrl.Result{}, err
-			}
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {

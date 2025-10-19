@@ -31,7 +31,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-const hostFinalizerName = "kdex.dev/web-host-finalizer"
+const hostFinalizerName = "kdex.dev/kdex-web/host-finalizer"
 
 // MicroFrontEndHostReconciler reconciles a MicroFrontEndHost object
 type MicroFrontEndHostReconciler struct {
@@ -64,6 +64,14 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if host.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
+			controllerutil.AddFinalizer(&host, hostFinalizerName)
+			if err := r.Update(ctx, &host); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{Requeue: true}, nil
+		}
+
 		if trackedHost, ok := r.HostStore.Get(host.Name); !ok {
 			log.Info("tracking new host")
 			newTrackedHost := store.NewHostHandler(host, log.WithName("host-handler").WithValues("host", host.Name))
@@ -85,13 +93,6 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 		if err := r.Status().Update(ctx, &host); err != nil {
 			return ctrl.Result{}, err
-		}
-
-		if !controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
-			controllerutil.AddFinalizer(&host, hostFinalizerName)
-			if err := r.Update(ctx, &host); err != nil {
-				return ctrl.Result{}, err
-			}
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&host, hostFinalizerName) {

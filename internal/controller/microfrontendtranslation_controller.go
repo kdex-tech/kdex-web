@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const translationFinalizerName = "kdex.dev/web-translation-finalizer"
+const translationFinalizerName = "kdex.dev/kdex-web/translation-finalizer"
 
 // MicroFrontEndTranslationReconciler reconciles a MicroFrontEndTranslation object
 type MicroFrontEndTranslationReconciler struct {
@@ -104,6 +104,14 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 	}
 
 	if translation.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
+			controllerutil.AddFinalizer(&translation, translationFinalizerName)
+			if err := r.Update(ctx, &translation); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{Requeue: true}, nil
+		}
+
 		trackedHost.AddOrUpdateTranslation(translation)
 
 		apimeta.SetStatusCondition(
@@ -118,13 +126,6 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 
 		if err := r.Status().Update(ctx, &translation); err != nil {
 			return ctrl.Result{}, err
-		}
-
-		if !controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
-			controllerutil.AddFinalizer(&translation, translationFinalizerName)
-			if err := r.Update(ctx, &translation); err != nil {
-				return ctrl.Result{}, err
-			}
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
