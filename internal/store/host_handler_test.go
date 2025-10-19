@@ -176,7 +176,8 @@ func TestHostHandler_L10nRender(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := store.NewHostHandler(tt.host, tt.translations)
+			th := store.NewHostHandler(tt.host)
+			th.SetTranslations(tt.translations)
 			got, gotErr := th.L10nRender(tt.page, &map[string]*menu.MenuEntry{}, tt.lang)
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
@@ -252,7 +253,8 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := store.NewHostHandler(tt.host, tt.translations)
+			th := store.NewHostHandler(tt.host)
+			th.SetTranslations(tt.translations)
 			got := th.L10nRenders(tt.page, tt.langs, &map[string]*menu.MenuEntry{})
 
 			for key, values := range tt.want {

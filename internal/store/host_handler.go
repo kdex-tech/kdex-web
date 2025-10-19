@@ -26,7 +26,6 @@ type HostHandler struct {
 
 func NewHostHandler(
 	host kdexv1alpha1.MicroFrontEndHost,
-	translations *catalog.Builder,
 ) *HostHandler {
 	defaultLang := "en"
 
@@ -46,7 +45,6 @@ func NewHostHandler(
 
 	th := &HostHandler{
 		Host:           host,
-		Translations:   translations,
 		defaultLang:    defaultLang,
 		supportedLangs: supportedLangs,
 	}
@@ -58,6 +56,16 @@ func NewHostHandler(
 	th.RenderPages = rps
 	th.RebuildMux()
 	return th
+}
+
+func (th *HostHandler) SetTranslations(translations *catalog.Builder) {
+	if translations == nil {
+		return
+	}
+	th.mu.Lock()
+	th.Translations = translations
+	th.mu.Unlock()
+	th.RebuildMux()
 }
 
 func (th *HostHandler) RebuildMux() {

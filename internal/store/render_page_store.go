@@ -58,6 +58,10 @@ func (s *RenderPageStore) BuildMenuEntries(
 			(parent != nil && item.Spec.ParentPageRef != nil &&
 				parent.Name == item.Spec.ParentPageRef.Name) {
 
+			if parent != nil && parent.Name == item.Name {
+				continue
+			}
+
 			if entry.Children == nil {
 				entry.Children = &map[string]*menu.MenuEntry{}
 			}
