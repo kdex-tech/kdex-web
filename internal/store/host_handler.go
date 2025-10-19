@@ -80,7 +80,10 @@ func (th *HostHandler) rebuildTranslations() {
 	for _, translation := range th.translationResources {
 		for _, tr := range translation.Spec.Translations {
 			for key, value := range tr.KeysAndValues {
-				catalogBuilder.SetString(language.Make(tr.Lang), key, value)
+				if err := catalogBuilder.SetString(language.Make(tr.Lang), key, value); err != nil {
+					// log something here...
+					continue
+				}
 			}
 		}
 	}

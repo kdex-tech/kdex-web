@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/text/message/catalog"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
