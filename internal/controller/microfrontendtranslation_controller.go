@@ -46,6 +46,7 @@ type MicroFrontEndTranslationReconciler struct {
 	Scheme       *runtime.Scheme
 }
 
+// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhost,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendtranslations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendtranslations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendtranslations/finalizers,verbs=update

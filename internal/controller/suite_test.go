@@ -144,6 +144,16 @@ var _ = BeforeSuite(func() {
 	err = renderPageReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
+	translationReconciler := &MicroFrontEndTranslationReconciler{
+		Client:       k8sClient,
+		HostStore:    hostStore,
+		RequeueDelay: 0,
+		Scheme:       k8sClient.Scheme(),
+	}
+
+	err = translationReconciler.SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
 	go func() {
 		defer GinkgoRecover()
 		err := k8sManager.Start(ctx)
