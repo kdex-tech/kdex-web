@@ -92,7 +92,7 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		trackedHost.SetHost(host)
 	}
 
-	log.Info("reconciled MicroFrontEndHost", "trackedHost", trackedHost)
+	log.Info("reconciled MicroFrontEndHost")
 
 	apimeta.SetStatusCondition(
 		&host.Status.Conditions,

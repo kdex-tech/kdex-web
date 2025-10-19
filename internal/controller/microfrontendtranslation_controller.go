@@ -127,7 +127,7 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 
 	trackedHost.AddOrUpdateTranslation(translation)
 
-	log.Info("reconciled MicroFrontEndTranslation", "host", host)
+	log.Info("reconciled MicroFrontEndTranslation")
 
 	apimeta.SetStatusCondition(
 		&translation.Status.Conditions,
