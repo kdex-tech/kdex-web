@@ -24,7 +24,10 @@ type HostHandler struct {
 	supportedLangs []language.Tag
 }
 
-func NewHostHandler(host kdexv1alpha1.MicroFrontEndHost) *HostHandler {
+func NewHostHandler(
+	host kdexv1alpha1.MicroFrontEndHost,
+	translations *catalog.Builder,
+) *HostHandler {
 	defaultLang := "en"
 
 	if host.Spec.DefaultLang != "" {
@@ -43,6 +46,7 @@ func NewHostHandler(host kdexv1alpha1.MicroFrontEndHost) *HostHandler {
 
 	th := &HostHandler{
 		Host:           host,
+		Translations:   translations,
 		defaultLang:    defaultLang,
 		supportedLangs: supportedLangs,
 	}
@@ -119,10 +123,14 @@ func (th *HostHandler) L10nRender(
 	menuEntries *map[string]*menu.MenuEntry,
 	lang string,
 ) (string, error) {
-	messagePrinter := message.NewPrinter(
-		language.Make(lang),
-		message.Catalog(th.Translations),
-	)
+	var messagePrinter *message.Printer
+
+	if th.Translations != nil {
+		messagePrinter = message.NewPrinter(
+			language.Make(lang),
+			message.Catalog(th.Translations),
+		)
+	}
 
 	renderer := render.Renderer{
 		Date:           time.Now(),

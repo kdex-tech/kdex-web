@@ -1,0 +1,189 @@
+package store_test
+
+import (
+	"testing"
+
+	. "github.com/onsi/gomega"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message/catalog"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/web/internal/menu"
+	"kdex.dev/web/internal/store"
+)
+
+const (
+	primaryTemplate = `<!DOCTYPE html>
+<html lang="{{ .Lang }}">
+	<head>
+	{{ .Meta }}
+	{{ .Title }}
+	{{ .Stylesheet }}
+	{{ .HeadScript }}
+	</head>
+	<body>
+	<header>
+		{{ .Header }}
+	</header>
+	<nav>
+		{{ .Navigation.main }}
+	</nav>
+	<main>
+		{{ .Content.main }}
+	</main>
+	<footer>
+		{{ .Footer }}
+	</footer>
+	{{ .FootScript }}
+	</body>
+</html>`
+)
+
+func TestHostHandler_L10nRender(t *testing.T) {
+	tests := []struct {
+		name         string
+		host         kdexv1alpha1.MicroFrontEndHost
+		page         kdexv1alpha1.MicroFrontEndRenderPage
+		lang         string
+		translations *catalog.Builder
+		want         []string
+	}{
+		{
+			name: "english translation",
+			host: kdexv1alpha1.MicroFrontEndHost{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "sample-host",
+				},
+				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+					AppPolicy:      kdexv1alpha1.NonStrictAppPolicy,
+					DefaultLang:    "en",
+					Domains:        []string{"foo.bar"},
+					Organization:   "KDex Tech Inc.",
+					SupportedLangs: []string{"en", "fr"},
+				},
+			},
+			page: kdexv1alpha1.MicroFrontEndRenderPage{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "sample-render-page",
+				},
+				Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+					PageComponents: kdexv1alpha1.PageComponents{
+						Contents: map[string]string{
+							"main": "MAIN",
+						},
+						Footer: "FOOTER",
+						Header: `{{ l10n "key" }}`,
+						Navigations: map[string]string{
+							"main": "NAV",
+						},
+						PrimaryTemplate: primaryTemplate,
+						Title:           "TITLE",
+					},
+					Path: "/",
+				},
+			},
+			lang: "en",
+			translations: func() *catalog.Builder {
+				b := catalog.NewBuilder()
+				b.SetString(language.English, "key", "ENGLISH_TRANSLATION")
+				b.SetString(language.French, "key", "FRENCH_TRANSLATION")
+				return b
+			}(),
+			want: []string{"FOOTER", "ENGLISH_TRANSLATION", "NAV", "MAIN", "TITLE"},
+		},
+		{
+			name: "english translation",
+			host: kdexv1alpha1.MicroFrontEndHost{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "sample-host",
+				},
+				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+					AppPolicy:      kdexv1alpha1.NonStrictAppPolicy,
+					DefaultLang:    "en",
+					Domains:        []string{"foo.bar"},
+					Organization:   "KDex Tech Inc.",
+					SupportedLangs: []string{"en", "fr"},
+				},
+			},
+			page: kdexv1alpha1.MicroFrontEndRenderPage{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "sample-render-page",
+				},
+				Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+					PageComponents: kdexv1alpha1.PageComponents{
+						Contents: map[string]string{
+							"main": "MAIN",
+						},
+						Footer: "FOOTER",
+						Header: `{{ l10n "key" }}`,
+						Navigations: map[string]string{
+							"main": "NAV",
+						},
+						PrimaryTemplate: primaryTemplate,
+						Title:           "TITLE",
+					},
+					Path: "/",
+				},
+			},
+			lang: "fr",
+			translations: func() *catalog.Builder {
+				b := catalog.NewBuilder()
+				b.SetString(language.English, "key", "ENGLISH_TRANSLATION")
+				b.SetString(language.French, "key", "FRENCH_TRANSLATION")
+				return b
+			}(),
+			want: []string{"FOOTER", "FRENCH_TRANSLATION", "NAV", "MAIN", "TITLE"},
+		},
+		{
+			name: "no translation",
+			host: kdexv1alpha1.MicroFrontEndHost{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "sample-host",
+				},
+				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+					AppPolicy:      kdexv1alpha1.NonStrictAppPolicy,
+					DefaultLang:    "en",
+					Domains:        []string{"foo.bar"},
+					Organization:   "KDex Tech Inc.",
+					SupportedLangs: []string{"en", "fr"},
+				},
+			},
+			page: kdexv1alpha1.MicroFrontEndRenderPage{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "sample-render-page",
+				},
+				Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+					PageComponents: kdexv1alpha1.PageComponents{
+						Contents: map[string]string{
+							"main": "MAIN",
+						},
+						Footer: "FOOTER",
+						Header: `{{ l10n "key" }}`,
+						Navigations: map[string]string{
+							"main": "NAV",
+						},
+						PrimaryTemplate: primaryTemplate,
+						Title:           "TITLE",
+					},
+					Path: "/",
+				},
+			},
+			lang: "en",
+			want: []string{"FOOTER", "key", "NAV", "MAIN", "TITLE"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+
+			th := store.NewHostHandler(tt.host, tt.translations)
+			got, gotErr := th.L10nRender(tt.page, &map[string]*menu.MenuEntry{}, tt.lang)
+
+			g.Expect(gotErr).NotTo(HaveOccurred())
+
+			for _, want := range tt.want {
+				g.Expect(got).To(ContainSubstring(want))
+			}
+		})
+	}
+}
