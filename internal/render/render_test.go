@@ -10,11 +10,9 @@ import (
 
 func TestRenderOne(t *testing.T) {
 	r := &Renderer{}
-	templateContent := "Hello, {{.Values.Title}}!"
+	templateContent := "Hello, {{.Title}}!"
 	data := TemplateData{
-		Values: Values{
-			Title: "World",
-		},
+		Title: "World",
 	}
 	expected := "Hello, World!"
 	actual, err := r.RenderOne("test", templateContent, data)
@@ -26,9 +24,7 @@ func TestRenderOne_InvalidTemplate(t *testing.T) {
 	r := &Renderer{}
 	templateContent := "Hello, {{.Invalid}}!"
 	data := TemplateData{
-		Values: Values{
-			Title: "World",
-		},
+		Title: "World",
 	}
 	_, err := r.RenderOne("test", templateContent, data)
 	assert.Error(t, err)
@@ -53,26 +49,26 @@ func TestRenderAll(t *testing.T) {
 		TemplateContent: `
 <html>
 	<head>
-		<title>{{.Values.Title}}</title>
-		{{.Values.Meta}}
-		{{.Values.HeadScript}}
-		{{.Values.Stylesheet}}
+		<title>{{.Title}}</title>
+		{{.Meta}}
+		{{.HeadScript}}
+		{{.Stylesheet}}
 	</head>
 	<body>
-		<header>{{.Values.Header}}</header>
-		<nav>{{range $key, $value := .Values.Navigation}}
+		<header>{{.Header}}</header>
+		<nav>{{range $key, $value := .Navigation}}
 			{{$key}}: {{$value}}
 		{{end}}</nav>
-		<main>{{range $key, $value := .Values.Content}}
+		<main>{{range $key, $value := .Content}}
 			<div id="slot-{{$key}}">{{$value}}</div>
 		{{end}}</main>
-		<footer>{{.Values.Footer}}</footer>
-		{{.Values.FootScript}}
+		<footer>{{.Footer}}</footer>
+		{{.FootScript}}
 	</body>
 </html>`,
 		Contents: map[string]string{
 			"main":    "<h1>Welcome</h1>",
-			"sidebar": `<my-app-element id="sidebar" data-date="{{.Values.Date.Format "2006-01-02"}}"></my-app-element>`,
+			"sidebar": `<my-app-element id="sidebar" data-date="{{.Date.Format "2006-01-02"}}"></my-app-element>`,
 		},
 		Navigations: map[string]string{
 			"main": "main-nav",

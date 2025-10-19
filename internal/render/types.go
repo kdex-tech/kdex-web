@@ -18,10 +18,6 @@ type Page struct {
 }
 
 type TemplateData struct {
-	Values Values
-}
-
-type Values struct {
 	Content      map[string]template.HTML
 	Date         time.Time
 	Footer       template.HTML

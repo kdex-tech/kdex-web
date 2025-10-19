@@ -29,27 +29,27 @@ import (
 
 const (
 	primaryTemplate = `<!DOCTYPE html>
-<html lang="{{ .Values.Lang }}">
+<html lang="{{ .Lang }}">
 	<head>
-	{{ .Values.Meta }}
-	{{ .Values.Title }}
-	{{ .Values.Stylesheet }}
-	{{ .Values.HeadScript }}
+	{{ .Meta }}
+	{{ .Title }}
+	{{ .Stylesheet }}
+	{{ .HeadScript }}
 	</head>
 	<body>
 	<header>
-		{{ .Values.Header }}
+		{{ .Header }}
 	</header>
 	<nav>
-		{{ .Values.Navigation["main"] }}
+		{{ .Navigation["main"] }}
 	</nav>
 	<main>
-		{{ .Values.Content["main"] }}
+		{{ .Content["main"] }}
 	</main>
 	<footer>
-		{{ .Values.Footer }}
+		{{ .Footer }}
 	</footer>
-	{{ .Values.FootScript }}
+	{{ .FootScript }}
 	</body>
 </html>`
 )

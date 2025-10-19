@@ -34,17 +34,15 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 	}
 
 	templateData := TemplateData{
-		Values: Values{
-			Date:         date,
-			FootScript:   template.HTML(r.FootScript),
-			HeadScript:   template.HTML(r.HeadScript),
-			Lang:         r.Lang,
-			MenuEntries:  *menuEntries,
-			Meta:         template.HTML(r.Meta),
-			Organization: r.Organization,
-			Stylesheet:   template.HTML(r.Stylesheet),
-			Title:        page.Label,
-		},
+		Date:         date,
+		FootScript:   template.HTML(r.FootScript),
+		HeadScript:   template.HTML(r.HeadScript),
+		Lang:         r.Lang,
+		MenuEntries:  *menuEntries,
+		Meta:         template.HTML(r.Meta),
+		Organization: r.Organization,
+		Stylesheet:   template.HTML(r.Stylesheet),
+		Title:        page.Label,
 	}
 
 	headerOutput, err := r.RenderOne(fmt.Sprintf("%s-header", page.TemplateName), page.Header, templateData)
@@ -52,14 +50,14 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 		return "", err
 	}
 
-	templateData.Values.Header = template.HTML(headerOutput)
+	templateData.Header = template.HTML(headerOutput)
 
 	footerOutput, err := r.RenderOne(fmt.Sprintf("%s-footer", page.TemplateName), page.Footer, templateData)
 	if err != nil {
 		return "", err
 	}
 
-	templateData.Values.Footer = template.HTML(footerOutput)
+	templateData.Footer = template.HTML(footerOutput)
 
 	navigationOutputs := make(map[string]template.HTML)
 	for name, content := range page.Navigations {
@@ -70,7 +68,7 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 		navigationOutputs[name] = template.HTML(output)
 	}
 
-	templateData.Values.Navigation = navigationOutputs
+	templateData.Navigation = navigationOutputs
 
 	contentOutputs := make(map[string]template.HTML)
 	for slot, content := range page.Contents {
@@ -82,7 +80,7 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 		contentOutputs[slot] = template.HTML(output)
 	}
 
-	templateData.Values.Content = contentOutputs
+	templateData.Content = contentOutputs
 
 	return r.RenderOne(page.TemplateName, page.TemplateContent, templateData)
 }
