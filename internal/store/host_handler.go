@@ -101,23 +101,6 @@ func (th *HostHandler) RebuildMux() {
 	th.Mux = mux
 }
 
-func (th *HostHandler) L10nRenders(
-	page kdexv1alpha1.MicroFrontEndRenderPage,
-	langs []string,
-	children *map[string]*menu.MenuEntry,
-) map[string]string {
-	l10nRenders := make(map[string]string)
-	for _, lang := range th.Host.Spec.SupportedLangs {
-		rendered, err := th.L10nRender(page, children, lang)
-		if err != nil {
-			// log something here...
-			continue
-		}
-		l10nRenders[lang] = rendered
-	}
-	return l10nRenders
-}
-
 func (th *HostHandler) L10nRender(
 	page kdexv1alpha1.MicroFrontEndRenderPage,
 	menuEntries *map[string]*menu.MenuEntry,
@@ -153,6 +136,23 @@ func (th *HostHandler) L10nRender(
 		TemplateContent: page.Spec.PageComponents.PrimaryTemplate,
 		TemplateName:    page.Name,
 	})
+}
+
+func (th *HostHandler) L10nRenders(
+	page kdexv1alpha1.MicroFrontEndRenderPage,
+	langs []string,
+	children *map[string]*menu.MenuEntry,
+) map[string]string {
+	l10nRenders := make(map[string]string)
+	for _, lang := range th.Host.Spec.SupportedLangs {
+		rendered, err := th.L10nRender(page, children, lang)
+		if err != nil {
+			// log something here...
+			continue
+		}
+		l10nRenders[lang] = rendered
+	}
+	return l10nRenders
 }
 
 func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
