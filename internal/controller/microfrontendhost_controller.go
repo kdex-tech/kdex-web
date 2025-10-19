@@ -70,29 +70,6 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			}
 			return ctrl.Result{Requeue: true}, nil
 		}
-
-		if trackedHost, ok := r.HostStore.Get(host.Name); !ok {
-			log.Info("tracking new host")
-			newTrackedHost := store.NewHostHandler(host, log.WithName("host-handler").WithValues("host", host.Name))
-			r.HostStore.Set(newTrackedHost)
-		} else {
-			log.Info("updating existing host")
-			trackedHost.SetHost(host)
-		}
-
-		apimeta.SetStatusCondition(
-			&host.Status.Conditions,
-			*kdexv1alpha1.NewCondition(
-				kdexv1alpha1.ConditionTypeReady,
-				metav1.ConditionTrue,
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
-				"all references resolved successfully",
-			),
-		)
-
-		if err := r.Status().Update(ctx, &host); err != nil {
-			return ctrl.Result{}, err
-		}
 	} else {
 		if controllerutil.ContainsFinalizer(&host, hostFinalizerName) {
 			r.HostStore.Delete(host.Name)
@@ -101,6 +78,34 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 				return ctrl.Result{}, err
 			}
 		}
+		return ctrl.Result{}, nil
+	}
+
+	trackedHost, ok := r.HostStore.Get(host.Name)
+
+	if !ok {
+		log.Info("tracking new host")
+		newTrackedHost := store.NewHostHandler(host, log.WithName("host-handler").WithValues("host", host.Name))
+		r.HostStore.Set(newTrackedHost)
+	} else {
+		log.Info("updating existing host")
+		trackedHost.SetHost(host)
+	}
+
+	log.Info("reconciled MicroFrontEndHost", "trackedHost", trackedHost)
+
+	apimeta.SetStatusCondition(
+		&host.Status.Conditions,
+		*kdexv1alpha1.NewCondition(
+			kdexv1alpha1.ConditionTypeReady,
+			metav1.ConditionTrue,
+			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			"all references resolved successfully",
+		),
+	)
+
+	if err := r.Status().Update(ctx, &host); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil

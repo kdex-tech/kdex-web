@@ -68,6 +68,29 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if translation.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
+			controllerutil.AddFinalizer(&translation, translationFinalizerName)
+			if err := r.Update(ctx, &translation); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{Requeue: true}, nil
+		}
+	} else {
+		if controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
+			trackedHost, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
+
+			if ok {
+				trackedHost.RemoveTranslation(translation)
+			}
+
+			controllerutil.RemoveFinalizer(&translation, translationFinalizerName)
+			if err := r.Update(ctx, &translation); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
 	var host kdexv1alpha1.MicroFrontEndHost
 	hostName := types.NamespacedName{
 		Name:      translation.Spec.HostRef.Name,
@@ -102,39 +125,22 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	if translation.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
-			controllerutil.AddFinalizer(&translation, translationFinalizerName)
-			if err := r.Update(ctx, &translation); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{Requeue: true}, nil
-		}
+	trackedHost.AddOrUpdateTranslation(translation)
 
-		trackedHost.AddOrUpdateTranslation(translation)
+	log.Info("reconciled MicroFrontEndTranslation", "host", host)
 
-		apimeta.SetStatusCondition(
-			&translation.Status.Conditions,
-			*kdexv1alpha1.NewCondition(
-				kdexv1alpha1.ConditionTypeReady,
-				metav1.ConditionTrue,
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
-				"all references resolved successfully",
-			),
-		)
+	apimeta.SetStatusCondition(
+		&translation.Status.Conditions,
+		*kdexv1alpha1.NewCondition(
+			kdexv1alpha1.ConditionTypeReady,
+			metav1.ConditionTrue,
+			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			"all references resolved successfully",
+		),
+	)
 
-		if err := r.Status().Update(ctx, &translation); err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		if controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
-			trackedHost.RemoveTranslation(translation)
-
-			controllerutil.RemoveFinalizer(&translation, translationFinalizerName)
-			if err := r.Update(ctx, &translation); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
+	if err := r.Status().Update(ctx, &translation); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil

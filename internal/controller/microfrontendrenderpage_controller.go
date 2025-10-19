@@ -126,6 +126,8 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 
 	trackedHost.RenderPages.Set(renderPage)
 
+	log.Info("reconciled MicroFrontEndRenderPage")
+
 	apimeta.SetStatusCondition(
 		&renderPage.Status.Conditions,
 		*kdexv1alpha1.NewCondition(
