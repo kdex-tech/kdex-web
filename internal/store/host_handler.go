@@ -145,8 +145,7 @@ func (th *HostHandler) RebuildMux() {
 	for i := range pages {
 		page := pages[i]
 
-		l10nRenders := th.L10nRenders(
-			page, th.Host.Spec.SupportedLangs, rootEntry.Children)
+		l10nRenders := th.L10nRenders(page, rootEntry.Children)
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			lang := kdexhttp.GetLang(r, th.defaultLang, th.supportedLangs)
@@ -176,13 +175,13 @@ func (th *HostHandler) RebuildMux() {
 func (th *HostHandler) L10nRender(
 	page kdexv1alpha1.MicroFrontEndRenderPage,
 	menuEntries *map[string]*menu.MenuEntry,
-	lang string,
+	lang language.Tag,
 ) (string, error) {
 	var messagePrinter *message.Printer
 
 	if th.Translations != nil {
 		messagePrinter = message.NewPrinter(
-			language.Make(lang),
+			lang,
 			message.Catalog(th.Translations),
 		)
 	}
@@ -191,7 +190,7 @@ func (th *HostHandler) L10nRender(
 		Date:           time.Now(),
 		FootScript:     "",
 		HeadScript:     "",
-		Lang:           lang,
+		Lang:           lang.String(),
 		MenuEntries:    menuEntries,
 		MessagePrinter: messagePrinter,
 		Meta:           th.Host.Spec.BaseMeta,
@@ -212,17 +211,16 @@ func (th *HostHandler) L10nRender(
 
 func (th *HostHandler) L10nRenders(
 	page kdexv1alpha1.MicroFrontEndRenderPage,
-	langs []string,
 	children *map[string]*menu.MenuEntry,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
-	for _, lang := range th.Host.Spec.SupportedLangs {
+	for _, lang := range th.supportedLangs {
 		rendered, err := th.L10nRender(page, children, lang)
 		if err != nil {
 			th.log.Error(err, "failed to render page for language", "page", page.Name, "lang", lang)
 			continue
 		}
-		l10nRenders[lang] = rendered
+		l10nRenders[lang.String()] = rendered
 	}
 	return l10nRenders
 }

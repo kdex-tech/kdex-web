@@ -180,7 +180,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 
 			th := store.NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
-			got, gotErr := th.L10nRender(tt.page, &map[string]*menu.MenuEntry{}, tt.lang)
+			got, gotErr := th.L10nRender(tt.page, &map[string]*menu.MenuEntry{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 
@@ -197,7 +197,6 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 		host         kdexv1alpha1.MicroFrontEndHost
 		translations *catalog.Builder
 		page         kdexv1alpha1.MicroFrontEndRenderPage
-		langs        []string
 		want         map[string][]string
 	}{
 		{
@@ -234,7 +233,6 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 					Path: "/",
 				},
 			},
-			langs: []string{"en", "fr"},
 			translations: func() *catalog.Builder {
 				b := catalog.NewBuilder()
 				b.SetString(language.English, "key", "ENGLISH_TRANSLATION")
@@ -257,7 +255,7 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 
 			th := store.NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
-			got := th.L10nRenders(tt.page, tt.langs, &map[string]*menu.MenuEntry{})
+			got := th.L10nRenders(tt.page, &map[string]*menu.MenuEntry{})
 
 			for key, values := range tt.want {
 				l10nRender := got[key]
