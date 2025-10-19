@@ -69,6 +69,28 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if renderPage.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {
+			controllerutil.AddFinalizer(&renderPage, renderPageFinalizerName)
+			if err := r.Update(ctx, &renderPage); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{Requeue: true}, nil
+		}
+	} else {
+		if controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {
+			trackedHost, ok := r.HostStore.Get(renderPage.Spec.HostRef.Name)
+			if ok {
+				trackedHost.RenderPages.Delete(renderPage.Name)
+			}
+			controllerutil.RemoveFinalizer(&renderPage, renderPageFinalizerName)
+			if err := r.Update(ctx, &renderPage); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
 	var host kdexv1alpha1.MicroFrontEndHost
 	hostName := types.NamespacedName{
 		Name:      renderPage.Spec.HostRef.Name,
@@ -103,37 +125,20 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	if renderPage.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {
-			controllerutil.AddFinalizer(&renderPage, renderPageFinalizerName)
-			if err := r.Update(ctx, &renderPage); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{Requeue: true}, nil
-		}
+	trackedHost.RenderPages.Set(renderPage)
 
-		trackedHost.RenderPages.Set(renderPage)
-		apimeta.SetStatusCondition(
-			&renderPage.Status.Conditions,
-			*kdexv1alpha1.NewCondition(
-				kdexv1alpha1.ConditionTypeReady,
-				metav1.ConditionTrue,
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
-				"all references resolved successfully",
-			),
-		)
+	apimeta.SetStatusCondition(
+		&renderPage.Status.Conditions,
+		*kdexv1alpha1.NewCondition(
+			kdexv1alpha1.ConditionTypeReady,
+			metav1.ConditionTrue,
+			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			"all references resolved successfully",
+		),
+	)
 
-		if err := r.Status().Update(ctx, &renderPage); err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		if controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {
-			trackedHost.RenderPages.Delete(renderPage.Name)
-			controllerutil.RemoveFinalizer(&renderPage, renderPageFinalizerName)
-			if err := r.Update(ctx, &renderPage); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
+	if err := r.Status().Update(ctx, &renderPage); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
