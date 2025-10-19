@@ -7,13 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"golang.org/x/text/language"
 )
 
 func TestGetParam(t *testing.T) {
-	RegisterFailHandler(Fail)
 	tests := []struct {
 		headers        *map[string]string
 		name           string
@@ -29,8 +27,11 @@ func TestGetParam(t *testing.T) {
 			path:           "/one/two/three",
 			pattern:        "/{lang}/{path...}",
 			want: Results{
-				Lang:           "en",
-				PathParameters: map[string]string{"lang": "one", "path": "two/three"},
+				Lang: "en",
+				Parameters: map[string][]string{
+					"lang": {"one"},
+					"path": {"two/three"},
+				},
 			},
 		},
 		{
@@ -39,8 +40,10 @@ func TestGetParam(t *testing.T) {
 			path:           "/one/two/three",
 			pattern:        "/{lang}/{foo...}",
 			want: Results{
-				Lang:           "en",
-				PathParameters: map[string]string{"lang": "one"},
+				Lang: "en",
+				Parameters: map[string][]string{
+					"lang": {"one"},
+				},
 			},
 		},
 		{
@@ -50,7 +53,7 @@ func TestGetParam(t *testing.T) {
 			pattern:        "/path",
 			want: Results{
 				Lang: "en",
-				QueryStringParameters: map[string][]string{
+				Parameters: map[string][]string{
 					"lang": {"one"},
 					"path": {"two", "three"},
 				},
@@ -62,9 +65,9 @@ func TestGetParam(t *testing.T) {
 			path:           "/one?path=two&path=three",
 			pattern:        "/{lang}",
 			want: Results{
-				Lang:           "en",
-				PathParameters: map[string]string{"lang": "one"},
-				QueryStringParameters: map[string][]string{
+				Lang: "en",
+				Parameters: map[string][]string{
+					"lang": {"one"},
 					"path": {"two", "three"},
 				},
 			},
@@ -98,7 +101,7 @@ func TestGetParam(t *testing.T) {
 		{
 			name: "get lang from headers",
 			headers: &map[string]string{
-				"Accept-Language": "zn,fr;q=0.9,en;q=0.8",
+				"Accept-Language": "zh,fr;q=0.9,en;q=0.8",
 			},
 			parameterNames: []string{},
 			path:           "/one",
@@ -114,21 +117,21 @@ func TestGetParam(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer GinkgoRecover()
+			g := NewGomegaWithT(t)
 			got := setupHandler(
-				tt.pattern, tt.parameterNames, tt.path, tt.supportedLangs, tt.headers)
-			Expect(got).To(Equal(tt.want))
+				g, tt.pattern, tt.parameterNames, tt.path, tt.supportedLangs, tt.headers)
+			g.Expect(got).To(Equal(tt.want))
 		})
 	}
 }
 
 type Results struct {
-	PathParameters        map[string]string   `json:"pathParameters"`
-	QueryStringParameters map[string][]string `json:"queryStringParameters"`
-	Lang                  string              `json:"lang"`
+	Lang       string              `json:"lang"`
+	Parameters map[string][]string `json:"parameters,omitempty"`
 }
 
 func setupHandler(
+	g *GomegaWithT,
 	path string,
 	parameterNames []string,
 	url string,
@@ -139,21 +142,12 @@ func setupHandler(
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		results := Results{}
 		for _, name := range parameterNames {
-			value := GetParam(name, "", r)
-			if value != "" {
-				if results.PathParameters == nil {
-					results.PathParameters = map[string]string{}
-				}
-				results.PathParameters[name] = value
-			}
-		}
-		for _, name := range parameterNames {
 			values := GetParamArray(name, []string{}, r)
 			if len(values) > 0 {
-				if results.QueryStringParameters == nil {
-					results.QueryStringParameters = map[string][]string{}
+				if results.Parameters == nil {
+					results.Parameters = map[string][]string{}
 				}
-				results.QueryStringParameters[name] = values
+				results.Parameters[name] = values
 			}
 		}
 
@@ -181,7 +175,7 @@ func setupHandler(
 	defer server.Close()
 
 	req, err := http.NewRequest("GET", server.URL+url, nil)
-	Expect(err).NotTo(HaveOccurred())
+	g.Expect(err).NotTo(HaveOccurred())
 
 	if headers != nil {
 		for key, value := range *headers {
@@ -190,17 +184,17 @@ func setupHandler(
 	}
 
 	resp, err := http.DefaultClient.Do(req)
-	Expect(err).NotTo(HaveOccurred())
+	g.Expect(err).NotTo(HaveOccurred())
 	defer resp.Body.Close()
 
-	Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
 
 	body, err := io.ReadAll(resp.Body)
-	Expect(err).NotTo(HaveOccurred())
+	g.Expect(err).NotTo(HaveOccurred())
 
 	results := Results{}
 	err = json.Unmarshal(body, &results)
-	Expect(err).NotTo(HaveOccurred())
+	g.Expect(err).NotTo(HaveOccurred())
 
 	return results
 }

@@ -59,8 +59,13 @@ func GetLang(r *http.Request, defaultLang string, supportedLangs []language.Tag)
 	headerLangs := strings.Split(r.Header.Get("Accept-Language"), ",")
 
 	for _, headerLang := range headerLangs {
-		headerLang = strings.TrimLeft(headerLang, ";")
-		preferences = append(preferences, language.Make(headerLang))
+		headerLang = strings.TrimSpace(headerLang)
+		if headerLang == "" {
+			continue
+		}
+		prefix := strings.SplitN(headerLang, ";", 2)[0]
+		tag := language.Make(prefix)
+		preferences = append(preferences, tag)
 	}
 
 	matcher := language.NewMatcher(supportedLangs)
