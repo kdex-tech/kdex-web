@@ -62,9 +62,13 @@ spec:
         - /manager
         args:
           - --health-probe-bind-address=:8081
+          - --webserver-bind-address=:8090
         image: controller:latest
         name: manager
-        ports: []
+        ports:
+        - containerPort: 8090
+          name: webserver
+          protocol: TCP
         securityContext:
           readOnlyRootFilesystem: true
           allowPrivilegeEscalation: false
@@ -96,3 +100,21 @@ spec:
       volumes: []
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: controller-manager
+  namespace: system
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: kdex-web
+    app.kubernetes.io/managed-by: kustomize
+spec:
+  selector:
+    control-plane: controller-manager
+  ports:
+  - name: webserver
+    port: 8090
+    protocol: TCP
+    targetPort: webserver
