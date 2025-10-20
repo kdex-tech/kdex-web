@@ -118,7 +118,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rps := RenderPageStore{
-				pages: *tt.items,
+				handlers: *tt.items,
 			}
 			got := &menu.MenuEntry{}
 			rps.BuildMenuEntries(got, nil)

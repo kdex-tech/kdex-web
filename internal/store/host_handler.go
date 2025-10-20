@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"net/http"
 	"sync"
 	"time"
@@ -38,7 +39,7 @@ func NewHostHandler(
 	th.updateHostDependentFields()
 	rps := &RenderPageStore{
 		host:     host,
-		pages:    map[string]RenderPageHandler{},
+		handlers: map[string]RenderPageHandler{},
 		onUpdate: th.RebuildMux,
 	}
 	th.RenderPages = rps
@@ -141,11 +142,10 @@ func (th *HostHandler) RebuildMux() {
 	rootEntry := &menu.MenuEntry{}
 	th.RenderPages.BuildMenuEntries(rootEntry, nil)
 
-	handlers := th.RenderPages.List()
-	for i := range handlers {
-		page := handlers[i].Page
+	for _, handler := range th.RenderPages.List() {
+		page := handler.Page
 
-		l10nRenders := th.L10nRenders(page, rootEntry.Children)
+		l10nRenders := th.L10nRenders(handler, rootEntry.Children)
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			lang := kdexhttp.GetLang(r, th.defaultLang, th.Translations.Languages())
@@ -173,7 +173,7 @@ func (th *HostHandler) RebuildMux() {
 }
 
 func (th *HostHandler) L10nRender(
-	page kdexv1alpha1.MicroFrontEndRenderPage,
+	handler RenderPageHandler,
 	menuEntries *map[string]*menu.MenuEntry,
 	lang language.Tag,
 ) (string, error) {
@@ -186,13 +186,45 @@ func (th *HostHandler) L10nRender(
 		)
 	}
 
-	// stylesheet := th.Host.Spec.Stylesheet
-	// prefix := strings.ToLower(stylesheet[0:4])
-	// if prefix == "http" {
-	// 	stylesheet = fmt.Sprintf(`<link rel="stylesheet" href="%s">`, stylesheet)
-	// } else {
-	// 	stylesheet = fmt.Sprintf(`<style>%s</style>`, stylesheet)
-	// }
+	page := handler.Page
+
+	var styleBuffer bytes.Buffer
+
+	if handler.Stylesheet != nil {
+		for _, item := range handler.Stylesheet.Spec.StyleItems {
+			if item.LinkHref != "" {
+				styleBuffer.WriteString(`<link`)
+				for key, value := range item.Attributes {
+					if key == "href" || key == "src" {
+						continue
+					}
+					styleBuffer.WriteRune(' ')
+					styleBuffer.WriteString(key)
+					styleBuffer.WriteString(`="`)
+					styleBuffer.WriteString(value)
+					styleBuffer.WriteString(`"`)
+				}
+				styleBuffer.WriteString(` href="`)
+				styleBuffer.WriteString(item.LinkHref)
+				styleBuffer.WriteString(`"/>\n`)
+			} else if item.Style != "" {
+				styleBuffer.WriteString(`<style`)
+				for key, value := range item.Attributes {
+					if key == "href" || key == "src" {
+						continue
+					}
+					styleBuffer.WriteRune(' ')
+					styleBuffer.WriteString(key)
+					styleBuffer.WriteString(`="`)
+					styleBuffer.WriteString(value)
+					styleBuffer.WriteString(`"`)
+				}
+				styleBuffer.WriteString(">\n")
+				styleBuffer.WriteString(item.Style)
+				styleBuffer.WriteString(`\n</style>\n`)
+			}
+		}
+	}
 
 	renderer := render.Renderer{
 		Date:           time.Now(),
@@ -203,7 +235,7 @@ func (th *HostHandler) L10nRender(
 		MessagePrinter: messagePrinter,
 		Meta:           th.Host.Spec.BaseMeta,
 		Organization:   th.Host.Spec.Organization,
-		Stylesheet:     "",
+		Stylesheet:     styleBuffer.String(),
 	}
 
 	return renderer.RenderPage(render.Page{
@@ -218,14 +250,14 @@ func (th *HostHandler) L10nRender(
 }
 
 func (th *HostHandler) L10nRenders(
-	page kdexv1alpha1.MicroFrontEndRenderPage,
+	handler RenderPageHandler,
 	children *map[string]*menu.MenuEntry,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, lang := range th.Translations.Languages() {
-		rendered, err := th.L10nRender(page, children, lang)
+		rendered, err := th.L10nRender(handler, children, lang)
 		if err != nil {
-			th.log.Error(err, "failed to render page for language", "page", page.Name, "lang", lang)
+			th.log.Error(err, "failed to render page for language", "page", handler.Page.Name, "lang", lang)
 			continue
 		}
 		l10nRenders[lang.String()] = rendered

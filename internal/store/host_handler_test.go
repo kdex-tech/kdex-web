@@ -177,7 +177,9 @@ func TestHostHandler_L10nRender(t *testing.T) {
 
 			th := store.NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
-			got, gotErr := th.L10nRender(tt.page, &map[string]*menu.MenuEntry{}, language.Make(tt.lang))
+			got, gotErr := th.L10nRender(store.RenderPageHandler{
+				Page: tt.page,
+			}, &map[string]*menu.MenuEntry{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 
@@ -251,7 +253,9 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 
 			th := store.NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
-			got := th.L10nRenders(tt.page, &map[string]*menu.MenuEntry{})
+			got := th.L10nRenders(store.RenderPageHandler{
+				Page: tt.page,
+			}, &map[string]*menu.MenuEntry{})
 
 			for key, values := range tt.want {
 				l10nRender := got[key]

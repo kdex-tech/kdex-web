@@ -11,12 +11,12 @@ type RenderPageStore struct {
 	host     kdexv1alpha1.MicroFrontEndHost
 	mu       sync.RWMutex
 	onUpdate func()
-	pages    map[string]RenderPageHandler
+	handlers map[string]RenderPageHandler
 }
 
 func (s *RenderPageStore) Delete(name string) {
 	s.mu.Lock()
-	delete(s.pages, name)
+	delete(s.handlers, name)
 	s.mu.Unlock()
 	if s.onUpdate != nil {
 		s.onUpdate()
@@ -26,7 +26,7 @@ func (s *RenderPageStore) Delete(name string) {
 func (s *RenderPageStore) Get(name string) (RenderPageHandler, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	page, ok := s.pages[name]
+	page, ok := s.handlers[name]
 	return page, ok
 }
 
@@ -34,15 +34,15 @@ func (s *RenderPageStore) List() []RenderPageHandler {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	pages := []RenderPageHandler{}
-	for _, page := range s.pages {
+	for _, page := range s.handlers {
 		pages = append(pages, page)
 	}
 	return pages
 }
 
-func (s *RenderPageStore) Set(page RenderPageHandler) {
+func (s *RenderPageStore) Set(handler RenderPageHandler) {
 	s.mu.Lock()
-	s.pages[page.Page.Name] = page
+	s.handlers[handler.Page.Name] = handler
 	s.mu.Unlock()
 	if s.onUpdate != nil {
 		s.onUpdate()
@@ -53,8 +53,9 @@ func (s *RenderPageStore) BuildMenuEntries(
 	entry *menu.MenuEntry,
 	parent *kdexv1alpha1.MicroFrontEndRenderPage,
 ) {
-	for _, item := range s.List() {
-		page := item.Page
+	for _, handler := range s.List() {
+		page := handler.Page
+
 		if (parent == nil && page.Spec.ParentPageRef == nil) ||
 			(parent != nil && page.Spec.ParentPageRef != nil &&
 				parent.Name == page.Spec.ParentPageRef.Name) {
