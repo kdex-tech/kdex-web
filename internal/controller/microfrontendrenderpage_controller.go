@@ -118,13 +118,13 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, err
 	}
 
-	var stylesheet *kdexv1alpha1.MicroFrontEndStylesheet
+	var stylesheet kdexv1alpha1.MicroFrontEndStylesheet
 	if renderPage.Spec.StylesheetRef != nil {
 		stylesheetName := types.NamespacedName{
 			Name:      renderPage.Spec.StylesheetRef.Name,
 			Namespace: renderPage.Namespace,
 		}
-		if err := r.Get(ctx, stylesheetName, stylesheet); err != nil {
+		if err := r.Get(ctx, stylesheetName, &stylesheet); err != nil {
 			if errors.IsNotFound(err) {
 				log.Error(err, "referenced MicroFrontEndStylesheet not found", "name", stylesheetName.Name)
 				apimeta.SetStatusCondition(
@@ -156,7 +156,7 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 
 	trackedHost.RenderPages.Set(store.RenderPageHandler{
 		Page:       renderPage,
-		Stylesheet: stylesheet,
+		Stylesheet: &stylesheet,
 	})
 
 	log.Info("reconciled MicroFrontEndRenderPage")
