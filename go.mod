@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.24.5
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.7.1
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.7.2
 
 require (
 	github.com/go-logr/logr v1.4.3
