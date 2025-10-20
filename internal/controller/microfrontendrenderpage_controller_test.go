@@ -29,7 +29,7 @@ import (
 
 const (
 	primaryTemplate = `<!DOCTYPE html>
-<html lang="{{ .Lang }}">
+<html lang="{{ .Language }}">
 	<head>
 	{{ .Meta }}
 	{{ .Title }}

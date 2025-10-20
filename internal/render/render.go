@@ -6,21 +6,8 @@ import (
 	"html/template"
 	"time"
 
-	"golang.org/x/text/message"
 	"kdex.dev/web/internal/menu"
 )
-
-type Renderer struct {
-	Date           time.Time
-	FootScript     string
-	HeadScript     string
-	Lang           string
-	MenuEntries    *map[string]*menu.MenuEntry
-	MessagePrinter *message.Printer
-	Meta           string
-	Organization   string
-	Stylesheet     string
-}
 
 func (r *Renderer) RenderPage(page Page) (string, error) {
 	date := r.Date
@@ -37,7 +24,8 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 		Date:         date,
 		FootScript:   template.HTML(r.FootScript),
 		HeadScript:   template.HTML(r.HeadScript),
-		Lang:         r.Lang,
+		Language:     r.Language,
+		Languages:    r.Languages,
 		MenuEntries:  *menuEntries,
 		Meta:         template.HTML(r.Meta),
 		Organization: r.Organization,

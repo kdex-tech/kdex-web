@@ -135,7 +135,7 @@ func setupHandler(
 	path string,
 	parameterNames []string,
 	url string,
-	supportedLangs *[]language.Tag,
+	languages *[]language.Tag,
 	headers *map[string]string,
 ) Results {
 	mux := http.NewServeMux()
@@ -151,13 +151,13 @@ func setupHandler(
 			}
 		}
 
-		if supportedLangs == nil {
-			supportedLangs = &[]language.Tag{
+		if languages == nil {
+			languages = &[]language.Tag{
 				language.Make("en"),
 			}
 		}
 
-		lang := GetLang(r, "en", *supportedLangs)
+		lang := GetLang(r, "en", *languages)
 
 		results.Lang = lang.String()
 

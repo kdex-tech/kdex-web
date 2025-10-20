@@ -36,7 +36,7 @@ func TestRenderAll(t *testing.T) {
 		Date:         testDate,
 		FootScript:   "<script>foot</script>",
 		HeadScript:   "<script>head</script>",
-		Lang:         "en",
+		Language:     "en",
 		MenuEntries:  &map[string]*menu.MenuEntry{"home": {Path: "/"}},
 		Meta:         `<meta name="description" content="test">`,
 		Organization: "Test Inc.",

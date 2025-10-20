@@ -39,7 +39,7 @@ func GetParamArray(name string, defaultValue []string, r *http.Request) []string
 	}
 }
 
-func GetLang(r *http.Request, defaultLang string, supportedLangs []language.Tag) language.Tag {
+func GetLang(r *http.Request, defaultLanguage string, languages []language.Tag) language.Tag {
 	log := logf.FromContext(r.Context())
 
 	fromParams := GetParam("l10n", "", r)
@@ -47,35 +47,35 @@ func GetLang(r *http.Request, defaultLang string, supportedLangs []language.Tag)
 	if fromParams != "" {
 		tag := language.Make(fromParams)
 		if tag.IsRoot() {
-			log.Info("parsing user supplied 'l10n' parameter failed, falling back to default", "l10n", fromParams, "defaultLang", defaultLang)
-			return language.Make(defaultLang)
+			log.Info("parsing user supplied 'l10n' parameter failed, falling back to default", "l10n", fromParams, "defaultLang", defaultLanguage)
+			return language.Make(defaultLanguage)
 		} else {
 			return tag
 		}
 	}
 
-	preferences := []language.Tag{}
+	preferredLanguages := []language.Tag{}
 
-	headerLangs := strings.Split(r.Header.Get("Accept-Language"), ",")
+	acceptLanguages := strings.Split(r.Header.Get("Accept-Language"), ",")
 
-	for _, headerLang := range headerLangs {
-		headerLang = strings.TrimSpace(headerLang)
-		if headerLang == "" {
+	for _, acceptLanguage := range acceptLanguages {
+		acceptLanguage = strings.TrimSpace(acceptLanguage)
+		if acceptLanguage == "" {
 			continue
 		}
-		prefix := strings.SplitN(headerLang, ";", 2)[0]
+		prefix := strings.SplitN(acceptLanguage, ";", 2)[0]
 		tag := language.Make(prefix)
-		preferences = append(preferences, tag)
+		preferredLanguages = append(preferredLanguages, tag)
 	}
 
-	matcher := language.NewMatcher(supportedLangs)
+	matcher := language.NewMatcher(languages)
 
-	_, index, _ := matcher.Match(preferences...)
+	_, index, _ := matcher.Match(preferredLanguages...)
 
-	matchedTag := supportedLangs[index]
+	matchedTag := languages[index]
 
 	if matchedTag.IsRoot() {
-		return language.Make(defaultLang)
+		return language.Make(defaultLanguage)
 	}
 
 	return matchedTag

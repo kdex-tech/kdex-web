@@ -21,7 +21,7 @@ type HostHandler struct {
 	Mux                  *http.ServeMux
 	RenderPages          *RenderPageStore
 	Translations         *catalog.Builder
-	defaultLang          string
+	defaultLanguage      string
 	log                  logr.Logger
 	mu                   sync.RWMutex
 	translationResources map[string]kdexv1alpha1.MicroFrontEndTranslation
@@ -70,7 +70,7 @@ func (th *HostHandler) RemoveTranslation(translation kdexv1alpha1.MicroFrontEndT
 func (th *HostHandler) rebuildTranslationsLocked() {
 	catalogBuilder := catalog.NewBuilder()
 
-	if err := catalogBuilder.SetString(language.Make(th.defaultLang), "_", "_"); err != nil {
+	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
 		th.log.Error(err, "failed to add default placeholder translation")
 	}
 
@@ -124,10 +124,10 @@ func (th *HostHandler) updateHostDependentFields() {
 	if th.Host.Spec.DefaultLang != "" {
 		defaultLang = th.Host.Spec.DefaultLang
 	}
-	th.defaultLang = defaultLang
+	th.defaultLanguage = defaultLang
 
 	catalogBuilder := catalog.NewBuilder()
-	if err := catalogBuilder.SetString(language.Make(th.defaultLang), "_", "_"); err != nil {
+	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
 		th.log.Error(err, "failed to add default placeholder translation")
 	}
 	th.Translations = catalogBuilder
@@ -148,16 +148,16 @@ func (th *HostHandler) RebuildMux() {
 		l10nRenders := th.L10nRenders(handler, rootEntry.Children)
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			lang := kdexhttp.GetLang(r, th.defaultLang, th.Translations.Languages())
+			l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 
-			rendered, ok := l10nRenders[lang.String()]
+			rendered, ok := l10nRenders[l.String()]
 
 			if !ok {
 				http.Error(w, "not found", http.StatusNotFound)
 				return
 			}
 
-			w.Header().Set("Content-Language", lang.String())
+			w.Header().Set("Content-Language", l.String())
 			w.Header().Set("Content-Type", "text/html")
 
 			_, err := w.Write([]byte(rendered))
@@ -178,12 +178,17 @@ func (th *HostHandler) L10nRender(
 	lang language.Tag,
 ) (string, error) {
 	var messagePrinter *message.Printer
+	var availableLangs []string
 
 	if th.Translations != nil {
 		messagePrinter = message.NewPrinter(
 			lang,
 			message.Catalog(th.Translations),
 		)
+
+		for _, tag := range th.Translations.Languages() {
+			availableLangs = append(availableLangs, tag.String())
+		}
 	}
 
 	page := handler.Page
@@ -230,10 +235,11 @@ func (th *HostHandler) L10nRender(
 	}
 
 	renderer := render.Renderer{
+		Languages:      availableLangs,
 		Date:           time.Now(),
 		FootScript:     "",
 		HeadScript:     "",
-		Lang:           lang.String(),
+		Language:       lang.String(),
 		MenuEntries:    menuEntries,
 		MessagePrinter: messagePrinter,
 		Meta:           th.Host.Spec.BaseMeta,
@@ -257,13 +263,13 @@ func (th *HostHandler) L10nRenders(
 	children *map[string]*menu.MenuEntry,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
-	for _, lang := range th.Translations.Languages() {
-		rendered, err := th.L10nRender(handler, children, lang)
+	for _, l := range th.Translations.Languages() {
+		rendered, err := th.L10nRender(handler, children, l)
 		if err != nil {
-			th.log.Error(err, "failed to render page for language", "page", handler.Page.Name, "lang", lang)
+			th.log.Error(err, "failed to render page for language", "page", handler.Page.Name, "language", l)
 			continue
 		}
-		l10nRenders[lang.String()] = rendered
+		l10nRenders[l.String()] = rendered
 	}
 	return l10nRenders
 }
