@@ -202,11 +202,12 @@ func (th *HostHandler) L10nRender(
 					styleBuffer.WriteString(key)
 					styleBuffer.WriteString(`="`)
 					styleBuffer.WriteString(value)
-					styleBuffer.WriteString(`"`)
+					styleBuffer.WriteRune('"')
 				}
 				styleBuffer.WriteString(` href="`)
 				styleBuffer.WriteString(item.LinkHref)
-				styleBuffer.WriteString(`"/>\n`)
+				styleBuffer.WriteString(`"/>`)
+				styleBuffer.WriteRune('\n')
 			} else if item.Style != "" {
 				styleBuffer.WriteString(`<style`)
 				for key, value := range item.Attributes {
@@ -217,11 +218,13 @@ func (th *HostHandler) L10nRender(
 					styleBuffer.WriteString(key)
 					styleBuffer.WriteString(`="`)
 					styleBuffer.WriteString(value)
-					styleBuffer.WriteString(`"`)
+					styleBuffer.WriteRune('"')
 				}
-				styleBuffer.WriteString(">\n")
+				styleBuffer.WriteRune('>')
+				styleBuffer.WriteRune('\n')
 				styleBuffer.WriteString(item.Style)
-				styleBuffer.WriteString(`\n</style>\n`)
+				styleBuffer.WriteString("</style>")
+				styleBuffer.WriteRune('\n')
 			}
 		}
 	}
