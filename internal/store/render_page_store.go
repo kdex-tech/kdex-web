@@ -3,8 +3,8 @@ package store
 import (
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/menu"
 )
 
 type RenderPageStore struct {
@@ -50,7 +50,7 @@ func (s *RenderPageStore) Set(handler RenderPageHandler) {
 }
 
 func (s *RenderPageStore) BuildMenuEntries(
-	entry *menu.MenuEntry,
+	entry *kdexv1alpha1.PageEntry,
 	parent *kdexv1alpha1.MicroFrontEndRenderPage,
 ) {
 	for _, handler := range s.List() {
@@ -65,24 +65,26 @@ func (s *RenderPageStore) BuildMenuEntries(
 			}
 
 			if entry.Children == nil {
-				entry.Children = &map[string]*menu.MenuEntry{}
+				entry.Children = &map[string]*kdexv1alpha1.PageEntry{}
 			}
 
 			label := page.Spec.PageComponents.Title
 
-			menuEntry := menu.MenuEntry{
-				Name: page.Name,
-				Path: page.Spec.Path,
+			pageEntry := kdexv1alpha1.PageEntry{
+				Href:   page.Spec.Path,
+				Label:  page.Spec.PageComponents.Title,
+				Name:   page.Name,
+				Weight: resource.MustParse("0"),
 			}
 
 			if page.Spec.NavigationHints != nil {
-				menuEntry.Icon = page.Spec.NavigationHints.Icon
-				menuEntry.Weight = page.Spec.NavigationHints.Weight
+				pageEntry.Icon = page.Spec.NavigationHints.Icon
+				pageEntry.Weight = page.Spec.NavigationHints.Weight
 			}
 
-			(*entry.Children)[label] = &menuEntry
+			(*entry.Children)[label] = &pageEntry
 
-			s.BuildMenuEntries(&menuEntry, &page)
+			s.BuildMenuEntries(&pageEntry, &page)
 		}
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	kdexhttp "kdex.dev/web/internal/http"
-	"kdex.dev/web/internal/menu"
 	"kdex.dev/web/internal/render"
 )
 
@@ -139,7 +138,7 @@ func (th *HostHandler) RebuildMux() {
 
 	mux := http.NewServeMux()
 
-	rootEntry := &menu.MenuEntry{}
+	rootEntry := &kdexv1alpha1.PageEntry{}
 	th.RenderPages.BuildMenuEntries(rootEntry, nil)
 
 	for _, handler := range th.RenderPages.List() {
@@ -174,7 +173,7 @@ func (th *HostHandler) RebuildMux() {
 
 func (th *HostHandler) L10nRender(
 	handler RenderPageHandler,
-	menuEntries *map[string]*menu.MenuEntry,
+	pageMap *map[string]*kdexv1alpha1.PageEntry,
 	lang language.Tag,
 ) (string, error) {
 	var messagePrinter *message.Printer
@@ -236,11 +235,11 @@ func (th *HostHandler) L10nRender(
 
 	renderer := render.Renderer{
 		Languages:      availableLangs,
-		Date:           time.Now(),
+		RenderTime:     time.Now(),
 		FootScript:     "",
 		HeadScript:     "",
 		Language:       lang.String(),
-		MenuEntries:    menuEntries,
+		PageMap:        pageMap,
 		MessagePrinter: messagePrinter,
 		Meta:           th.Host.Spec.BaseMeta,
 		Organization:   th.Host.Spec.Organization,
@@ -260,7 +259,7 @@ func (th *HostHandler) L10nRender(
 
 func (th *HostHandler) L10nRenders(
 	handler RenderPageHandler,
-	children *map[string]*menu.MenuEntry,
+	children *map[string]*kdexv1alpha1.PageEntry,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, l := range th.Translations.Languages() {

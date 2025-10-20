@@ -10,7 +10,6 @@ import (
 	"golang.org/x/text/message/catalog"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/menu"
 	"kdex.dev/web/internal/store"
 )
 
@@ -179,7 +178,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got, gotErr := th.L10nRender(store.RenderPageHandler{
 				Page: tt.page,
-			}, &map[string]*menu.MenuEntry{}, language.Make(tt.lang))
+			}, &map[string]*kdexv1alpha1.PageEntry{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 
@@ -255,7 +254,7 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got := th.L10nRenders(store.RenderPageHandler{
 				Page: tt.page,
-			}, &map[string]*menu.MenuEntry{})
+			}, &map[string]*kdexv1alpha1.PageEntry{})
 
 			for key, values := range tt.want {
 				l10nRender := got[key]

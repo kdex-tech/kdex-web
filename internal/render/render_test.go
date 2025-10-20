@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"kdex.dev/web/internal/menu"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
 func TestRenderOne(t *testing.T) {
 	r := &Renderer{}
 	templateContent := "Hello, {{.Title}}!"
-	data := TemplateData{
+	data := kdexv1alpha1.TemplateData{
 		Title: "World",
 	}
 	expected := "Hello, World!"
@@ -23,7 +23,7 @@ func TestRenderOne(t *testing.T) {
 func TestRenderOne_InvalidTemplate(t *testing.T) {
 	r := &Renderer{}
 	templateContent := "Hello, {{.Invalid}}!"
-	data := TemplateData{
+	data := kdexv1alpha1.TemplateData{
 		Title: "World",
 	}
 	_, err := r.RenderOne("test", templateContent, data)
@@ -33,11 +33,11 @@ func TestRenderOne_InvalidTemplate(t *testing.T) {
 func TestRenderAll(t *testing.T) {
 	testDate, _ := time.Parse("2006-01-02", "2025-09-20")
 	r := &Renderer{
-		Date:         testDate,
+		RenderTime:   testDate,
 		FootScript:   "<script>foot</script>",
 		HeadScript:   "<script>head</script>",
 		Language:     "en",
-		MenuEntries:  &map[string]*menu.MenuEntry{"home": {Path: "/"}},
+		PageMap:      &map[string]*kdexv1alpha1.PageEntry{"home": {Href: "/"}},
 		Meta:         `<meta name="description" content="test">`,
 		Organization: "Test Inc.",
 		Stylesheet:   "<style>body{}</style>",
@@ -68,7 +68,7 @@ func TestRenderAll(t *testing.T) {
 </html>`,
 		Contents: map[string]string{
 			"main":    "<h1>Welcome</h1>",
-			"sidebar": `<my-app-element id="sidebar" data-date="{{.Date.Format "2006-01-02"}}"></my-app-element>`,
+			"sidebar": `<my-app-element id="sidebar" data-date="{{.LastModified.Format "2006-01-02"}}"></my-app-element>`,
 		},
 		Navigations: map[string]string{
 			"main": "main-nav",

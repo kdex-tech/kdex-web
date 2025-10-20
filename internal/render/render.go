@@ -6,27 +6,27 @@ import (
 	"html/template"
 	"time"
 
-	"kdex.dev/web/internal/menu"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
 func (r *Renderer) RenderPage(page Page) (string, error) {
-	date := r.Date
+	date := r.RenderTime
 	if date.IsZero() {
 		date = time.Now()
 	}
 
-	menuEntries := &map[string]*menu.MenuEntry{}
-	if r.MenuEntries != nil {
-		menuEntries = r.MenuEntries
+	pageMap := map[string]*kdexv1alpha1.PageEntry{}
+	if r.PageMap != nil {
+		pageMap = *r.PageMap
 	}
 
-	templateData := TemplateData{
-		Date:         date,
+	templateData := kdexv1alpha1.TemplateData{
 		FootScript:   template.HTML(r.FootScript),
 		HeadScript:   template.HTML(r.HeadScript),
 		Language:     r.Language,
 		Languages:    r.Languages,
-		MenuEntries:  *menuEntries,
+		LastModified: date,
+		PageMap:      pageMap,
 		Meta:         template.HTML(r.Meta),
 		Organization: r.Organization,
 		Stylesheet:   template.HTML(r.Stylesheet),
@@ -76,7 +76,7 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 func (r *Renderer) RenderOne(
 	templateName string,
 	templateContent string,
-	data TemplateData,
+	data kdexv1alpha1.TemplateData,
 ) (string, error) {
 	funcs := template.FuncMap{
 		"l10n": func(key string, args ...string) string {

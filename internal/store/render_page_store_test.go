@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/menu"
 )
 
 func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
@@ -16,7 +15,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 		name string // description of this test case
 		// Named input parameters for target function.
 		items *map[string]RenderPageHandler
-		want  *map[string]*menu.MenuEntry
+		want  *map[string]*kdexv1alpha1.PageEntry
 	}{
 		{
 			name:  "empty",
@@ -40,10 +39,12 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*menu.MenuEntry{
+			want: &map[string]*kdexv1alpha1.PageEntry{
 				"Foo": {
-					Name: "foo",
-					Path: "/foo",
+					Name:   "foo",
+					Label:  "Foo",
+					Href:   "/foo",
+					Weight: resource.MustParse("0"),
 				},
 			},
 		},
@@ -96,20 +97,25 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*menu.MenuEntry{
+			want: &map[string]*kdexv1alpha1.PageEntry{
 				"Home": {
-					Children: &map[string]*menu.MenuEntry{
+					Children: &map[string]*kdexv1alpha1.PageEntry{
 						"Foo": {
-							Name: "foo",
-							Path: "/foo",
+							Href:   "/foo",
+							Label:  "Foo",
+							Name:   "foo",
+							Weight: resource.MustParse("0"),
 						},
 					},
-					Name: "home",
-					Path: "/home",
+					Href:   "/home",
+					Label:  "Home",
+					Name:   "home",
+					Weight: resource.MustParse("0"),
 				},
 				"Contact Us": {
+					Href:   "/contact",
+					Label:  "Contact Us",
 					Name:   "contact",
-					Path:   "/contact",
 					Weight: resource.MustParse("100"),
 				},
 			},
@@ -120,7 +126,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			rps := RenderPageStore{
 				handlers: *tt.items,
 			}
-			got := &menu.MenuEntry{}
+			got := &kdexv1alpha1.PageEntry{}
 			rps.BuildMenuEntries(got, nil)
 			assert.Equal(t, tt.want, got.Children)
 		})
