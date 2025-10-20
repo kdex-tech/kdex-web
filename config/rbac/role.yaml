@@ -8,6 +8,7 @@ rules:
   - kdex.dev
   resources:
   - microfrontendhost
+  - microfrontendstylesheets
   verbs:
   - get
   - list

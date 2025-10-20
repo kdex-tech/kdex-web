@@ -15,25 +15,27 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
-		items *map[string]kdexv1alpha1.MicroFrontEndRenderPage
+		items *map[string]RenderPageHandler
 		want  *map[string]*menu.MenuEntry
 	}{
 		{
 			name:  "empty",
-			items: &map[string]kdexv1alpha1.MicroFrontEndRenderPage{},
+			items: &map[string]RenderPageHandler{},
 			want:  nil,
 		},
 		{
 			name: "simple",
-			items: &map[string]kdexv1alpha1.MicroFrontEndRenderPage{
+			items: &map[string]RenderPageHandler{
 				"foo": {
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo",
-					},
-					Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
-						Path: "/foo",
-						PageComponents: kdexv1alpha1.PageComponents{
-							Title: "Foo",
+					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "foo",
+						},
+						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+							Path: "/foo",
+							PageComponents: kdexv1alpha1.PageComponents{
+								Title: "Foo",
+							},
 						},
 					},
 				},
@@ -47,43 +49,49 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 		},
 		{
 			name: "more complex",
-			items: &map[string]kdexv1alpha1.MicroFrontEndRenderPage{
+			items: &map[string]RenderPageHandler{
 				"foo": {
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "foo",
-					},
-					Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
-						Path: "/foo",
-						PageComponents: kdexv1alpha1.PageComponents{
-							Title: "Foo",
+					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "foo",
 						},
-						ParentPageRef: &corev1.LocalObjectReference{
-							Name: "home",
+						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+							Path: "/foo",
+							PageComponents: kdexv1alpha1.PageComponents{
+								Title: "Foo",
+							},
+							ParentPageRef: &corev1.LocalObjectReference{
+								Name: "home",
+							},
 						},
 					},
 				},
 				"home": {
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "home",
-					},
-					Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
-						Path: "/home",
-						PageComponents: kdexv1alpha1.PageComponents{
-							Title: "Home",
+					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "home",
+						},
+						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+							Path: "/home",
+							PageComponents: kdexv1alpha1.PageComponents{
+								Title: "Home",
+							},
 						},
 					},
 				},
 				"contact": {
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "contact",
-					},
-					Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
-						NavigationHints: &kdexv1alpha1.NavigationHints{
-							Weight: resource.MustParse("100"),
+					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "contact",
 						},
-						Path: "/contact",
-						PageComponents: kdexv1alpha1.PageComponents{
-							Title: "Contact Us",
+						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+							NavigationHints: &kdexv1alpha1.NavigationHints{
+								Weight: resource.MustParse("100"),
+							},
+							Path: "/contact",
+							PageComponents: kdexv1alpha1.PageComponents{
+								Title: "Contact Us",
+							},
 						},
 					},
 				},

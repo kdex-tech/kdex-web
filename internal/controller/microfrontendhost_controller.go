@@ -18,17 +18,22 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal/store"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const hostFinalizerName = "kdex.dev/kdex-web-host-finalizer"
@@ -44,6 +49,7 @@ type MicroFrontEndHostReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhosts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhosts/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhosts/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendstylesheets,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -81,6 +87,36 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, nil
 	}
 
+	var stylesheet kdexv1alpha1.MicroFrontEndStylesheet
+	if host.Spec.DefaultStylesheetRef != nil {
+		stylesheetName := types.NamespacedName{
+			Name:      host.Spec.DefaultStylesheetRef.Name,
+			Namespace: host.Namespace,
+		}
+		if err := r.Get(ctx, stylesheetName, &stylesheet); err != nil {
+			if errors.IsNotFound(err) {
+				log.Error(err, "referenced MicroFrontEndStylesheet not found", "name", stylesheetName.Name)
+				apimeta.SetStatusCondition(
+					&host.Status.Conditions,
+					*kdexv1alpha1.NewCondition(
+						kdexv1alpha1.ConditionTypeReady,
+						metav1.ConditionFalse,
+						kdexv1alpha1.ConditionReasonReconcileError,
+						fmt.Sprintf("referenced MicroFrontEndStylesheet %s not found", stylesheetName.Name),
+					),
+				)
+				if err := r.Status().Update(ctx, &host); err != nil {
+					return ctrl.Result{}, err
+				}
+
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			}
+
+			log.Error(err, "unable to fetch MicroFrontEndStylesheet", "name", stylesheetName.Name)
+			return ctrl.Result{}, err
+		}
+	}
+
 	trackedHost, ok := r.HostStore.Get(host.Name)
 
 	if !ok {
@@ -115,6 +151,40 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *MicroFrontEndHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.MicroFrontEndHost{}).
+		Watches(
+			&kdexv1alpha1.MicroFrontEndStylesheet{},
+			handler.EnqueueRequestsFromMapFunc(r.findHostsForStylesheet)).
 		Named("microfrontendhost").
 		Complete(r)
+}
+
+func (r *MicroFrontEndHostReconciler) findHostsForStylesheet(
+	ctx context.Context,
+	stylesheet client.Object,
+) []reconcile.Request {
+	log := logf.FromContext(ctx)
+
+	var hostsList kdexv1alpha1.MicroFrontEndHostList
+	if err := r.List(ctx, &hostsList, &client.ListOptions{
+		Namespace: stylesheet.GetNamespace(),
+	}); err != nil {
+		log.Error(err, "unable to list MicroFrontEndHost for stylesheet", "name", stylesheet.GetName())
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, 0, len(hostsList.Items))
+	for _, host := range hostsList.Items {
+		if host.Spec.DefaultStylesheetRef == nil {
+			continue
+		}
+		if host.Spec.DefaultStylesheetRef.Name == stylesheet.GetName() {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      host.Name,
+					Namespace: host.Namespace,
+				},
+			})
+		}
+	}
+	return requests
 }

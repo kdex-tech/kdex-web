@@ -11,7 +11,7 @@ type RenderPageStore struct {
 	host     kdexv1alpha1.MicroFrontEndHost
 	mu       sync.RWMutex
 	onUpdate func()
-	pages    map[string]kdexv1alpha1.MicroFrontEndRenderPage
+	pages    map[string]RenderPageHandler
 }
 
 func (s *RenderPageStore) Delete(name string) {
@@ -23,26 +23,26 @@ func (s *RenderPageStore) Delete(name string) {
 	}
 }
 
-func (s *RenderPageStore) Get(name string) (kdexv1alpha1.MicroFrontEndRenderPage, bool) {
+func (s *RenderPageStore) Get(name string) (RenderPageHandler, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	page, ok := s.pages[name]
 	return page, ok
 }
 
-func (s *RenderPageStore) List() []kdexv1alpha1.MicroFrontEndRenderPage {
+func (s *RenderPageStore) List() []RenderPageHandler {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	pages := []kdexv1alpha1.MicroFrontEndRenderPage{}
+	pages := []RenderPageHandler{}
 	for _, page := range s.pages {
 		pages = append(pages, page)
 	}
 	return pages
 }
 
-func (s *RenderPageStore) Set(page kdexv1alpha1.MicroFrontEndRenderPage) {
+func (s *RenderPageStore) Set(page RenderPageHandler) {
 	s.mu.Lock()
-	s.pages[page.Name] = page
+	s.pages[page.Page.Name] = page
 	s.mu.Unlock()
 	if s.onUpdate != nil {
 		s.onUpdate()
@@ -54,11 +54,12 @@ func (s *RenderPageStore) BuildMenuEntries(
 	parent *kdexv1alpha1.MicroFrontEndRenderPage,
 ) {
 	for _, item := range s.List() {
-		if (parent == nil && item.Spec.ParentPageRef == nil) ||
-			(parent != nil && item.Spec.ParentPageRef != nil &&
-				parent.Name == item.Spec.ParentPageRef.Name) {
+		page := item.Page
+		if (parent == nil && page.Spec.ParentPageRef == nil) ||
+			(parent != nil && page.Spec.ParentPageRef != nil &&
+				parent.Name == page.Spec.ParentPageRef.Name) {
 
-			if parent != nil && parent.Name == item.Name {
+			if parent != nil && parent.Name == page.Name {
 				continue
 			}
 
@@ -66,21 +67,21 @@ func (s *RenderPageStore) BuildMenuEntries(
 				entry.Children = &map[string]*menu.MenuEntry{}
 			}
 
-			label := item.Spec.PageComponents.Title
+			label := page.Spec.PageComponents.Title
 
 			menuEntry := menu.MenuEntry{
-				Name: item.Name,
-				Path: item.Spec.Path,
+				Name: page.Name,
+				Path: page.Spec.Path,
 			}
 
-			if item.Spec.NavigationHints != nil {
-				menuEntry.Icon = item.Spec.NavigationHints.Icon
-				menuEntry.Weight = item.Spec.NavigationHints.Weight
+			if page.Spec.NavigationHints != nil {
+				menuEntry.Icon = page.Spec.NavigationHints.Icon
+				menuEntry.Weight = page.Spec.NavigationHints.Weight
 			}
 
 			(*entry.Children)[label] = &menuEntry
 
-			s.BuildMenuEntries(&menuEntry, &item)
+			s.BuildMenuEntries(&menuEntry, &page)
 		}
 	}
 }

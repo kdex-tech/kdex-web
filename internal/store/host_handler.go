@@ -23,7 +23,6 @@ type HostHandler struct {
 	defaultLang          string
 	log                  logr.Logger
 	mu                   sync.RWMutex
-	supportedLangs       []language.Tag
 	translationResources map[string]kdexv1alpha1.MicroFrontEndTranslation
 }
 
@@ -34,12 +33,12 @@ func NewHostHandler(
 	th := &HostHandler{
 		Host:                 host,
 		log:                  log,
-		translationResources: make(map[string]kdexv1alpha1.MicroFrontEndTranslation),
+		translationResources: map[string]kdexv1alpha1.MicroFrontEndTranslation{},
 	}
 	th.updateHostDependentFields()
 	rps := &RenderPageStore{
 		host:     host,
-		pages:    make(map[string]kdexv1alpha1.MicroFrontEndRenderPage),
+		pages:    map[string]RenderPageHandler{},
 		onUpdate: th.RebuildMux,
 	}
 	th.RenderPages = rps
@@ -70,6 +69,10 @@ func (th *HostHandler) RemoveTranslation(translation kdexv1alpha1.MicroFrontEndT
 func (th *HostHandler) rebuildTranslationsLocked() {
 	catalogBuilder := catalog.NewBuilder()
 
+	if err := catalogBuilder.SetString(language.Make(th.defaultLang), "_", "_"); err != nil {
+		th.log.Error(err, "failed to add default placeholder translation")
+	}
+
 	for _, translation := range th.translationResources {
 		for _, tr := range translation.Spec.Translations {
 			for key, value := range tr.KeysAndValues {
@@ -80,6 +83,7 @@ func (th *HostHandler) rebuildTranslationsLocked() {
 			}
 		}
 	}
+
 	th.setTranslationsLocked(catalogBuilder)
 }
 
@@ -121,15 +125,11 @@ func (th *HostHandler) updateHostDependentFields() {
 	}
 	th.defaultLang = defaultLang
 
-	supportedLangs := []language.Tag{}
-	if len(th.Host.Spec.SupportedLangs) > 0 {
-		for _, lang := range th.Host.Spec.SupportedLangs {
-			supportedLangs = append(supportedLangs, language.Make(lang))
-		}
-	} else {
-		supportedLangs = append(supportedLangs, language.Make(defaultLang))
+	catalogBuilder := catalog.NewBuilder()
+	if err := catalogBuilder.SetString(language.Make(th.defaultLang), "_", "_"); err != nil {
+		th.log.Error(err, "failed to add default placeholder translation")
 	}
-	th.supportedLangs = supportedLangs
+	th.Translations = catalogBuilder
 }
 
 func (th *HostHandler) RebuildMux() {
@@ -141,14 +141,14 @@ func (th *HostHandler) RebuildMux() {
 	rootEntry := &menu.MenuEntry{}
 	th.RenderPages.BuildMenuEntries(rootEntry, nil)
 
-	pages := th.RenderPages.List()
-	for i := range pages {
-		page := pages[i]
+	handlers := th.RenderPages.List()
+	for i := range handlers {
+		page := handlers[i].Page
 
 		l10nRenders := th.L10nRenders(page, rootEntry.Children)
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			lang := kdexhttp.GetLang(r, th.defaultLang, th.supportedLangs)
+			lang := kdexhttp.GetLang(r, th.defaultLang, th.Translations.Languages())
 
 			rendered, ok := l10nRenders[lang.String()]
 
@@ -186,6 +186,14 @@ func (th *HostHandler) L10nRender(
 		)
 	}
 
+	// stylesheet := th.Host.Spec.Stylesheet
+	// prefix := strings.ToLower(stylesheet[0:4])
+	// if prefix == "http" {
+	// 	stylesheet = fmt.Sprintf(`<link rel="stylesheet" href="%s">`, stylesheet)
+	// } else {
+	// 	stylesheet = fmt.Sprintf(`<style>%s</style>`, stylesheet)
+	// }
+
 	renderer := render.Renderer{
 		Date:           time.Now(),
 		FootScript:     "",
@@ -195,7 +203,7 @@ func (th *HostHandler) L10nRender(
 		MessagePrinter: messagePrinter,
 		Meta:           th.Host.Spec.BaseMeta,
 		Organization:   th.Host.Spec.Organization,
-		Stylesheet:     th.Host.Spec.Stylesheet,
+		Stylesheet:     "",
 	}
 
 	return renderer.RenderPage(render.Page{
@@ -214,7 +222,7 @@ func (th *HostHandler) L10nRenders(
 	children *map[string]*menu.MenuEntry,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
-	for _, lang := range th.supportedLangs {
+	for _, lang := range th.Translations.Languages() {
 		rendered, err := th.L10nRender(page, children, lang)
 		if err != nil {
 			th.log.Error(err, "failed to render page for language", "page", page.Name, "lang", lang)

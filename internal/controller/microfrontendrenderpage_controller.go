@@ -118,13 +118,46 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, err
 	}
 
+	var stylesheet *kdexv1alpha1.MicroFrontEndStylesheet
+	if renderPage.Spec.StylesheetRef != nil {
+		stylesheetName := types.NamespacedName{
+			Name:      renderPage.Spec.StylesheetRef.Name,
+			Namespace: renderPage.Namespace,
+		}
+		if err := r.Get(ctx, stylesheetName, stylesheet); err != nil {
+			if errors.IsNotFound(err) {
+				log.Error(err, "referenced MicroFrontEndStylesheet not found", "name", stylesheetName.Name)
+				apimeta.SetStatusCondition(
+					&host.Status.Conditions,
+					*kdexv1alpha1.NewCondition(
+						kdexv1alpha1.ConditionTypeReady,
+						metav1.ConditionFalse,
+						kdexv1alpha1.ConditionReasonReconcileError,
+						fmt.Sprintf("referenced MicroFrontEndStylesheet %s not found", stylesheetName.Name),
+					),
+				)
+				if err := r.Status().Update(ctx, &renderPage); err != nil {
+					return ctrl.Result{}, err
+				}
+
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			}
+
+			log.Error(err, "unable to fetch MicroFrontEndStylesheet", "name", stylesheetName.Name)
+			return ctrl.Result{}, err
+		}
+	}
+
 	trackedHost, ok := r.HostStore.Get(renderPage.Spec.HostRef.Name)
 
 	if !ok {
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	trackedHost.RenderPages.Set(renderPage)
+	trackedHost.RenderPages.Set(store.RenderPageHandler{
+		Page:       renderPage,
+		Stylesheet: stylesheet,
+	})
 
 	log.Info("reconciled MicroFrontEndRenderPage")
 
