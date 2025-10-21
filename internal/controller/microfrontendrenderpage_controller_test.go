@@ -89,7 +89,9 @@ var _ = Describe("MicroFrontEndRenderPage Controller", func() {
 						PrimaryTemplate: primaryTemplate,
 						Title:           "TITLE",
 					},
-					Path: "/",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
+					},
 				},
 			}
 

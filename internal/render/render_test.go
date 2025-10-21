@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	kdextemplate "kdex.dev/crds/api/template"
 )
 
 func TestRenderOne(t *testing.T) {
 	r := &Renderer{}
 	templateContent := "Hello, {{.Title}}!"
-	data := kdexv1alpha1.TemplateData{
+	data := kdextemplate.TemplateData{
 		Title: "World",
 	}
 	expected := "Hello, World!"
@@ -23,7 +23,7 @@ func TestRenderOne(t *testing.T) {
 func TestRenderOne_InvalidTemplate(t *testing.T) {
 	r := &Renderer{}
 	templateContent := "Hello, {{.Invalid}}!"
-	data := kdexv1alpha1.TemplateData{
+	data := kdextemplate.TemplateData{
 		Title: "World",
 	}
 	_, err := r.RenderOne("test", templateContent, data)
@@ -37,7 +37,7 @@ func TestRenderAll(t *testing.T) {
 		FootScript:   "<script>foot</script>",
 		HeadScript:   "<script>head</script>",
 		Language:     "en",
-		PageMap:      &map[string]*kdexv1alpha1.PageEntry{"home": {Href: "/"}},
+		PageMap:      &map[string]*kdextemplate.PageEntry{"home": {Href: "/"}},
 		Meta:         `<meta name="description" content="test">`,
 		Organization: "Test Inc.",
 		Stylesheet:   "<style>body{}</style>",

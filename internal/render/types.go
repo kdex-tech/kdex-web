@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"golang.org/x/text/message"
-	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	kdextemplate "kdex.dev/crds/api/template"
 )
 
 type Page struct {
@@ -25,7 +25,7 @@ type Renderer struct {
 	MessagePrinter *message.Printer
 	Meta           string
 	Organization   string
-	PageMap        *map[string]*kdexv1alpha1.PageEntry
+	PageMap        *map[string]*kdextemplate.PageEntry
 	RenderTime     time.Time
 	Stylesheet     string
 }

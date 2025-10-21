@@ -3,7 +3,10 @@ package store
 import (
 	"sync"
 
+	"golang.org/x/text/language"
+	"golang.org/x/text/message/catalog"
 	"k8s.io/apimachinery/pkg/api/resource"
+	kdextemplate "kdex.dev/crds/api/template"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
@@ -50,7 +53,9 @@ func (s *RenderPageStore) Set(handler RenderPageHandler) {
 }
 
 func (s *RenderPageStore) BuildMenuEntries(
-	entry *kdexv1alpha1.PageEntry,
+	entry *kdextemplate.PageEntry,
+	l *language.Tag,
+	translations *catalog.Builder,
 	parent *kdexv1alpha1.MicroFrontEndRenderPage,
 ) {
 	for _, handler := range s.List() {
@@ -65,13 +70,13 @@ func (s *RenderPageStore) BuildMenuEntries(
 			}
 
 			if entry.Children == nil {
-				entry.Children = &map[string]*kdexv1alpha1.PageEntry{}
+				entry.Children = &map[string]*kdextemplate.PageEntry{}
 			}
 
 			label := page.Spec.PageComponents.Title
 
-			pageEntry := kdexv1alpha1.PageEntry{
-				Href:   page.Spec.Path,
+			pageEntry := kdextemplate.PageEntry{
+				Href:   page.Spec.Paths.BasePath,
 				Label:  page.Spec.PageComponents.Title,
 				Name:   page.Name,
 				Weight: resource.MustParse("0"),
@@ -84,7 +89,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 
 			(*entry.Children)[label] = &pageEntry
 
-			s.BuildMenuEntries(&pageEntry, &page)
+			s.BuildMenuEntries(&pageEntry, l, translations, &page)
 		}
 	}
 }

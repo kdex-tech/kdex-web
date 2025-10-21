@@ -10,6 +10,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"golang.org/x/text/message/catalog"
+	kdextemplate "kdex.dev/crds/api/template"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	kdexhttp "kdex.dev/web/internal/http"
 	"kdex.dev/web/internal/render"
@@ -138,13 +139,18 @@ func (th *HostHandler) RebuildMux() {
 
 	mux := http.NewServeMux()
 
-	rootEntry := &kdexv1alpha1.PageEntry{}
-	th.RenderPages.BuildMenuEntries(rootEntry, nil)
+	l10nPageMaps := map[language.Tag]*map[string]*kdextemplate.PageEntry{}
+
+	for _, l := range th.Translations.Languages() {
+		rootEntry := &kdextemplate.PageEntry{}
+		th.RenderPages.BuildMenuEntries(rootEntry, &l, th.Translations, nil)
+		l10nPageMaps[l] = rootEntry.Children
+	}
 
 	for _, handler := range th.RenderPages.List() {
 		page := handler.Page
 
-		l10nRenders := th.L10nRenders(handler, rootEntry.Children)
+		l10nRenders := th.L10nRenders(handler, l10nPageMaps)
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
@@ -165,7 +171,7 @@ func (th *HostHandler) RebuildMux() {
 			}
 		}
 
-		mux.HandleFunc("GET "+page.Spec.Path, handler)
+		mux.HandleFunc("GET "+page.Spec.Paths.BasePath, handler)
 	}
 
 	th.Mux = mux
@@ -173,7 +179,7 @@ func (th *HostHandler) RebuildMux() {
 
 func (th *HostHandler) L10nRender(
 	handler RenderPageHandler,
-	pageMap *map[string]*kdexv1alpha1.PageEntry,
+	pageMap *map[string]*kdextemplate.PageEntry,
 	lang language.Tag,
 ) (string, error) {
 	var messagePrinter *message.Printer
@@ -259,11 +265,11 @@ func (th *HostHandler) L10nRender(
 
 func (th *HostHandler) L10nRenders(
 	handler RenderPageHandler,
-	children *map[string]*kdexv1alpha1.PageEntry,
+	pageMaps map[language.Tag]*map[string]*kdextemplate.PageEntry,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, l := range th.Translations.Languages() {
-		rendered, err := th.L10nRender(handler, children, l)
+		rendered, err := th.L10nRender(handler, pageMaps[l], l)
 		if err != nil {
 			th.log.Error(err, "failed to render page for language", "page", handler.Page.Name, "language", l)
 			continue

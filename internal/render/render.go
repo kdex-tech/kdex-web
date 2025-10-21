@@ -6,7 +6,7 @@ import (
 	"html/template"
 	"time"
 
-	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	kdextemplate "kdex.dev/crds/api/template"
 )
 
 func (r *Renderer) RenderPage(page Page) (string, error) {
@@ -15,12 +15,12 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 		date = time.Now()
 	}
 
-	pageMap := map[string]*kdexv1alpha1.PageEntry{}
+	pageMap := map[string]*kdextemplate.PageEntry{}
 	if r.PageMap != nil {
 		pageMap = *r.PageMap
 	}
 
-	templateData := kdexv1alpha1.TemplateData{
+	templateData := kdextemplate.TemplateData{
 		FootScript:   template.HTML(r.FootScript),
 		HeadScript:   template.HTML(r.HeadScript),
 		Language:     r.Language,
@@ -76,7 +76,7 @@ func (r *Renderer) RenderPage(page Page) (string, error) {
 func (r *Renderer) RenderOne(
 	templateName string,
 	templateContent string,
-	data kdexv1alpha1.TemplateData,
+	data kdextemplate.TemplateData,
 ) (string, error) {
 	funcs := template.FuncMap{
 		"l10n": func(key string, args ...string) string {

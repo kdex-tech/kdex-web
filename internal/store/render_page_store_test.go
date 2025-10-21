@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message/catalog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kdextemplate "kdex.dev/crds/api/template"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
@@ -15,7 +18,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 		name string // description of this test case
 		// Named input parameters for target function.
 		items *map[string]RenderPageHandler
-		want  *map[string]*kdexv1alpha1.PageEntry
+		want  *map[string]*kdextemplate.PageEntry
 	}{
 		{
 			name:  "empty",
@@ -31,7 +34,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 							Name: "foo",
 						},
 						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
-							Path: "/foo",
+							Paths: kdexv1alpha1.Paths{
+								BasePath: "/foo",
+							},
 							PageComponents: kdexv1alpha1.PageComponents{
 								Title: "Foo",
 							},
@@ -39,7 +44,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*kdexv1alpha1.PageEntry{
+			want: &map[string]*kdextemplate.PageEntry{
 				"Foo": {
 					Name:   "foo",
 					Label:  "Foo",
@@ -57,7 +62,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 							Name: "foo",
 						},
 						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
-							Path: "/foo",
+							Paths: kdexv1alpha1.Paths{
+								BasePath: "/foo",
+							},
 							PageComponents: kdexv1alpha1.PageComponents{
 								Title: "Foo",
 							},
@@ -73,7 +80,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 							Name: "home",
 						},
 						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
-							Path: "/home",
+							Paths: kdexv1alpha1.Paths{
+								BasePath: "/home",
+							},
 							PageComponents: kdexv1alpha1.PageComponents{
 								Title: "Home",
 							},
@@ -89,7 +98,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 							NavigationHints: &kdexv1alpha1.NavigationHints{
 								Weight: resource.MustParse("100"),
 							},
-							Path: "/contact",
+							Paths: kdexv1alpha1.Paths{
+								BasePath: "/contact",
+							},
 							PageComponents: kdexv1alpha1.PageComponents{
 								Title: "Contact Us",
 							},
@@ -97,9 +108,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*kdexv1alpha1.PageEntry{
+			want: &map[string]*kdextemplate.PageEntry{
 				"Home": {
-					Children: &map[string]*kdexv1alpha1.PageEntry{
+					Children: &map[string]*kdextemplate.PageEntry{
 						"Foo": {
 							Href:   "/foo",
 							Label:  "Foo",
@@ -126,8 +137,8 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			rps := RenderPageStore{
 				handlers: *tt.items,
 			}
-			got := &kdexv1alpha1.PageEntry{}
-			rps.BuildMenuEntries(got, nil)
+			got := &kdextemplate.PageEntry{}
+			rps.BuildMenuEntries(got, &language.English, catalog.NewBuilder(), nil)
 			assert.Equal(t, tt.want, got.Children)
 		})
 	}

@@ -9,6 +9,7 @@ import (
 	"golang.org/x/text/message"
 	"golang.org/x/text/message/catalog"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kdextemplate "kdex.dev/crds/api/template"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal/store"
 )
@@ -79,7 +80,9 @@ func TestHostHandler_L10nRender(t *testing.T) {
 						PrimaryTemplate: primaryTemplate,
 						Title:           "TITLE",
 					},
-					Path: "/",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
+					},
 				},
 			},
 			lang: "en",
@@ -121,7 +124,9 @@ func TestHostHandler_L10nRender(t *testing.T) {
 						PrimaryTemplate: primaryTemplate,
 						Title:           "TITLE",
 					},
-					Path: "/",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
+					},
 				},
 			},
 			lang: "fr",
@@ -163,7 +168,9 @@ func TestHostHandler_L10nRender(t *testing.T) {
 						PrimaryTemplate: primaryTemplate,
 						Title:           "TITLE",
 					},
-					Path: "/",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
+					},
 				},
 			},
 			lang: "en",
@@ -178,7 +185,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got, gotErr := th.L10nRender(store.RenderPageHandler{
 				Page: tt.page,
-			}, &map[string]*kdexv1alpha1.PageEntry{}, language.Make(tt.lang))
+			}, &map[string]*kdextemplate.PageEntry{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 
@@ -227,7 +234,9 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 						PrimaryTemplate: primaryTemplate,
 						Title:           "TITLE",
 					},
-					Path: "/",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
+					},
 				},
 			},
 			translations: func() *catalog.Builder {
@@ -254,7 +263,7 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got := th.L10nRenders(store.RenderPageHandler{
 				Page: tt.page,
-			}, &map[string]*kdexv1alpha1.PageEntry{})
+			}, map[language.Tag]*map[string]*kdextemplate.PageEntry{})
 
 			for key, values := range tt.want {
 				l10nRender := got[key]
