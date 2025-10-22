@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 	"golang.org/x/text/message/catalog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -15,10 +16,10 @@ import (
 
 func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 	tests := []struct {
-		name string // description of this test case
-		// Named input parameters for target function.
-		items *map[string]RenderPageHandler
-		want  *map[string]*kdextemplate.PageEntry
+		name              string
+		items             *map[string]RenderPageHandler
+		isDefaultLanguage bool
+		want              *map[string]*kdextemplate.PageEntry
 	}{
 		{
 			name:  "empty",
@@ -26,7 +27,8 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			want:  nil,
 		},
 		{
-			name: "simple",
+			name:              "simple",
+			isDefaultLanguage: true,
 			items: &map[string]RenderPageHandler{
 				"foo": {
 					Page: kdexv1alpha1.MicroFrontEndRenderPage{
@@ -45,16 +47,17 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 				},
 			},
 			want: &map[string]*kdextemplate.PageEntry{
-				"Foo": {
+				"Foo Translated": {
 					Name:   "foo",
-					Label:  "Foo",
+					Label:  "Foo Translated",
 					Href:   "/foo",
 					Weight: resource.MustParse("0"),
 				},
 			},
 		},
 		{
-			name: "more complex",
+			name:              "more complex",
+			isDefaultLanguage: true,
 			items: &map[string]RenderPageHandler{
 				"foo": {
 					Page: kdexv1alpha1.MicroFrontEndRenderPage{
@@ -111,9 +114,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			want: &map[string]*kdextemplate.PageEntry{
 				"Home": {
 					Children: &map[string]*kdextemplate.PageEntry{
-						"Foo": {
+						"Foo Translated": {
 							Href:   "/foo",
-							Label:  "Foo",
+							Label:  "Foo Translated",
 							Name:   "foo",
 							Weight: resource.MustParse("0"),
 						},
@@ -131,14 +134,48 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:              "none default language",
+			isDefaultLanguage: false,
+			items: &map[string]RenderPageHandler{
+				"foo": {
+					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "foo",
+						},
+						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+							Paths: kdexv1alpha1.Paths{
+								BasePath: "/foo",
+							},
+							PageComponents: kdexv1alpha1.PageComponents{
+								Title: "Foo",
+							},
+						},
+					},
+				},
+			},
+			want: &map[string]*kdextemplate.PageEntry{
+				"Foo Translated": {
+					Name:   "foo",
+					Label:  "Foo Translated",
+					Href:   "/en/foo",
+					Weight: resource.MustParse("0"),
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rps := RenderPageStore{
 				handlers: *tt.items,
 			}
+			tag := language.English
+			catalogBuilder := catalog.NewBuilder()
+			catalogBuilder.SetString(language.English, "Foo", "Foo Translated")
+			messagePrinter := message.NewPrinter(tag, message.Catalog(catalogBuilder))
 			got := &kdextemplate.PageEntry{}
-			rps.BuildMenuEntries(got, &language.English, catalog.NewBuilder(), true, nil)
+
+			rps.BuildMenuEntries(got, &tag, messagePrinter, tt.isDefaultLanguage, nil)
 			assert.Equal(t, tt.want, got.Children)
 		})
 	}

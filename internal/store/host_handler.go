@@ -135,6 +135,12 @@ func (th *HostHandler) RebuildMux() {
 		}
 
 		mux.HandleFunc("GET "+page.Spec.Paths.BasePath, handler)
+		mux.HandleFunc("GET /{l10n}"+page.Spec.Paths.BasePath, handler)
+
+		if page.Spec.Paths.PatternPath != "" {
+			mux.HandleFunc("GET "+page.Spec.Paths.PatternPath, handler)
+			mux.HandleFunc("GET /{l10n}"+page.Spec.Paths.PatternPath, handler)
+		}
 	}
 
 	th.Mux = mux
@@ -199,7 +205,7 @@ func (th *HostHandler) generatePageMapsLocked() map[language.Tag]*map[string]*kd
 	for _, l := range th.Translations.Languages() {
 		rootEntry := &kdextemplate.PageEntry{}
 		th.RenderPages.BuildMenuEntries(
-			rootEntry, &l, th.Translations, l.String() == th.defaultLanguage, nil)
+			rootEntry, &l, th.messagePrinterLocked(l), l.String() == th.defaultLanguage, nil)
 		l10nPageMaps[l] = rootEntry.Children
 	}
 

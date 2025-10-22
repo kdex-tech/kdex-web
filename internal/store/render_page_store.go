@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"golang.org/x/text/language"
-	"golang.org/x/text/message/catalog"
+	"golang.org/x/text/message"
 	"k8s.io/apimachinery/pkg/api/resource"
 	kdextemplate "kdex.dev/crds/api/template"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
@@ -55,7 +55,7 @@ func (s *RenderPageStore) Set(handler RenderPageHandler) {
 func (s *RenderPageStore) BuildMenuEntries(
 	entry *kdextemplate.PageEntry,
 	l *language.Tag,
-	translations *catalog.Builder,
+	messagePrinter *message.Printer,
 	isDefaultLanguage bool,
 	parent *kdexv1alpha1.MicroFrontEndRenderPage,
 ) {
@@ -74,11 +74,16 @@ func (s *RenderPageStore) BuildMenuEntries(
 				entry.Children = &map[string]*kdextemplate.PageEntry{}
 			}
 
-			label := page.Spec.PageComponents.Title
+			label := messagePrinter.Sprintf(page.Spec.PageComponents.Title)
+			href := page.Spec.Paths.BasePath
+
+			if !isDefaultLanguage {
+				href = "/" + l.String() + href
+			}
 
 			pageEntry := kdextemplate.PageEntry{
-				Href:   page.Spec.Paths.BasePath,
-				Label:  page.Spec.PageComponents.Title,
+				Href:   href,
+				Label:  label,
 				Name:   page.Name,
 				Weight: resource.MustParse("0"),
 			}
@@ -91,7 +96,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 			(*entry.Children)[label] = &pageEntry
 
 			s.BuildMenuEntries(
-				&pageEntry, l, translations, isDefaultLanguage, &page)
+				&pageEntry, l, messagePrinter, isDefaultLanguage, &page)
 		}
 	}
 }
