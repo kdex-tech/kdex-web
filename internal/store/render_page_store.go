@@ -56,6 +56,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 	entry *kdextemplate.PageEntry,
 	l *language.Tag,
 	translations *catalog.Builder,
+	isDefaultLanguage bool,
 	parent *kdexv1alpha1.MicroFrontEndRenderPage,
 ) {
 	for _, handler := range s.List() {
@@ -89,7 +90,8 @@ func (s *RenderPageStore) BuildMenuEntries(
 
 			(*entry.Children)[label] = &pageEntry
 
-			s.BuildMenuEntries(&pageEntry, l, translations, &page)
+			s.BuildMenuEntries(
+				&pageEntry, l, translations, isDefaultLanguage, &page)
 		}
 	}
 }

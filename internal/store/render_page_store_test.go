@@ -138,7 +138,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 				handlers: *tt.items,
 			}
 			got := &kdextemplate.PageEntry{}
-			rps.BuildMenuEntries(got, &language.English, catalog.NewBuilder(), nil)
+			rps.BuildMenuEntries(got, &language.English, catalog.NewBuilder(), true, nil)
 			assert.Equal(t, tt.want, got.Children)
 		})
 	}

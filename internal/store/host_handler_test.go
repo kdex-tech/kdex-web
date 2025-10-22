@@ -41,7 +41,7 @@ const (
 </html>`
 )
 
-func TestHostHandler_L10nRender(t *testing.T) {
+func TestHostHandler_L10nRenderLocked(t *testing.T) {
 	tests := []struct {
 		name         string
 		host         kdexv1alpha1.MicroFrontEndHost
@@ -183,7 +183,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 
 			th := store.NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
-			got, gotErr := th.L10nRender(store.RenderPageHandler{
+			got, gotErr := th.L10nRenderLocked(store.RenderPageHandler{
 				Page: tt.page,
 			}, &map[string]*kdextemplate.PageEntry{}, language.Make(tt.lang))
 
@@ -196,7 +196,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 	}
 }
 
-func TestHostHandler_L10nRenders(t *testing.T) {
+func TestHostHandler_L10nRendersLocked(t *testing.T) {
 	tests := []struct {
 		name         string
 		host         kdexv1alpha1.MicroFrontEndHost
@@ -261,7 +261,7 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 
 			th := store.NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
-			got := th.L10nRenders(store.RenderPageHandler{
+			got := th.L10nRendersLocked(store.RenderPageHandler{
 				Page: tt.page,
 			}, map[language.Tag]*map[string]*kdextemplate.PageEntry{})
 
