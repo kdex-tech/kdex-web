@@ -98,7 +98,6 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 	}
 	if err := r.Get(ctx, hostName, &host); err != nil {
 		if errors.IsNotFound(err) {
-			log.Error(err, "referenced MicroFrontEndHost not found", "name", translation.Spec.HostRef.Name)
 			apimeta.SetStatusCondition(
 				&translation.Status.Conditions,
 				*kdexv1alpha1.NewCondition(
@@ -119,6 +118,8 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{}, err
 	}
 
+	log.Info("reconciled MicroFrontEndTranslation")
+
 	trackedHost, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
 
 	if !ok {
@@ -126,8 +127,6 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 	}
 
 	trackedHost.AddOrUpdateTranslation(translation)
-
-	log.Info("reconciled MicroFrontEndTranslation")
 
 	apimeta.SetStatusCondition(
 		&translation.Status.Conditions,

@@ -39,6 +39,7 @@ func NewHostHandler(
 	rps := &RenderPageStore{
 		host:     host,
 		handlers: map[string]RenderPageHandler{},
+		log:      log.WithName("render-page-store"),
 		onUpdate: th.RebuildMux,
 	}
 	th.RenderPages = rps
@@ -47,6 +48,7 @@ func NewHostHandler(
 }
 
 func (th *HostHandler) AddOrUpdateTranslation(translation kdexv1alpha1.MicroFrontEndTranslation) {
+	th.log.Info("add or update translation")
 	th.mu.Lock()
 	th.translationResources[translation.Name] = translation
 	th.rebuildTranslationsLocked()
@@ -103,6 +105,7 @@ func (th *HostHandler) L10nRendersLocked(
 }
 
 func (th *HostHandler) RebuildMux() {
+	th.log.Info("rebuilding mux")
 	th.mu.Lock()
 	defer th.mu.Unlock()
 

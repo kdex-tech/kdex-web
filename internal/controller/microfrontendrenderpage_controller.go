@@ -97,7 +97,6 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 	}
 	if err := r.Get(ctx, hostName, &host); err != nil {
 		if errors.IsNotFound(err) {
-			log.Error(err, "referenced MicroFrontEndHost not found", "name", renderPage.Spec.HostRef.Name)
 			apimeta.SetStatusCondition(
 				&renderPage.Status.Conditions,
 				*kdexv1alpha1.NewCondition(
@@ -126,7 +125,6 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		}
 		if err := r.Get(ctx, stylesheetName, &stylesheet); err != nil {
 			if errors.IsNotFound(err) {
-				log.Error(err, "referenced MicroFrontEndStylesheet not found", "name", stylesheetName.Name)
 				apimeta.SetStatusCondition(
 					&host.Status.Conditions,
 					*kdexv1alpha1.NewCondition(
@@ -148,6 +146,8 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		}
 	}
 
+	log.Info("reconciled MicroFrontEndRenderPage")
+
 	trackedHost, ok := r.HostStore.Get(renderPage.Spec.HostRef.Name)
 
 	if !ok {
@@ -158,8 +158,6 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		Page:       renderPage,
 		Stylesheet: &stylesheet,
 	})
-
-	log.Info("reconciled MicroFrontEndRenderPage")
 
 	apimeta.SetStatusCondition(
 		&renderPage.Status.Conditions,

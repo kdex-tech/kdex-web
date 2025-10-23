@@ -3,6 +3,7 @@ package store
 import (
 	"sync"
 
+	"github.com/go-logr/logr"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -12,6 +13,7 @@ import (
 
 type RenderPageStore struct {
 	host     kdexv1alpha1.MicroFrontEndHost
+	log      logr.Logger
 	mu       sync.RWMutex
 	onUpdate func()
 	handlers map[string]RenderPageHandler
@@ -44,6 +46,7 @@ func (s *RenderPageStore) List() []RenderPageHandler {
 }
 
 func (s *RenderPageStore) Set(handler RenderPageHandler) {
+	s.log.Info("set render page", "name", handler.Page.Name)
 	s.mu.Lock()
 	s.handlers[handler.Page.Name] = handler
 	s.mu.Unlock()

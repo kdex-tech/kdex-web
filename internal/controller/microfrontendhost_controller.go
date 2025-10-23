@@ -95,7 +95,6 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 		if err := r.Get(ctx, stylesheetName, &stylesheet); err != nil {
 			if errors.IsNotFound(err) {
-				log.Error(err, "referenced MicroFrontEndStylesheet not found", "name", stylesheetName.Name)
 				apimeta.SetStatusCondition(
 					&host.Status.Conditions,
 					*kdexv1alpha1.NewCondition(
@@ -117,6 +116,8 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 	}
 
+	log.Info("reconciled MicroFrontEndHost")
+
 	trackedHost, ok := r.HostStore.Get(host.Name)
 
 	if !ok {
@@ -127,8 +128,6 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Info("updating existing host")
 		trackedHost.SetHost(host)
 	}
-
-	log.Info("reconciled MicroFrontEndHost")
 
 	apimeta.SetStatusCondition(
 		&host.Status.Conditions,
