@@ -78,7 +78,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 			}
 
 			label := messagePrinter.Sprintf(page.Spec.PageComponents.Title)
-			href := page.Spec.Paths.BasePath
+			href := page.Spec.BasePath
 
 			if !isDefaultLanguage {
 				href = "/" + l.String() + href
