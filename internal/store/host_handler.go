@@ -9,10 +9,10 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"golang.org/x/text/message/catalog"
-	kdextemplate "kdex.dev/crds/api/template"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/crds/render"
+	"kdex.dev/crds/template"
 	kdexhttp "kdex.dev/web/internal/http"
-	"kdex.dev/web/internal/render"
 )
 
 type HostHandler struct {
@@ -59,7 +59,7 @@ func (th *HostHandler) AddOrUpdateTranslation(translation kdexv1alpha1.MicroFron
 
 func (th *HostHandler) L10nRenderLocked(
 	handler RenderPageHandler,
-	pageMap *map[string]*kdextemplate.PageEntry,
+	pageMap *map[string]*template.PageEntry,
 	l language.Tag,
 ) (string, error) {
 	page := handler.Page
@@ -81,7 +81,7 @@ func (th *HostHandler) L10nRenderLocked(
 		Contents:        page.Spec.PageComponents.Contents,
 		Footer:          page.Spec.PageComponents.Footer,
 		Header:          page.Spec.PageComponents.Header,
-		Label:           page.Spec.PageComponents.Title,
+		Title:           page.Spec.PageComponents.Title,
 		Navigations:     page.Spec.PageComponents.Navigations,
 		TemplateContent: page.Spec.PageComponents.PrimaryTemplate,
 		TemplateName:    page.Name,
@@ -90,7 +90,7 @@ func (th *HostHandler) L10nRenderLocked(
 
 func (th *HostHandler) L10nRendersLocked(
 	handler RenderPageHandler,
-	pageMaps map[language.Tag]*map[string]*kdextemplate.PageEntry,
+	pageMaps map[language.Tag]*map[string]*template.PageEntry,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, l := range th.Translations.Languages() {
@@ -202,11 +202,11 @@ func (th *HostHandler) availableLanguagesLocked() []string {
 	return availableLangs
 }
 
-func (th *HostHandler) generatePageMapsLocked() map[language.Tag]*map[string]*kdextemplate.PageEntry {
-	l10nPageMaps := map[language.Tag]*map[string]*kdextemplate.PageEntry{}
+func (th *HostHandler) generatePageMapsLocked() map[language.Tag]*map[string]*template.PageEntry {
+	l10nPageMaps := map[language.Tag]*map[string]*template.PageEntry{}
 
 	for _, l := range th.Translations.Languages() {
-		rootEntry := &kdextemplate.PageEntry{}
+		rootEntry := &template.PageEntry{}
 		th.RenderPages.BuildMenuEntries(
 			rootEntry, &l, th.messagePrinterLocked(l), l.String() == th.defaultLanguage, nil)
 		l10nPageMaps[l] = rootEntry.Children

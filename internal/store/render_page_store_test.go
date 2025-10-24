@@ -10,8 +10,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kdextemplate "kdex.dev/crds/api/template"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/crds/template"
 )
 
 func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
@@ -19,7 +19,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 		name              string
 		items             *map[string]RenderPageHandler
 		isDefaultLanguage bool
-		want              *map[string]*kdextemplate.PageEntry
+		want              *map[string]*template.PageEntry
 	}{
 		{
 			name:  "empty",
@@ -46,7 +46,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*kdextemplate.PageEntry{
+			want: &map[string]*template.PageEntry{
 				"Foo Translated": {
 					Name:   "foo",
 					Label:  "Foo Translated",
@@ -111,9 +111,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*kdextemplate.PageEntry{
+			want: &map[string]*template.PageEntry{
 				"Home": {
-					Children: &map[string]*kdextemplate.PageEntry{
+					Children: &map[string]*template.PageEntry{
 						"Foo Translated": {
 							Href:   "/foo",
 							Label:  "Foo Translated",
@@ -154,7 +154,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*kdextemplate.PageEntry{
+			want: &map[string]*template.PageEntry{
 				"Foo Translated": {
 					Name:   "foo",
 					Label:  "Foo Translated",
@@ -173,7 +173,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			catalogBuilder := catalog.NewBuilder()
 			catalogBuilder.SetString(language.English, "Foo", "Foo Translated")
 			messagePrinter := message.NewPrinter(tag, message.Catalog(catalogBuilder))
-			got := &kdextemplate.PageEntry{}
+			got := &template.PageEntry{}
 
 			rps.BuildMenuEntries(got, &tag, messagePrinter, tt.isDefaultLanguage, nil)
 			assert.Equal(t, tt.want, got.Children)
