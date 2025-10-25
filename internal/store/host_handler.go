@@ -64,19 +64,21 @@ func (th *HostHandler) L10nRenderLocked(
 	page := handler.Page
 
 	renderer := render.Renderer{
-		FootScript:     "",
-		HeadScript:     "",
-		Language:       l.String(),
-		Languages:      th.availableLanguagesLocked(),
-		LastModified:   time.Now(),
-		MessagePrinter: th.messagePrinterLocked(l),
-		Meta:           th.Host.Spec.BaseMeta,
-		Organization:   th.Host.Spec.Organization,
-		PageMap:        pageMap,
-		StyleItems:     handler.Stylesheet.Spec.StyleItems,
+		DefaultLanguage: th.defaultLanguage,
+		FootScript:      "",
+		HeadScript:      "",
+		Language:        l.String(),
+		Languages:       th.availableLanguagesLocked(),
+		LastModified:    time.Now(),
+		MessagePrinter:  th.messagePrinterLocked(l),
+		Meta:            th.Host.Spec.BaseMeta,
+		Organization:    th.Host.Spec.Organization,
+		PageMap:         pageMap,
+		StyleItems:      handler.Stylesheet.Spec.StyleItems,
 	}
 
 	return renderer.RenderPage(render.Page{
+		BasePath:        page.Spec.BasePath,
 		Contents:        page.Spec.PageComponents.Contents,
 		Footer:          page.Spec.PageComponents.Footer,
 		Header:          page.Spec.PageComponents.Header,
