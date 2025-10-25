@@ -22,19 +22,34 @@ type HostHandler struct {
 	defaultLanguage      string
 	log                  logr.Logger
 	mu                   sync.RWMutex
+	stylesheet           *kdexv1alpha1.MicroFrontEndStylesheet
 	translationResources map[string]kdexv1alpha1.MicroFrontEndTranslation
 }
 
 func NewHostHandler(
 	host kdexv1alpha1.MicroFrontEndHost,
+	stylesheet *kdexv1alpha1.MicroFrontEndStylesheet,
 	log logr.Logger,
 ) *HostHandler {
 	th := &HostHandler{
 		Host:                 host,
 		log:                  log,
+		stylesheet:           stylesheet,
 		translationResources: map[string]kdexv1alpha1.MicroFrontEndTranslation{},
 	}
-	th.updateHostDependentFields()
+
+	defaultLang := "en"
+	if th.Host.Spec.DefaultLang != "" {
+		defaultLang = th.Host.Spec.DefaultLang
+	}
+	th.defaultLanguage = defaultLang
+
+	catalogBuilder := catalog.NewBuilder()
+	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
+		th.log.Error(err, "failed to add default placeholder translation")
+	}
+	th.Translations = catalogBuilder
+
 	rps := &RenderPageStore{
 		host:     host,
 		handlers: map[string]RenderPageHandler{},
@@ -63,6 +78,16 @@ func (th *HostHandler) L10nRenderLocked(
 ) (string, error) {
 	page := handler.Page
 
+	var styleItems []kdexv1alpha1.StyleItem
+
+	if th.stylesheet != nil {
+		styleItems = th.stylesheet.Spec.StyleItems
+	}
+
+	if handler.Stylesheet != nil && len(handler.Stylesheet.Spec.StyleItems) > 0 {
+		styleItems = append(styleItems, handler.Stylesheet.Spec.StyleItems...)
+	}
+
 	renderer := render.Renderer{
 		DefaultLanguage: th.defaultLanguage,
 		FootScript:      "",
@@ -74,7 +99,7 @@ func (th *HostHandler) L10nRenderLocked(
 		Meta:            th.Host.Spec.BaseMeta,
 		Organization:    th.Host.Spec.Organization,
 		PageMap:         pageMap,
-		StyleItems:      handler.Stylesheet.Spec.StyleItems,
+		StyleItems:      styleItems,
 	}
 
 	return renderer.RenderPage(render.Page{
@@ -171,8 +196,8 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (th *HostHandler) SetHost(host kdexv1alpha1.MicroFrontEndHost) {
 	th.mu.Lock()
+	th.defaultLanguage = host.Spec.DefaultLang
 	th.Host = host
-	th.updateHostDependentFields()
 	th.mu.Unlock() // <-- Release lock BEFORE calling RebuildMux
 
 	th.RebuildMux()
@@ -248,18 +273,4 @@ func (th *HostHandler) setTranslationsLocked(translations *catalog.Builder) {
 		return
 	}
 	th.Translations = translations
-}
-
-func (th *HostHandler) updateHostDependentFields() {
-	defaultLang := "en"
-	if th.Host.Spec.DefaultLang != "" {
-		defaultLang = th.Host.Spec.DefaultLang
-	}
-	th.defaultLanguage = defaultLang
-
-	catalogBuilder := catalog.NewBuilder()
-	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
-		th.log.Error(err, "failed to add default placeholder translation")
-	}
-	th.Translations = catalogBuilder
 }

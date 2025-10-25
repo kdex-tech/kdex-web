@@ -180,7 +180,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(tt.host, logr.Discard())
+			th := NewHostHandler(tt.host, nil, logr.Discard())
 			th.SetTranslations(tt.translations)
 			got, gotErr := th.L10nRenderLocked(RenderPageHandler{
 				Page: tt.page,
@@ -263,7 +263,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(tt.host, logr.Discard())
+			th := NewHostHandler(tt.host, nil, logr.Discard())
 			th.SetTranslations(tt.translations)
 			got := th.L10nRendersLocked(RenderPageHandler{
 				Page: tt.page,
@@ -351,7 +351,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(tt.host, logr.Discard())
+			th := NewHostHandler(tt.host, nil, logr.Discard())
 			th.AddOrUpdateTranslation(tt.translation)
 
 			for lang, expected := range tt.langTests {

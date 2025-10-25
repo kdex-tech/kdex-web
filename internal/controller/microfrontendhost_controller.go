@@ -18,10 +18,8 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,33 +85,9 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, nil
 	}
 
-	var stylesheet kdexv1alpha1.MicroFrontEndStylesheet
-	if host.Spec.DefaultStylesheetRef != nil {
-		stylesheetName := types.NamespacedName{
-			Name:      host.Spec.DefaultStylesheetRef.Name,
-			Namespace: host.Namespace,
-		}
-		if err := r.Get(ctx, stylesheetName, &stylesheet); err != nil {
-			if errors.IsNotFound(err) {
-				apimeta.SetStatusCondition(
-					&host.Status.Conditions,
-					*kdexv1alpha1.NewCondition(
-						kdexv1alpha1.ConditionTypeReady,
-						metav1.ConditionFalse,
-						kdexv1alpha1.ConditionReasonReconcileError,
-						fmt.Sprintf("referenced MicroFrontEndStylesheet %s not found", stylesheetName.Name),
-					),
-				)
-				if err := r.Status().Update(ctx, &host); err != nil {
-					return ctrl.Result{}, err
-				}
-
-				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-			}
-
-			log.Error(err, "unable to fetch MicroFrontEndStylesheet", "name", stylesheetName.Name)
-			return ctrl.Result{}, err
-		}
+	stylesheet, shouldReturn, r1, err := resolveStylesheet(ctx, r.Client, &host, &host.Status.Conditions, host.Spec.DefaultStylesheetRef, r.RequeueDelay)
+	if shouldReturn {
+		return r1, err
 	}
 
 	log.Info("reconciled MicroFrontEndHost")
@@ -122,7 +96,8 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	if !ok {
 		log.Info("tracking new host")
-		newTrackedHost := store.NewHostHandler(host, log.WithName("host-handler").WithValues("host", host.Name))
+		newTrackedHost := store.NewHostHandler(
+			host, stylesheet, log.WithName("host-handler").WithValues("host", host.Name))
 		r.HostStore.Set(newTrackedHost)
 	} else {
 		log.Info("updating existing host")
