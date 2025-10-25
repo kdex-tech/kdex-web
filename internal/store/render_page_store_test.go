@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 	"golang.org/x/text/message/catalog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,9 +46,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 				},
 			},
 			want: &map[string]*render.PageEntry{
-				"Foo Translated": {
+				"Foo": {
 					Name:   "foo",
-					Label:  "Foo Translated",
+					Label:  "Foo",
 					Href:   "/foo",
 					Weight: resource.MustParse("0"),
 				},
@@ -114,9 +113,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			want: &map[string]*render.PageEntry{
 				"Home": {
 					Children: &map[string]*render.PageEntry{
-						"Foo Translated": {
+						"Foo": {
 							Href:   "/foo",
-							Label:  "Foo Translated",
+							Label:  "Foo",
 							Name:   "foo",
 							Weight: resource.MustParse("0"),
 						},
@@ -155,9 +154,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 				},
 			},
 			want: &map[string]*render.PageEntry{
-				"Foo Translated": {
+				"Foo": {
 					Name:   "foo",
-					Label:  "Foo Translated",
+					Label:  "Foo",
 					Href:   "/en/foo",
 					Weight: resource.MustParse("0"),
 				},
@@ -172,10 +171,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			tag := language.English
 			catalogBuilder := catalog.NewBuilder()
 			catalogBuilder.SetString(language.English, "Foo", "Foo Translated")
-			messagePrinter := message.NewPrinter(tag, message.Catalog(catalogBuilder))
 			got := &render.PageEntry{}
 
-			rps.BuildMenuEntries(got, &tag, messagePrinter, tt.isDefaultLanguage, nil)
+			rps.BuildMenuEntries(got, &tag, tt.isDefaultLanguage, nil)
 			assert.Equal(t, tt.want, got.Children)
 		})
 	}

@@ -206,8 +206,7 @@ func (th *HostHandler) generatePageMapsLocked() map[language.Tag]*map[string]*re
 
 	for _, l := range th.Translations.Languages() {
 		rootEntry := &render.PageEntry{}
-		th.RenderPages.BuildMenuEntries(
-			rootEntry, &l, th.messagePrinterLocked(l), l.String() == th.defaultLanguage, nil)
+		th.RenderPages.BuildMenuEntries(rootEntry, &l, l.String() == th.defaultLanguage, nil)
 		l10nPageMaps[l] = rootEntry.Children
 	}
 

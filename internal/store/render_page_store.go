@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"golang.org/x/text/language"
-	"golang.org/x/text/message"
 	"k8s.io/apimachinery/pkg/api/resource"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
@@ -58,7 +57,6 @@ func (s *RenderPageStore) Set(handler RenderPageHandler) {
 func (s *RenderPageStore) BuildMenuEntries(
 	entry *render.PageEntry,
 	l *language.Tag,
-	messagePrinter *message.Printer,
 	isDefaultLanguage bool,
 	parent *kdexv1alpha1.MicroFrontEndRenderPage,
 ) {
@@ -77,7 +75,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 				entry.Children = &map[string]*render.PageEntry{}
 			}
 
-			label := messagePrinter.Sprintf(page.Spec.PageComponents.Title)
+			label := page.Spec.PageComponents.Title
 			href := page.Spec.BasePath
 
 			if !isDefaultLanguage {
@@ -99,7 +97,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 			(*entry.Children)[label] = &pageEntry
 
 			s.BuildMenuEntries(
-				&pageEntry, l, messagePrinter, isDefaultLanguage, &page)
+				&pageEntry, l, isDefaultLanguage, &page)
 		}
 	}
 }

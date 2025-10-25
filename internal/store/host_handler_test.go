@@ -184,6 +184,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got, gotErr := th.L10nRenderLocked(RenderPageHandler{
 				Page: tt.page,
+				Stylesheet: &kdexv1alpha1.MicroFrontEndStylesheet{
+					Spec: kdexv1alpha1.MicroFrontEndStylesheetSpec{
+						StyleItems: []kdexv1alpha1.StyleItem{},
+					},
+				},
 			}, &map[string]*render.PageEntry{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
@@ -262,6 +267,11 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got := th.L10nRendersLocked(RenderPageHandler{
 				Page: tt.page,
+				Stylesheet: &kdexv1alpha1.MicroFrontEndStylesheet{
+					Spec: kdexv1alpha1.MicroFrontEndStylesheetSpec{
+						StyleItems: []kdexv1alpha1.StyleItem{},
+					},
+				},
 			}, map[language.Tag]*map[string]*render.PageEntry{})
 
 			for key, values := range tt.want {
