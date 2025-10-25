@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/crds/template"
+	"kdex.dev/crds/render"
 )
 
 func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
@@ -19,7 +19,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 		name              string
 		items             *map[string]RenderPageHandler
 		isDefaultLanguage bool
-		want              *map[string]*template.PageEntry
+		want              *map[string]*render.PageEntry
 	}{
 		{
 			name:  "empty",
@@ -46,7 +46,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*template.PageEntry{
+			want: &map[string]*render.PageEntry{
 				"Foo Translated": {
 					Name:   "foo",
 					Label:  "Foo Translated",
@@ -111,9 +111,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*template.PageEntry{
+			want: &map[string]*render.PageEntry{
 				"Home": {
-					Children: &map[string]*template.PageEntry{
+					Children: &map[string]*render.PageEntry{
 						"Foo Translated": {
 							Href:   "/foo",
 							Label:  "Foo Translated",
@@ -154,7 +154,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*template.PageEntry{
+			want: &map[string]*render.PageEntry{
 				"Foo Translated": {
 					Name:   "foo",
 					Label:  "Foo Translated",
@@ -173,7 +173,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			catalogBuilder := catalog.NewBuilder()
 			catalogBuilder.SetString(language.English, "Foo", "Foo Translated")
 			messagePrinter := message.NewPrinter(tag, message.Catalog(catalogBuilder))
-			got := &template.PageEntry{}
+			got := &render.PageEntry{}
 
 			rps.BuildMenuEntries(got, &tag, messagePrinter, tt.isDefaultLanguage, nil)
 			assert.Equal(t, tt.want, got.Children)

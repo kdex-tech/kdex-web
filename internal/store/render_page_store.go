@@ -8,7 +8,7 @@ import (
 	"golang.org/x/text/message"
 	"k8s.io/apimachinery/pkg/api/resource"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/crds/template"
+	"kdex.dev/crds/render"
 )
 
 type RenderPageStore struct {
@@ -56,7 +56,7 @@ func (s *RenderPageStore) Set(handler RenderPageHandler) {
 }
 
 func (s *RenderPageStore) BuildMenuEntries(
-	entry *template.PageEntry,
+	entry *render.PageEntry,
 	l *language.Tag,
 	messagePrinter *message.Printer,
 	isDefaultLanguage bool,
@@ -74,7 +74,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 			}
 
 			if entry.Children == nil {
-				entry.Children = &map[string]*template.PageEntry{}
+				entry.Children = &map[string]*render.PageEntry{}
 			}
 
 			label := messagePrinter.Sprintf(page.Spec.PageComponents.Title)
@@ -84,7 +84,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 				href = "/" + l.String() + href
 			}
 
-			pageEntry := template.PageEntry{
+			pageEntry := render.PageEntry{
 				Href:   href,
 				Label:  label,
 				Name:   page.Name,

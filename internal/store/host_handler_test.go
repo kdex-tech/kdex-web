@@ -1,4 +1,4 @@
-package store_test
+package store
 
 import (
 	"testing"
@@ -10,8 +10,7 @@ import (
 	"golang.org/x/text/message/catalog"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/crds/template"
-	"kdex.dev/web/internal/store"
+	"kdex.dev/crds/render"
 )
 
 const (
@@ -181,11 +180,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := store.NewHostHandler(tt.host, logr.Discard())
+			th := NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
-			got, gotErr := th.L10nRenderLocked(store.RenderPageHandler{
+			got, gotErr := th.L10nRenderLocked(RenderPageHandler{
 				Page: tt.page,
-			}, &map[string]*template.PageEntry{}, language.Make(tt.lang))
+			}, &map[string]*render.PageEntry{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 
@@ -259,11 +258,11 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := store.NewHostHandler(tt.host, logr.Discard())
+			th := NewHostHandler(tt.host, logr.Discard())
 			th.SetTranslations(tt.translations)
-			got := th.L10nRendersLocked(store.RenderPageHandler{
+			got := th.L10nRendersLocked(RenderPageHandler{
 				Page: tt.page,
-			}, map[language.Tag]*map[string]*template.PageEntry{})
+			}, map[language.Tag]*map[string]*render.PageEntry{})
 
 			for key, values := range tt.want {
 				l10nRender := got[key]
@@ -342,7 +341,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := store.NewHostHandler(tt.host, logr.Discard())
+			th := NewHostHandler(tt.host, logr.Discard())
 			th.AddOrUpdateTranslation(tt.translation)
 
 			for lang, expected := range tt.langTests {

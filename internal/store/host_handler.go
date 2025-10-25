@@ -11,7 +11,6 @@ import (
 	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
-	"kdex.dev/crds/template"
 	kdexhttp "kdex.dev/web/internal/http"
 )
 
@@ -59,22 +58,22 @@ func (th *HostHandler) AddOrUpdateTranslation(translation kdexv1alpha1.MicroFron
 
 func (th *HostHandler) L10nRenderLocked(
 	handler RenderPageHandler,
-	pageMap *map[string]*template.PageEntry,
+	pageMap *map[string]*render.PageEntry,
 	l language.Tag,
 ) (string, error) {
 	page := handler.Page
 
 	renderer := render.Renderer{
-		Languages:      th.availableLanguagesLocked(),
-		RenderTime:     time.Now(),
 		FootScript:     "",
 		HeadScript:     "",
 		Language:       l.String(),
-		PageMap:        pageMap,
+		Languages:      th.availableLanguagesLocked(),
+		LastModified:   time.Now(),
 		MessagePrinter: th.messagePrinterLocked(l),
 		Meta:           th.Host.Spec.BaseMeta,
 		Organization:   th.Host.Spec.Organization,
-		Stylesheet:     handler.StylesheetToString(),
+		PageMap:        pageMap,
+		StyleItems:     handler.Stylesheet.Spec.StyleItems,
 	}
 
 	return renderer.RenderPage(render.Page{
@@ -90,7 +89,7 @@ func (th *HostHandler) L10nRenderLocked(
 
 func (th *HostHandler) L10nRendersLocked(
 	handler RenderPageHandler,
-	pageMaps map[language.Tag]*map[string]*template.PageEntry,
+	pageMaps map[language.Tag]*map[string]*render.PageEntry,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, l := range th.Translations.Languages() {
@@ -202,11 +201,11 @@ func (th *HostHandler) availableLanguagesLocked() []string {
 	return availableLangs
 }
 
-func (th *HostHandler) generatePageMapsLocked() map[language.Tag]*map[string]*template.PageEntry {
-	l10nPageMaps := map[language.Tag]*map[string]*template.PageEntry{}
+func (th *HostHandler) generatePageMapsLocked() map[language.Tag]*map[string]*render.PageEntry {
+	l10nPageMaps := map[language.Tag]*map[string]*render.PageEntry{}
 
 	for _, l := range th.Translations.Languages() {
-		rootEntry := &template.PageEntry{}
+		rootEntry := &render.PageEntry{}
 		th.RenderPages.BuildMenuEntries(
 			rootEntry, &l, th.messagePrinterLocked(l), l.String() == th.defaultLanguage, nil)
 		l10nPageMaps[l] = rootEntry.Children
