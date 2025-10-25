@@ -76,10 +76,10 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
-			trackedHost, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
+			hostHandler, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
 
 			if ok {
-				trackedHost.RemoveTranslation(translation)
+				hostHandler.RemoveTranslation(translation)
 			}
 
 			controllerutil.RemoveFinalizer(&translation, translationFinalizerName)
@@ -96,13 +96,13 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 
 	log.Info("reconciled MicroFrontEndTranslation")
 
-	trackedHost, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
+	hostHandler, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
 
 	if !ok {
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	trackedHost.AddOrUpdateTranslation(translation)
+	hostHandler.AddOrUpdateTranslation(translation)
 
 	apimeta.SetStatusCondition(
 		&translation.Status.Conditions,

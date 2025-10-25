@@ -9,13 +9,13 @@ import (
 
 func New(address string, store *store_.HostStore) *http.Server {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		trackedHost, ok := r.Context().Value(middleware.HostKey).(*store_.HostHandler)
+		hostHandler, ok := r.Context().Value(middleware.HostKey).(*store_.HostHandler)
 		if !ok {
 			http.NotFound(w, r)
 			return
 		}
 
-		trackedHost.ServeHTTP(w, r)
+		hostHandler.ServeHTTP(w, r)
 	})
 
 	hostHandler := middleware.WithHost(store)(handler)

@@ -51,7 +51,6 @@ func NewHostHandler(
 	th.Translations = catalogBuilder
 
 	rps := &RenderPageStore{
-		host:     host,
 		handlers: map[string]RenderPageHandler{},
 		log:      log.WithName("render-page-store"),
 		onUpdate: th.RebuildMux,

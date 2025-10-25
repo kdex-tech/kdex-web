@@ -78,9 +78,9 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&renderPage, renderPageFinalizerName) {
-			trackedHost, ok := r.HostStore.Get(renderPage.Spec.HostRef.Name)
+			hostHandler, ok := r.HostStore.Get(renderPage.Spec.HostRef.Name)
 			if ok {
-				trackedHost.RenderPages.Delete(renderPage.Name)
+				hostHandler.RenderPages.Delete(renderPage.Name)
 			}
 			controllerutil.RemoveFinalizer(&renderPage, renderPageFinalizerName)
 			if err := r.Update(ctx, &renderPage); err != nil {
@@ -148,13 +148,13 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 
 	log.Info("reconciled MicroFrontEndRenderPage")
 
-	trackedHost, ok := r.HostStore.Get(renderPage.Spec.HostRef.Name)
+	hostHandler, ok := r.HostStore.Get(renderPage.Spec.HostRef.Name)
 
 	if !ok {
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	trackedHost.RenderPages.Set(store.RenderPageHandler{
+	hostHandler.RenderPages.Set(store.RenderPageHandler{
 		Page:       renderPage,
 		Stylesheet: &stylesheet,
 	})

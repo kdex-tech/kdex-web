@@ -92,16 +92,16 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	log.Info("reconciled MicroFrontEndHost")
 
-	trackedHost, ok := r.HostStore.Get(host.Name)
+	hostHandler, ok := r.HostStore.Get(host.Name)
 
 	if !ok {
 		log.Info("tracking new host")
-		newTrackedHost := store.NewHostHandler(
+		hostHandler = store.NewHostHandler(
 			host, stylesheet, log.WithName("host-handler").WithValues("host", host.Name))
-		r.HostStore.Set(newTrackedHost)
+		r.HostStore.Set(hostHandler)
 	} else {
 		log.Info("updating existing host")
-		trackedHost.SetHost(host)
+		hostHandler.SetHost(host)
 	}
 
 	apimeta.SetStatusCondition(

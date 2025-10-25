@@ -11,7 +11,6 @@ import (
 )
 
 type RenderPageStore struct {
-	host     kdexv1alpha1.MicroFrontEndHost
 	log      logr.Logger
 	mu       sync.RWMutex
 	onUpdate func()
@@ -96,8 +95,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 
 			(*entry.Children)[label] = &pageEntry
 
-			s.BuildMenuEntries(
-				&pageEntry, l, isDefaultLanguage, &page)
+			s.BuildMenuEntries(&pageEntry, l, isDefaultLanguage, &page)
 		}
 	}
 }
