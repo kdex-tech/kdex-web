@@ -18,10 +18,8 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,31 +89,9 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 		}
 	}
 
-	var host kdexv1alpha1.MicroFrontEndHost
-	hostName := types.NamespacedName{
-		Name:      translation.Spec.HostRef.Name,
-		Namespace: translation.Namespace,
-	}
-	if err := r.Get(ctx, hostName, &host); err != nil {
-		if errors.IsNotFound(err) {
-			apimeta.SetStatusCondition(
-				&translation.Status.Conditions,
-				*kdexv1alpha1.NewCondition(
-					kdexv1alpha1.ConditionTypeReady,
-					metav1.ConditionFalse,
-					kdexv1alpha1.ConditionReasonReconcileError,
-					fmt.Sprintf("referenced MicroFrontEndHost %s not found", translation.Spec.HostRef.Name),
-				),
-			)
-			if err := r.Status().Update(ctx, &translation); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-		}
-
-		log.Error(err, "unable to fetch MicroFrontEndHost", "name", translation.Spec.HostRef.Name)
-		return ctrl.Result{}, err
+	_, shouldReturn, r1, err := resolveHost(ctx, r.Client, &translation, &translation.Status.Conditions, &translation.Spec.HostRef, r.RequeueDelay)
+	if shouldReturn {
+		return r1, err
 	}
 
 	log.Info("reconciled MicroFrontEndTranslation")
