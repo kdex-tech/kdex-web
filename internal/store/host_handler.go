@@ -15,7 +15,7 @@ import (
 )
 
 type HostHandler struct {
-	Host                 kdexv1alpha1.MicroFrontEndHost
+	Host                 *kdexv1alpha1.MicroFrontEndHost
 	Mux                  *http.ServeMux
 	RenderPages          *RenderPageStore
 	Translations         *catalog.Builder
@@ -27,22 +27,15 @@ type HostHandler struct {
 }
 
 func NewHostHandler(
-	host kdexv1alpha1.MicroFrontEndHost,
 	stylesheet *kdexv1alpha1.MicroFrontEndStylesheet,
 	log logr.Logger,
 ) *HostHandler {
 	th := &HostHandler{
-		Host:                 host,
+		defaultLanguage:      "en",
 		log:                  log,
 		stylesheet:           stylesheet,
 		translationResources: map[string]kdexv1alpha1.MicroFrontEndTranslation{},
 	}
-
-	defaultLang := "en"
-	if th.Host.Spec.DefaultLang != "" {
-		defaultLang = th.Host.Spec.DefaultLang
-	}
-	th.defaultLanguage = defaultLang
 
 	catalogBuilder := catalog.NewBuilder()
 	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
@@ -134,6 +127,10 @@ func (th *HostHandler) RebuildMux() {
 	th.mu.Lock()
 	defer th.mu.Unlock()
 
+	if th.Host == nil {
+		return
+	}
+
 	mux := http.NewServeMux()
 
 	l10nPageMaps := th.generatePageMapsLocked()
@@ -193,7 +190,7 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (th *HostHandler) SetHost(host kdexv1alpha1.MicroFrontEndHost) {
+func (th *HostHandler) SetHost(host *kdexv1alpha1.MicroFrontEndHost) {
 	th.mu.Lock()
 	th.defaultLanguage = host.Spec.DefaultLang
 	th.Host = host
