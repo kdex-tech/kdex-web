@@ -75,11 +75,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 			}
 
 			label := page.Spec.PageComponents.Title
-			href := page.Spec.BasePath
-
-			if !isDefaultLanguage {
-				href = "/" + l.String() + href
-			}
+			href := "/" + l.String() + page.Spec.BasePath
 
 			pageEntry := render.PageEntry{
 				Href:   href,
