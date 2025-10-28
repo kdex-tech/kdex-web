@@ -70,13 +70,12 @@ func (th *HostHandler) L10nRenderLocked(
 ) (string, error) {
 	page := handler.Page
 
-	var styleItems []kdexv1alpha1.StyleItem
+	styleItems := []kdexv1alpha1.StyleItem{}
 
 	if th.stylesheet != nil {
-		styleItems = th.stylesheet.Spec.StyleItems
+		styleItems = append(styleItems, th.stylesheet.Spec.StyleItems...)
 	}
-
-	if handler.Stylesheet != nil && len(handler.Stylesheet.Spec.StyleItems) > 0 {
+	if handler.Stylesheet != nil {
 		styleItems = append(styleItems, handler.Stylesheet.Spec.StyleItems...)
 	}
 
@@ -190,10 +189,14 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (th *HostHandler) SetHost(host *kdexv1alpha1.MicroFrontEndHost) {
+func (th *HostHandler) SetHost(
+	host *kdexv1alpha1.MicroFrontEndHost,
+	stylesheet *kdexv1alpha1.MicroFrontEndStylesheet,
+) {
 	th.mu.Lock()
-	th.defaultLanguage = host.Spec.DefaultLang
 	th.Host = host
+	th.defaultLanguage = host.Spec.DefaultLang
+	th.stylesheet = stylesheet
 	th.mu.Unlock() // <-- Release lock BEFORE calling RebuildMux
 
 	th.RebuildMux()

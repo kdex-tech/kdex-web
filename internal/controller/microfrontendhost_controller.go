@@ -94,7 +94,7 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	hostHandler := r.HostStore.GetOrDefault(
 		host.Name, stylesheet, log.WithName("host-handler").WithValues("host", host.Name))
-	hostHandler.SetHost(&host)
+	hostHandler.SetHost(&host, stylesheet)
 
 	apimeta.SetStatusCondition(
 		&host.Status.Conditions,
