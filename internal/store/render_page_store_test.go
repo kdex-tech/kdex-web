@@ -30,11 +30,11 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			isDefaultLanguage: true,
 			items: &map[string]RenderPageHandler{
 				"foo": {
-					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+					Page: kdexv1alpha1.KDexRenderPage{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
-						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+						Spec: kdexv1alpha1.KDexRenderPageSpec{
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/foo",
 							},
@@ -59,11 +59,11 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			isDefaultLanguage: true,
 			items: &map[string]RenderPageHandler{
 				"foo": {
-					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+					Page: kdexv1alpha1.KDexRenderPage{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
-						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+						Spec: kdexv1alpha1.KDexRenderPageSpec{
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/foo",
 							},
@@ -77,11 +77,11 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 				"home": {
-					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+					Page: kdexv1alpha1.KDexRenderPage{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "home",
 						},
-						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+						Spec: kdexv1alpha1.KDexRenderPageSpec{
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/home",
 							},
@@ -92,11 +92,11 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 				"contact": {
-					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+					Page: kdexv1alpha1.KDexRenderPage{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "contact",
 						},
-						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+						Spec: kdexv1alpha1.KDexRenderPageSpec{
 							NavigationHints: &kdexv1alpha1.NavigationHints{
 								Weight: resource.MustParse("100"),
 							},
@@ -138,11 +138,11 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			isDefaultLanguage: false,
 			items: &map[string]RenderPageHandler{
 				"foo": {
-					Page: kdexv1alpha1.MicroFrontEndRenderPage{
+					Page: kdexv1alpha1.KDexRenderPage{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
-						Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+						Spec: kdexv1alpha1.KDexRenderPageSpec{
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/foo",
 							},

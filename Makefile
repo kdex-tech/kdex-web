@@ -172,32 +172,32 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 	CRD_VERSION=$$(awk '/replace/ {print $$NF}' go.mod); \
 	echo "CRD_VERSION=$${CRD_VERSION}"; \
 	$(KUBECTL) apply \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendapps.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendhosts.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagearchetypes.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagebindings.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagefooters.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpageheaders.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagenavigations.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendrenderpages.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendstylesheets.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendtranslations.yaml
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexapps.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexhosts.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagearchetypes.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagebindings.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagefooters.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpageheaders.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagenavigations.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexrenderpages.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexstylesheets.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdextranslations.yaml
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	CRD_VERSION=$$(awk '/replace/ {print $$NF}' go.mod); \
 	echo "CRD_VERSION=$${CRD_VERSION}"; \
 	$(KUBECTL) delete \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendapps.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendhosts.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagearchetypes.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagebindings.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagefooters.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpageheaders.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendpagenavigations.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendrenderpages.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendstylesheets.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_microfrontendtranslations.yaml
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexapps.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexhosts.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagearchetypes.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagebindings.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagefooters.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpageheaders.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagenavigations.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexrenderpages.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexstylesheets.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdextranslations.yaml
 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.

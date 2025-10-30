@@ -36,32 +36,32 @@ import (
 
 const translationFinalizerName = "kdex.dev/kdex-web-translation-finalizer"
 
-// MicroFrontEndTranslationReconciler reconciles a MicroFrontEndTranslation object
-type MicroFrontEndTranslationReconciler struct {
+// KDexTranslationReconciler reconciles a KDexTranslation object
+type KDexTranslationReconciler struct {
 	client.Client
 	HostStore    *store.HostStore
 	RequeueDelay time.Duration
 	Scheme       *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhost,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendtranslations,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendtranslations/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendtranslations/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhost,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdextranslations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdextranslations/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdextranslations/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the MicroFrontEndTranslation object against the actual cluster state, and then
+// the KDexTranslation object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.22.1/pkg/reconcile
-func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	var translation kdexv1alpha1.MicroFrontEndTranslation
+	var translation kdexv1alpha1.KDexTranslation
 	if err := r.Get(ctx, req.NamespacedName, &translation); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -94,7 +94,7 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 		return r1, err
 	}
 
-	log.Info("reconciled MicroFrontEndTranslation")
+	log.Info("reconciled KDexTranslation")
 
 	hostHandler, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
 
@@ -122,27 +122,27 @@ func (r *MicroFrontEndTranslationReconciler) Reconcile(ctx context.Context, req 
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *MicroFrontEndTranslationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *KDexTranslationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kdexv1alpha1.MicroFrontEndTranslation{}).
+		For(&kdexv1alpha1.KDexTranslation{}).
 		Watches(
-			&kdexv1alpha1.MicroFrontEndHost{},
+			&kdexv1alpha1.KDexHost{},
 			handler.EnqueueRequestsFromMapFunc(r.findTranslationsForHost)).
-		Named("microfrontendtranslation").
+		Named("kdextranslation").
 		Complete(r)
 }
 
-func (r *MicroFrontEndTranslationReconciler) findTranslationsForHost(
+func (r *KDexTranslationReconciler) findTranslationsForHost(
 	ctx context.Context,
 	host client.Object,
 ) []reconcile.Request {
 	log := logf.FromContext(ctx)
 
-	var translationList kdexv1alpha1.MicroFrontEndTranslationList
+	var translationList kdexv1alpha1.KDexTranslationList
 	if err := r.List(ctx, &translationList, &client.ListOptions{
 		Namespace: host.GetNamespace(),
 	}); err != nil {
-		log.Error(err, "unable to list MicroFrontEndTranslation for host", "name", host.GetName())
+		log.Error(err, "unable to list KDexTranslation for host", "name", host.GetName())
 		return []reconcile.Request{}
 	}
 

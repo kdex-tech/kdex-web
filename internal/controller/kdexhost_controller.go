@@ -36,32 +36,32 @@ import (
 
 const hostFinalizerName = "kdex.dev/kdex-web-host-finalizer"
 
-// MicroFrontEndHostReconciler reconciles a MicroFrontEndHost object
-type MicroFrontEndHostReconciler struct {
+// KDexHostReconciler reconciles a KDexHost object
+type KDexHostReconciler struct {
 	client.Client
 	HostStore    *store.HostStore
 	RequeueDelay time.Duration
 	Scheme       *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhosts,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhosts/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhosts/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendstylesheets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhosts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhosts/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhosts/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexstylesheets,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the MicroFrontEndHost object against the actual cluster state, and then
+// the KDexHost object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
-func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *KDexHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	var host kdexv1alpha1.MicroFrontEndHost
+	var host kdexv1alpha1.KDexHost
 	if err := r.Get(ctx, req.NamespacedName, &host); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -90,7 +90,7 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return r1, err
 	}
 
-	log.Info("reconciled MicroFrontEndHost")
+	log.Info("reconciled KDexHost")
 
 	hostHandler := r.HostStore.GetOrDefault(
 		host.Name, stylesheet, log.WithName("host-handler").WithValues("host", host.Name))
@@ -114,27 +114,27 @@ func (r *MicroFrontEndHostReconciler) Reconcile(ctx context.Context, req ctrl.Re
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *MicroFrontEndHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *KDexHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kdexv1alpha1.MicroFrontEndHost{}).
+		For(&kdexv1alpha1.KDexHost{}).
 		Watches(
-			&kdexv1alpha1.MicroFrontEndStylesheet{},
+			&kdexv1alpha1.KDexStylesheet{},
 			handler.EnqueueRequestsFromMapFunc(r.findHostsForStylesheet)).
-		Named("microfrontendhost").
+		Named("kdexhost").
 		Complete(r)
 }
 
-func (r *MicroFrontEndHostReconciler) findHostsForStylesheet(
+func (r *KDexHostReconciler) findHostsForStylesheet(
 	ctx context.Context,
 	stylesheet client.Object,
 ) []reconcile.Request {
 	log := logf.FromContext(ctx)
 
-	var hostsList kdexv1alpha1.MicroFrontEndHostList
+	var hostsList kdexv1alpha1.KDexHostList
 	if err := r.List(ctx, &hostsList, &client.ListOptions{
 		Namespace: stylesheet.GetNamespace(),
 	}); err != nil {
-		log.Error(err, "unable to list MicroFrontEndHost for stylesheet", "name", stylesheet.GetName())
+		log.Error(err, "unable to list KDexHost for stylesheet", "name", stylesheet.GetName())
 		return []reconcile.Request{}
 	}
 

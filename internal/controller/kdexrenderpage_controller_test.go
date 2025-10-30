@@ -27,7 +27,34 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var _ = Describe("MicroFrontEndTranslation Controller", func() {
+const (
+	primaryTemplate = `<!DOCTYPE html>
+<html lang="{{ .Language }}">
+	<head>
+	{{ .Meta }}
+	{{ .Title }}
+	{{ .Stylesheet }}
+	{{ .HeadScript }}
+	</head>
+	<body>
+	<header>
+		{{ .Header }}
+	</header>
+	<nav>
+		{{ .Navigation["main"] }}
+	</nav>
+	<main>
+		{{ .Content["main"] }}
+	</main>
+	<footer>
+		{{ .Footer }}
+	</footer>
+	{{ .FootScript }}
+	</body>
+</html>`
+)
+
+var _ = Describe("KDexRenderPage Controller", func() {
 	Context("When reconciling a resource", func() {
 		const namespace = "default"
 		const resourceName = "test-resource"
@@ -36,36 +63,34 @@ var _ = Describe("MicroFrontEndTranslation Controller", func() {
 
 		AfterEach(func() {
 			By("Cleanup all the test resource instances")
-			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.MicroFrontEndHost{}, client.InNamespace(namespace))).To(Succeed())
-			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.MicroFrontEndRenderPage{}, client.InNamespace(namespace))).To(Succeed())
-			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.MicroFrontEndTranslation{}, client.InNamespace(namespace))).To(Succeed())
+			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexHost{}, client.InNamespace(namespace))).To(Succeed())
+			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexRenderPage{}, client.InNamespace(namespace))).To(Succeed())
 		})
 
 		It("should successfully reconcile the resource", func() {
-			resource := &kdexv1alpha1.MicroFrontEndTranslation{
+			resource := &kdexv1alpha1.KDexRenderPage{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.MicroFrontEndTranslationSpec{
+				Spec: kdexv1alpha1.KDexRenderPageSpec{
 					HostRef: corev1.LocalObjectReference{
 						Name: "test-host",
 					},
-					Translations: []kdexv1alpha1.Translation{
-						{
-							Lang: "en",
-							KeysAndValues: map[string]string{
-								"key-1": "KEY_1_ENGLISH",
-								"key-2": "KEY_2_ENGLISH",
-							},
+					PageComponents: kdexv1alpha1.PageComponents{
+						Contents: map[string]string{
+							"main": "MAIN",
 						},
-						{
-							Lang: "fr",
-							KeysAndValues: map[string]string{
-								"key-1": "KEY_1_FRENCH",
-								"key-2": "KEY_2_FRENCH",
-							},
+						Footer: "FOOTER",
+						Header: "HEADER",
+						Navigations: map[string]string{
+							"main": "NAV",
 						},
+						PrimaryTemplate: primaryTemplate,
+						Title:           "TITLE",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
 					},
 				},
 			}
@@ -74,14 +99,14 @@ var _ = Describe("MicroFrontEndTranslation Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.MicroFrontEndTranslation{}, false)
+				&kdexv1alpha1.KDexRenderPage{}, false)
 
-			hostResource := &kdexv1alpha1.MicroFrontEndHost{
+			hostResource := &kdexv1alpha1.KDexHost{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-host",
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+				Spec: kdexv1alpha1.KDexHostSpec{
 					AppPolicy: kdexv1alpha1.NonStrictAppPolicy,
 					Domains: []string{
 						"foo.bar.dev",
@@ -94,7 +119,7 @@ var _ = Describe("MicroFrontEndTranslation Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.MicroFrontEndTranslation{}, true)
+				&kdexv1alpha1.KDexRenderPage{}, true)
 		})
 	})
 })

@@ -22,8 +22,8 @@ func resolveHost(
 	objectConditions *[]metav1.Condition,
 	hostRef *v1.LocalObjectReference,
 	requeueDelay time.Duration,
-) (*kdexv1alpha1.MicroFrontEndHost, bool, ctrl.Result, error) {
-	var host kdexv1alpha1.MicroFrontEndHost
+) (*kdexv1alpha1.KDexHost, bool, ctrl.Result, error) {
+	var host kdexv1alpha1.KDexHost
 	hostName := types.NamespacedName{
 		Name:      hostRef.Name,
 		Namespace: object.GetNamespace(),
@@ -36,7 +36,7 @@ func resolveHost(
 					kdexv1alpha1.ConditionTypeReady,
 					metav1.ConditionFalse,
 					kdexv1alpha1.ConditionReasonReconcileError,
-					fmt.Sprintf("referenced MicroFrontEndHost %s not found", hostName.Name),
+					fmt.Sprintf("referenced KDexHost %s not found", hostName.Name),
 				),
 			)
 			if err := c.Status().Update(ctx, object); err != nil {
@@ -63,8 +63,8 @@ func resolveStylesheet(
 	objectConditions *[]metav1.Condition,
 	stylesheetRef *v1.LocalObjectReference,
 	requeueDelay time.Duration,
-) (*kdexv1alpha1.MicroFrontEndStylesheet, bool, ctrl.Result, error) {
-	var stylesheet kdexv1alpha1.MicroFrontEndStylesheet
+) (*kdexv1alpha1.KDexStylesheet, bool, ctrl.Result, error) {
+	var stylesheet kdexv1alpha1.KDexStylesheet
 	if stylesheetRef != nil {
 		stylesheetName := types.NamespacedName{
 			Name:      stylesheetRef.Name,
@@ -78,7 +78,7 @@ func resolveStylesheet(
 						kdexv1alpha1.ConditionTypeReady,
 						metav1.ConditionFalse,
 						kdexv1alpha1.ConditionReasonReconcileError,
-						fmt.Sprintf("referenced MicroFrontEndStylesheet %s not found", stylesheetName.Name),
+						fmt.Sprintf("referenced KDexStylesheet %s not found", stylesheetName.Name),
 					),
 				)
 				if err := c.Status().Update(ctx, object); err != nil {

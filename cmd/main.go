@@ -172,31 +172,31 @@ func main() {
 
 	hostStore := store.NewHostStore()
 
-	if err := (&controller.MicroFrontEndHostReconciler{
+	if err := (&controller.KDexHostReconciler{
 		Client:       mgr.GetClient(),
 		HostStore:    hostStore,
 		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
 		Scheme:       mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MicroFrontEndHost")
+		setupLog.Error(err, "unable to create controller", "controller", "KDexHost")
 		os.Exit(1)
 	}
-	if err := (&controller.MicroFrontEndRenderPageReconciler{
+	if err := (&controller.KDexRenderPageReconciler{
 		Client:       mgr.GetClient(),
 		HostStore:    hostStore,
 		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
 		Scheme:       mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MicroFrontEndRenderPage")
+		setupLog.Error(err, "unable to create controller", "controller", "KDexRenderPage")
 		os.Exit(1)
 	}
-	if err := (&controller.MicroFrontEndTranslationReconciler{
+	if err := (&controller.KDexTranslationReconciler{
 		Client:       mgr.GetClient(),
 		HostStore:    hostStore,
 		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
 		Scheme:       mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "MicroFrontEndTranslation")
+		setupLog.Error(err, "unable to create controller", "controller", "KDexTranslation")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

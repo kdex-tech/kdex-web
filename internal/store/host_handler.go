@@ -15,26 +15,26 @@ import (
 )
 
 type HostHandler struct {
-	Host                 *kdexv1alpha1.MicroFrontEndHost
+	Host                 *kdexv1alpha1.KDexHost
 	Mux                  *http.ServeMux
 	RenderPages          *RenderPageStore
 	Translations         *catalog.Builder
 	defaultLanguage      string
 	log                  logr.Logger
 	mu                   sync.RWMutex
-	stylesheet           *kdexv1alpha1.MicroFrontEndStylesheet
-	translationResources map[string]kdexv1alpha1.MicroFrontEndTranslation
+	stylesheet           *kdexv1alpha1.KDexStylesheet
+	translationResources map[string]kdexv1alpha1.KDexTranslation
 }
 
 func NewHostHandler(
-	stylesheet *kdexv1alpha1.MicroFrontEndStylesheet,
+	stylesheet *kdexv1alpha1.KDexStylesheet,
 	log logr.Logger,
 ) *HostHandler {
 	th := &HostHandler{
 		defaultLanguage:      "en",
 		log:                  log,
 		stylesheet:           stylesheet,
-		translationResources: map[string]kdexv1alpha1.MicroFrontEndTranslation{},
+		translationResources: map[string]kdexv1alpha1.KDexTranslation{},
 	}
 
 	catalogBuilder := catalog.NewBuilder()
@@ -53,7 +53,7 @@ func NewHostHandler(
 	return th
 }
 
-func (th *HostHandler) AddOrUpdateTranslation(translation kdexv1alpha1.MicroFrontEndTranslation) {
+func (th *HostHandler) AddOrUpdateTranslation(translation kdexv1alpha1.KDexTranslation) {
 	th.log.Info("add or update translation")
 	th.mu.Lock()
 	th.translationResources[translation.Name] = translation
@@ -170,7 +170,7 @@ func (th *HostHandler) RebuildMux() {
 	th.Mux = mux
 }
 
-func (th *HostHandler) RemoveTranslation(translation kdexv1alpha1.MicroFrontEndTranslation) {
+func (th *HostHandler) RemoveTranslation(translation kdexv1alpha1.KDexTranslation) {
 	th.mu.Lock()
 	delete(th.translationResources, translation.Name)
 	th.rebuildTranslationsLocked()
@@ -190,8 +190,8 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (th *HostHandler) SetHost(
-	host *kdexv1alpha1.MicroFrontEndHost,
-	stylesheet *kdexv1alpha1.MicroFrontEndStylesheet,
+	host *kdexv1alpha1.KDexHost,
+	stylesheet *kdexv1alpha1.KDexStylesheet,
 ) {
 	th.mu.Lock()
 	th.Host = host

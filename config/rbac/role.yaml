@@ -7,8 +7,8 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
-  - microfrontendhost
-  - microfrontendstylesheets
+  - kdexhost
+  - kdexstylesheets
   verbs:
   - get
   - list
@@ -16,9 +16,9 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
-  - microfrontendhosts
-  - microfrontendrenderpages
-  - microfrontendtranslations
+  - kdexhosts
+  - kdexrenderpages
+  - kdextranslations
   verbs:
   - create
   - delete
@@ -30,17 +30,17 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
-  - microfrontendhosts/finalizers
-  - microfrontendrenderpages/finalizers
-  - microfrontendtranslations/finalizers
+  - kdexhosts/finalizers
+  - kdexrenderpages/finalizers
+  - kdextranslations/finalizers
   verbs:
   - update
 - apiGroups:
   - kdex.dev
   resources:
-  - microfrontendhosts/status
-  - microfrontendrenderpages/status
-  - microfrontendtranslations/status
+  - kdexhosts/status
+  - kdexrenderpages/status
+  - kdextranslations/status
   verbs:
   - get
   - patch

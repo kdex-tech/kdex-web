@@ -5,6 +5,6 @@ import (
 )
 
 type RenderPageHandler struct {
-	Page       kdexv1alpha1.MicroFrontEndRenderPage
-	Stylesheet *kdexv1alpha1.MicroFrontEndStylesheet
+	Page       kdexv1alpha1.KDexRenderPage
+	Stylesheet *kdexv1alpha1.KDexStylesheet
 }

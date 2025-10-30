@@ -57,7 +57,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 	entry *render.PageEntry,
 	l *language.Tag,
 	isDefaultLanguage bool,
-	parent *kdexv1alpha1.MicroFrontEndRenderPage,
+	parent *kdexv1alpha1.KDexRenderPage,
 ) {
 	for _, handler := range s.List() {
 		page := handler.Page

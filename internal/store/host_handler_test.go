@@ -43,30 +43,30 @@ const (
 func TestHostHandler_L10nRenderLocked(t *testing.T) {
 	tests := []struct {
 		name         string
-		host         kdexv1alpha1.MicroFrontEndHost
-		page         kdexv1alpha1.MicroFrontEndRenderPage
+		host         kdexv1alpha1.KDexHost
+		page         kdexv1alpha1.KDexRenderPage
 		lang         string
 		translations *catalog.Builder
 		want         []string
 	}{
 		{
 			name: "english translation",
-			host: kdexv1alpha1.MicroFrontEndHost{
+			host: kdexv1alpha1.KDexHost{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+				Spec: kdexv1alpha1.KDexHostSpec{
 					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
 					DefaultLang:  "en",
 					Domains:      []string{"foo.bar"},
 					Organization: "KDex Tech Inc.",
 				},
 			},
-			page: kdexv1alpha1.MicroFrontEndRenderPage{
+			page: kdexv1alpha1.KDexRenderPage{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-render-page",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+				Spec: kdexv1alpha1.KDexRenderPageSpec{
 					PageComponents: kdexv1alpha1.PageComponents{
 						Contents: map[string]string{
 							"main": "MAIN",
@@ -95,22 +95,22 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		},
 		{
 			name: "english translation",
-			host: kdexv1alpha1.MicroFrontEndHost{
+			host: kdexv1alpha1.KDexHost{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+				Spec: kdexv1alpha1.KDexHostSpec{
 					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
 					DefaultLang:  "en",
 					Domains:      []string{"foo.bar"},
 					Organization: "KDex Tech Inc.",
 				},
 			},
-			page: kdexv1alpha1.MicroFrontEndRenderPage{
+			page: kdexv1alpha1.KDexRenderPage{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-render-page",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+				Spec: kdexv1alpha1.KDexRenderPageSpec{
 					PageComponents: kdexv1alpha1.PageComponents{
 						Contents: map[string]string{
 							"main": "MAIN",
@@ -139,22 +139,22 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		},
 		{
 			name: "no translation",
-			host: kdexv1alpha1.MicroFrontEndHost{
+			host: kdexv1alpha1.KDexHost{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+				Spec: kdexv1alpha1.KDexHostSpec{
 					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
 					DefaultLang:  "en",
 					Domains:      []string{"foo.bar"},
 					Organization: "KDex Tech Inc.",
 				},
 			},
-			page: kdexv1alpha1.MicroFrontEndRenderPage{
+			page: kdexv1alpha1.KDexRenderPage{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-render-page",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+				Spec: kdexv1alpha1.KDexRenderPageSpec{
 					PageComponents: kdexv1alpha1.PageComponents{
 						Contents: map[string]string{
 							"main": "MAIN",
@@ -185,8 +185,8 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got, gotErr := th.L10nRenderLocked(RenderPageHandler{
 				Page: tt.page,
-				Stylesheet: &kdexv1alpha1.MicroFrontEndStylesheet{
-					Spec: kdexv1alpha1.MicroFrontEndStylesheetSpec{
+				Stylesheet: &kdexv1alpha1.KDexStylesheet{
+					Spec: kdexv1alpha1.KDexStylesheetSpec{
 						StyleItems: []kdexv1alpha1.StyleItem{},
 					},
 				},
@@ -204,29 +204,29 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 func TestHostHandler_L10nRendersLocked(t *testing.T) {
 	tests := []struct {
 		name         string
-		host         kdexv1alpha1.MicroFrontEndHost
+		host         kdexv1alpha1.KDexHost
 		translations *catalog.Builder
-		page         kdexv1alpha1.MicroFrontEndRenderPage
+		page         kdexv1alpha1.KDexRenderPage
 		want         map[string][]string
 	}{
 		{
 			name: "translations",
-			host: kdexv1alpha1.MicroFrontEndHost{
+			host: kdexv1alpha1.KDexHost{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+				Spec: kdexv1alpha1.KDexHostSpec{
 					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
 					DefaultLang:  "en",
 					Domains:      []string{"foo.bar"},
 					Organization: "KDex Tech Inc.",
 				},
 			},
-			page: kdexv1alpha1.MicroFrontEndRenderPage{
+			page: kdexv1alpha1.KDexRenderPage{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-render-page",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndRenderPageSpec{
+				Spec: kdexv1alpha1.KDexRenderPageSpec{
 					PageComponents: kdexv1alpha1.PageComponents{
 						Contents: map[string]string{
 							"main": "MAIN",
@@ -269,8 +269,8 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got := th.L10nRendersLocked(RenderPageHandler{
 				Page: tt.page,
-				Stylesheet: &kdexv1alpha1.MicroFrontEndStylesheet{
-					Spec: kdexv1alpha1.MicroFrontEndStylesheetSpec{
+				Stylesheet: &kdexv1alpha1.KDexStylesheet{
+					Spec: kdexv1alpha1.KDexStylesheetSpec{
 						StyleItems: []kdexv1alpha1.StyleItem{},
 					},
 				},
@@ -293,28 +293,28 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 	}
 	tests := []struct {
 		name        string
-		host        kdexv1alpha1.MicroFrontEndHost
-		translation kdexv1alpha1.MicroFrontEndTranslation
+		host        kdexv1alpha1.KDexHost
+		translation kdexv1alpha1.KDexTranslation
 		langTests   map[string]KeyAndExpected
 	}{
 		{
 			name: "add translation",
-			host: kdexv1alpha1.MicroFrontEndHost{
+			host: kdexv1alpha1.KDexHost{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndHostSpec{
+				Spec: kdexv1alpha1.KDexHostSpec{
 					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
 					DefaultLang:  "en",
 					Domains:      []string{"foo.bar"},
 					Organization: "KDex Tech Inc.",
 				},
 			},
-			translation: kdexv1alpha1.MicroFrontEndTranslation{
+			translation: kdexv1alpha1.KDexTranslation{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-translation",
 				},
-				Spec: kdexv1alpha1.MicroFrontEndTranslationSpec{
+				Spec: kdexv1alpha1.KDexTranslationSpec{
 					Translations: []kdexv1alpha1.Translation{
 						{
 							Lang: "en",

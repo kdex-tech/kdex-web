@@ -38,32 +38,32 @@ import (
 
 const renderPageFinalizerName = "kdex.dev/kdex-web-render-page-finalizer"
 
-// MicroFrontEndRenderPageReconciler reconciles a MicroFrontEndRenderPage object
-type MicroFrontEndRenderPageReconciler struct {
+// KDexRenderPageReconciler reconciles a KDexRenderPage object
+type KDexRenderPageReconciler struct {
 	client.Client
 	HostStore    *store.HostStore
 	RequeueDelay time.Duration
 	Scheme       *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendhost,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendrenderpages,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendrenderpages/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=kdex.dev,resources=microfrontendrenderpages/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhost,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexrenderpages,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexrenderpages/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexrenderpages/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the MicroFrontEndRenderPage object against the actual cluster state, and then
+// the KDexRenderPage object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.21.0/pkg/reconcile
-func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *KDexRenderPageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	var renderPage kdexv1alpha1.MicroFrontEndRenderPage
+	var renderPage kdexv1alpha1.KDexRenderPage
 	if err := r.Get(ctx, req.NamespacedName, &renderPage); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -90,7 +90,7 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, nil
 	}
 
-	var host kdexv1alpha1.MicroFrontEndHost
+	var host kdexv1alpha1.KDexHost
 	hostName := types.NamespacedName{
 		Name:      renderPage.Spec.HostRef.Name,
 		Namespace: renderPage.Namespace,
@@ -103,7 +103,7 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 					kdexv1alpha1.ConditionTypeReady,
 					metav1.ConditionFalse,
 					kdexv1alpha1.ConditionReasonReconcileError,
-					fmt.Sprintf("referenced MicroFrontEndHost %s not found", renderPage.Spec.HostRef.Name),
+					fmt.Sprintf("referenced KDexHost %s not found", renderPage.Spec.HostRef.Name),
 				),
 			)
 			if err := r.Status().Update(ctx, &renderPage); err != nil {
@@ -113,11 +113,11 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 		}
 
-		log.Error(err, "unable to fetch MicroFrontEndHost", "name", renderPage.Spec.HostRef.Name)
+		log.Error(err, "unable to fetch KDexHost", "name", renderPage.Spec.HostRef.Name)
 		return ctrl.Result{}, err
 	}
 
-	var stylesheet kdexv1alpha1.MicroFrontEndStylesheet
+	var stylesheet kdexv1alpha1.KDexStylesheet
 	if renderPage.Spec.StylesheetRef != nil {
 		stylesheetName := types.NamespacedName{
 			Name:      renderPage.Spec.StylesheetRef.Name,
@@ -131,7 +131,7 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 						kdexv1alpha1.ConditionTypeReady,
 						metav1.ConditionFalse,
 						kdexv1alpha1.ConditionReasonReconcileError,
-						fmt.Sprintf("referenced MicroFrontEndStylesheet %s not found", stylesheetName.Name),
+						fmt.Sprintf("referenced KDexStylesheet %s not found", stylesheetName.Name),
 					),
 				)
 				if err := r.Status().Update(ctx, &renderPage); err != nil {
@@ -141,12 +141,12 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 			}
 
-			log.Error(err, "unable to fetch MicroFrontEndStylesheet", "name", stylesheetName.Name)
+			log.Error(err, "unable to fetch KDexStylesheet", "name", stylesheetName.Name)
 			return ctrl.Result{}, err
 		}
 	}
 
-	log.Info("reconciled MicroFrontEndRenderPage")
+	log.Info("reconciled KDexRenderPage")
 
 	hostHandler, ok := r.HostStore.Get(renderPage.Spec.HostRef.Name)
 
@@ -177,27 +177,27 @@ func (r *MicroFrontEndRenderPageReconciler) Reconcile(ctx context.Context, req c
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *MicroFrontEndRenderPageReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *KDexRenderPageReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kdexv1alpha1.MicroFrontEndRenderPage{}).
+		For(&kdexv1alpha1.KDexRenderPage{}).
 		Watches(
-			&kdexv1alpha1.MicroFrontEndHost{},
+			&kdexv1alpha1.KDexHost{},
 			handler.EnqueueRequestsFromMapFunc(r.findRenderPagesForHost)).
-		Named("microfrontendrenderpage").
+		Named("kdexrenderpage").
 		Complete(r)
 }
 
-func (r *MicroFrontEndRenderPageReconciler) findRenderPagesForHost(
+func (r *KDexRenderPageReconciler) findRenderPagesForHost(
 	ctx context.Context,
 	host client.Object,
 ) []reconcile.Request {
 	log := logf.FromContext(ctx)
 
-	var renderPageList kdexv1alpha1.MicroFrontEndRenderPageList
+	var renderPageList kdexv1alpha1.KDexRenderPageList
 	if err := r.List(ctx, &renderPageList, &client.ListOptions{
 		Namespace: host.GetNamespace(),
 	}); err != nil {
-		log.Error(err, "unable to list MicroFrontEndRenderPage for host", "name", host.GetName())
+		log.Error(err, "unable to list KDexRenderPage for host", "name", host.GetName())
 		return []reconcile.Request{}
 	}
 

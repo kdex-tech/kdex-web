@@ -33,7 +33,7 @@ func (s *HostStore) Get(name string) (*HostHandler, bool) {
 
 func (s *HostStore) GetOrDefault(
 	name string,
-	stylesheet *kdexv1alpha1.MicroFrontEndStylesheet,
+	stylesheet *kdexv1alpha1.KDexStylesheet,
 	log logr.Logger,
 ) *HostHandler {
 	s.mu.RLock()
