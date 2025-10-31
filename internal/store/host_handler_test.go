@@ -19,7 +19,7 @@ const (
 	<head>
 	{{ .Meta }}
 	{{ .Title }}
-	{{ .Stylesheet }}
+	{{ .Theme }}
 	{{ .HeadScript }}
 	</head>
 	<body>
@@ -185,9 +185,9 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got, gotErr := th.L10nRenderLocked(RenderPageHandler{
 				Page: tt.page,
-				Stylesheet: &kdexv1alpha1.KDexStylesheet{
-					Spec: kdexv1alpha1.KDexStylesheetSpec{
-						StyleItems: []kdexv1alpha1.StyleItem{},
+				Theme: &kdexv1alpha1.KDexTheme{
+					Spec: kdexv1alpha1.KDexThemeSpec{
+						ThemeAssets: []kdexv1alpha1.ThemeAsset{},
 					},
 				},
 			}, &map[string]*render.PageEntry{}, language.Make(tt.lang))
@@ -269,9 +269,9 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 			th.SetTranslations(tt.translations)
 			got := th.L10nRendersLocked(RenderPageHandler{
 				Page: tt.page,
-				Stylesheet: &kdexv1alpha1.KDexStylesheet{
-					Spec: kdexv1alpha1.KDexStylesheetSpec{
-						StyleItems: []kdexv1alpha1.StyleItem{},
+				Theme: &kdexv1alpha1.KDexTheme{
+					Spec: kdexv1alpha1.KDexThemeSpec{
+						ThemeAssets: []kdexv1alpha1.ThemeAsset{},
 					},
 				},
 			}, map[language.Tag]*map[string]*render.PageEntry{})

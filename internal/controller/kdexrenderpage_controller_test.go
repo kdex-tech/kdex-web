@@ -33,7 +33,7 @@ const (
 	<head>
 	{{ .Meta }}
 	{{ .Title }}
-	{{ .Stylesheet }}
+	{{ .Theme }}
 	{{ .HeadScript }}
 	</head>
 	<body>

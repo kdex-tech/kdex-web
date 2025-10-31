@@ -47,7 +47,7 @@ type KDexHostReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhosts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhosts/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhosts/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexstylesheets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -85,7 +85,7 @@ func (r *KDexHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	stylesheet, shouldReturn, r1, err := resolveStylesheet(ctx, r.Client, &host, &host.Status.Conditions, host.Spec.DefaultStylesheetRef, r.RequeueDelay)
+	stylesheet, shouldReturn, r1, err := resolveTheme(ctx, r.Client, &host, &host.Status.Conditions, host.Spec.DefaultThemeRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
@@ -118,13 +118,13 @@ func (r *KDexHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexHost{}).
 		Watches(
-			&kdexv1alpha1.KDexStylesheet{},
-			handler.EnqueueRequestsFromMapFunc(r.findHostsForStylesheet)).
+			&kdexv1alpha1.KDexTheme{},
+			handler.EnqueueRequestsFromMapFunc(r.findHostsForTheme)).
 		Named("kdexhost").
 		Complete(r)
 }
 
-func (r *KDexHostReconciler) findHostsForStylesheet(
+func (r *KDexHostReconciler) findHostsForTheme(
 	ctx context.Context,
 	stylesheet client.Object,
 ) []reconcile.Request {
@@ -140,10 +140,10 @@ func (r *KDexHostReconciler) findHostsForStylesheet(
 
 	requests := make([]reconcile.Request, 0, len(hostsList.Items))
 	for _, host := range hostsList.Items {
-		if host.Spec.DefaultStylesheetRef == nil {
+		if host.Spec.DefaultThemeRef == nil {
 			continue
 		}
-		if host.Spec.DefaultStylesheetRef.Name == stylesheet.GetName() {
+		if host.Spec.DefaultThemeRef.Name == stylesheet.GetName() {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      host.Name,

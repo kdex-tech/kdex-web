@@ -22,12 +22,12 @@ type HostHandler struct {
 	defaultLanguage      string
 	log                  logr.Logger
 	mu                   sync.RWMutex
-	stylesheet           *kdexv1alpha1.KDexStylesheet
+	stylesheet           *kdexv1alpha1.KDexTheme
 	translationResources map[string]kdexv1alpha1.KDexTranslation
 }
 
 func NewHostHandler(
-	stylesheet *kdexv1alpha1.KDexStylesheet,
+	stylesheet *kdexv1alpha1.KDexTheme,
 	log logr.Logger,
 ) *HostHandler {
 	th := &HostHandler{
@@ -70,13 +70,13 @@ func (th *HostHandler) L10nRenderLocked(
 ) (string, error) {
 	page := handler.Page
 
-	styleItems := []kdexv1alpha1.StyleItem{}
+	styleItems := []kdexv1alpha1.ThemeAsset{}
 
 	if th.stylesheet != nil {
-		styleItems = append(styleItems, th.stylesheet.Spec.StyleItems...)
+		styleItems = append(styleItems, th.stylesheet.Spec.ThemeAssets...)
 	}
-	if handler.Stylesheet != nil {
-		styleItems = append(styleItems, handler.Stylesheet.Spec.StyleItems...)
+	if handler.Theme != nil {
+		styleItems = append(styleItems, handler.Theme.Spec.ThemeAssets...)
 	}
 
 	renderer := render.Renderer{
@@ -90,7 +90,7 @@ func (th *HostHandler) L10nRenderLocked(
 		Meta:            th.Host.Spec.BaseMeta,
 		Organization:    th.Host.Spec.Organization,
 		PageMap:         pageMap,
-		StyleItems:      styleItems,
+		ThemeAssets:     styleItems,
 	}
 
 	return renderer.RenderPage(render.Page{
@@ -191,7 +191,7 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (th *HostHandler) SetHost(
 	host *kdexv1alpha1.KDexHost,
-	stylesheet *kdexv1alpha1.KDexStylesheet,
+	stylesheet *kdexv1alpha1.KDexTheme,
 ) {
 	th.mu.Lock()
 	th.Host = host

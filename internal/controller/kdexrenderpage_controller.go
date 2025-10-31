@@ -117,10 +117,10 @@ func (r *KDexRenderPageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	var stylesheet kdexv1alpha1.KDexStylesheet
-	if renderPage.Spec.StylesheetRef != nil {
+	var stylesheet kdexv1alpha1.KDexTheme
+	if renderPage.Spec.ThemeRef != nil {
 		stylesheetName := types.NamespacedName{
-			Name:      renderPage.Spec.StylesheetRef.Name,
+			Name:      renderPage.Spec.ThemeRef.Name,
 			Namespace: renderPage.Namespace,
 		}
 		if err := r.Get(ctx, stylesheetName, &stylesheet); err != nil {
@@ -131,7 +131,7 @@ func (r *KDexRenderPageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 						kdexv1alpha1.ConditionTypeReady,
 						metav1.ConditionFalse,
 						kdexv1alpha1.ConditionReasonReconcileError,
-						fmt.Sprintf("referenced KDexStylesheet %s not found", stylesheetName.Name),
+						fmt.Sprintf("referenced KDexTheme %s not found", stylesheetName.Name),
 					),
 				)
 				if err := r.Status().Update(ctx, &renderPage); err != nil {
@@ -141,7 +141,7 @@ func (r *KDexRenderPageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 			}
 
-			log.Error(err, "unable to fetch KDexStylesheet", "name", stylesheetName.Name)
+			log.Error(err, "unable to fetch KDexTheme", "name", stylesheetName.Name)
 			return ctrl.Result{}, err
 		}
 	}
@@ -155,8 +155,8 @@ func (r *KDexRenderPageReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	hostHandler.RenderPages.Set(store.RenderPageHandler{
-		Page:       renderPage,
-		Stylesheet: &stylesheet,
+		Page:  renderPage,
+		Theme: &stylesheet,
 	})
 
 	apimeta.SetStatusCondition(

@@ -8,7 +8,7 @@ rules:
   - kdex.dev
   resources:
   - kdexhost
-  - kdexstylesheets
+  - kdexthemes
   verbs:
   - get
   - list

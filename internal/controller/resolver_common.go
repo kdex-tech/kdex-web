@@ -56,15 +56,15 @@ func resolveHost(
 	return &host, false, ctrl.Result{}, nil
 }
 
-func resolveStylesheet(
+func resolveTheme(
 	ctx context.Context,
 	c client.Client,
 	object client.Object,
 	objectConditions *[]metav1.Condition,
 	stylesheetRef *v1.LocalObjectReference,
 	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexStylesheet, bool, ctrl.Result, error) {
-	var stylesheet kdexv1alpha1.KDexStylesheet
+) (*kdexv1alpha1.KDexTheme, bool, ctrl.Result, error) {
+	var stylesheet kdexv1alpha1.KDexTheme
 	if stylesheetRef != nil {
 		stylesheetName := types.NamespacedName{
 			Name:      stylesheetRef.Name,
@@ -78,7 +78,7 @@ func resolveStylesheet(
 						kdexv1alpha1.ConditionTypeReady,
 						metav1.ConditionFalse,
 						kdexv1alpha1.ConditionReasonReconcileError,
-						fmt.Sprintf("referenced KDexStylesheet %s not found", stylesheetName.Name),
+						fmt.Sprintf("referenced KDexTheme %s not found", stylesheetName.Name),
 					),
 				)
 				if err := c.Status().Update(ctx, object); err != nil {

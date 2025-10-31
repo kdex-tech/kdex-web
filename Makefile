@@ -180,7 +180,7 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpageheaders.yaml \
 		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagenavigations.yaml \
 		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexrenderpages.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexstylesheets.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexthemes.yaml \
 		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdextranslations.yaml
 
 .PHONY: uninstall
@@ -196,7 +196,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpageheaders.yaml \
 		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexpagenavigations.yaml \
 		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexrenderpages.yaml \
-		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexstylesheets.yaml \
+		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdexthemes.yaml \
 		-f https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/$${CRD_VERSION}/config/crd/bases/kdex.dev_kdextranslations.yaml
 
 .PHONY: deploy
