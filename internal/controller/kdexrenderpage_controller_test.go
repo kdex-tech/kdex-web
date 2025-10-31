@@ -108,8 +108,9 @@ var _ = Describe("KDexRenderPage Controller", func() {
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
 					AppPolicy: kdexv1alpha1.NonStrictAppPolicy,
-					Domains: []string{
-						"foo.bar.dev",
+					Routing: kdexv1alpha1.Routing{
+						Domains:  []string{"foo.bar"},
+						Strategy: kdexv1alpha1.IngressRoutingStrategy,
 					},
 					Organization: "KDex Tech Inc.",
 				},

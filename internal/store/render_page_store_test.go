@@ -47,9 +47,9 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 			},
 			want: &map[string]*render.PageEntry{
 				"Foo": {
-					Name:   "foo",
+					Href:   "/en/foo",
 					Label:  "Foo",
-					Href:   "/foo",
+					Name:   "foo",
 					Weight: resource.MustParse("0"),
 				},
 			},
@@ -114,19 +114,19 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 				"Home": {
 					Children: &map[string]*render.PageEntry{
 						"Foo": {
-							Href:   "/foo",
+							Href:   "/en/foo",
 							Label:  "Foo",
 							Name:   "foo",
 							Weight: resource.MustParse("0"),
 						},
 					},
-					Href:   "/home",
+					Href:   "/en/home",
 					Label:  "Home",
 					Name:   "home",
 					Weight: resource.MustParse("0"),
 				},
 				"Contact Us": {
-					Href:   "/contact",
+					Href:   "/en/contact",
 					Label:  "Contact Us",
 					Name:   "contact",
 					Weight: resource.MustParse("100"),

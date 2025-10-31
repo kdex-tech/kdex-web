@@ -27,7 +27,7 @@ func WithHost(store *store_.HostStore) func(http.Handler) http.Handler {
 			var bestMatchLength = -1
 
 			for _, host := range hosts {
-				for _, domain := range host.Host.Spec.Domains {
+				for _, domain := range host.Host.Spec.Routing.Domains {
 					if domain == hostHeader {
 						ctx := context.WithValue(r.Context(), HostKey, host)
 						next.ServeHTTP(w, r.WithContext(ctx))

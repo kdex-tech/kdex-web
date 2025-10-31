@@ -56,9 +56,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang:  "en",
-					Domains:      []string{"foo.bar"},
+					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
+					DefaultLang: "en",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
+					},
 					Organization: "KDex Tech Inc.",
 				},
 			},
@@ -100,9 +102,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang:  "en",
-					Domains:      []string{"foo.bar"},
+					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
+					DefaultLang: "en",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
+					},
 					Organization: "KDex Tech Inc.",
 				},
 			},
@@ -144,9 +148,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang:  "en",
-					Domains:      []string{"foo.bar"},
+					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
+					DefaultLang: "en",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
+					},
 					Organization: "KDex Tech Inc.",
 				},
 			},
@@ -181,13 +187,13 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
 			th := NewHostHandler(nil, logr.Discard())
-			th.SetHost(&tt.host)
+			th.SetHost(&tt.host, nil)
 			th.SetTranslations(tt.translations)
 			got, gotErr := th.L10nRenderLocked(RenderPageHandler{
 				Page: tt.page,
 				Theme: &kdexv1alpha1.KDexTheme{
 					Spec: kdexv1alpha1.KDexThemeSpec{
-						ThemeAssets: []kdexv1alpha1.ThemeAsset{},
+						Assets: []kdexv1alpha1.ThemeAsset{},
 					},
 				},
 			}, &map[string]*render.PageEntry{}, language.Make(tt.lang))
@@ -216,9 +222,11 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang:  "en",
-					Domains:      []string{"foo.bar"},
+					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
+					DefaultLang: "en",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
+					},
 					Organization: "KDex Tech Inc.",
 				},
 			},
@@ -265,13 +273,13 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
 			th := NewHostHandler(nil, logr.Discard())
-			th.SetHost(&tt.host)
+			th.SetHost(&tt.host, nil)
 			th.SetTranslations(tt.translations)
 			got := th.L10nRendersLocked(RenderPageHandler{
 				Page: tt.page,
 				Theme: &kdexv1alpha1.KDexTheme{
 					Spec: kdexv1alpha1.KDexThemeSpec{
-						ThemeAssets: []kdexv1alpha1.ThemeAsset{},
+						Assets: []kdexv1alpha1.ThemeAsset{},
 					},
 				},
 			}, map[language.Tag]*map[string]*render.PageEntry{})
@@ -304,9 +312,11 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:    kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang:  "en",
-					Domains:      []string{"foo.bar"},
+					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
+					DefaultLang: "en",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
+					},
 					Organization: "KDex Tech Inc.",
 				},
 			},
@@ -354,7 +364,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
 			th := NewHostHandler(nil, logr.Discard())
-			th.SetHost(&tt.host)
+			th.SetHost(&tt.host, nil)
 			th.AddOrUpdateTranslation(tt.translation)
 
 			for lang, expected := range tt.langTests {

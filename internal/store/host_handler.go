@@ -70,13 +70,13 @@ func (th *HostHandler) L10nRenderLocked(
 ) (string, error) {
 	page := handler.Page
 
-	styleItems := []kdexv1alpha1.ThemeAsset{}
+	assets := []kdexv1alpha1.ThemeAsset{}
 
 	if th.stylesheet != nil {
-		styleItems = append(styleItems, th.stylesheet.Spec.ThemeAssets...)
+		assets = append(assets, th.stylesheet.Spec.Assets...)
 	}
 	if handler.Theme != nil {
-		styleItems = append(styleItems, handler.Theme.Spec.ThemeAssets...)
+		assets = append(assets, handler.Theme.Spec.Assets...)
 	}
 
 	renderer := render.Renderer{
@@ -90,7 +90,7 @@ func (th *HostHandler) L10nRenderLocked(
 		Meta:            th.Host.Spec.BaseMeta,
 		Organization:    th.Host.Spec.Organization,
 		PageMap:         pageMap,
-		ThemeAssets:     styleItems,
+		ThemeAssets:     assets,
 	}
 
 	return renderer.RenderPage(render.Page{
