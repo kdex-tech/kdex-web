@@ -61,16 +61,16 @@ func resolveTheme(
 	c client.Client,
 	object client.Object,
 	objectConditions *[]metav1.Condition,
-	stylesheetRef *v1.LocalObjectReference,
+	themeRef *v1.LocalObjectReference,
 	requeueDelay time.Duration,
 ) (*kdexv1alpha1.KDexTheme, bool, ctrl.Result, error) {
-	var stylesheet kdexv1alpha1.KDexTheme
-	if stylesheetRef != nil {
-		stylesheetName := types.NamespacedName{
-			Name:      stylesheetRef.Name,
+	var theme kdexv1alpha1.KDexTheme
+	if themeRef != nil {
+		themeName := types.NamespacedName{
+			Name:      themeRef.Name,
 			Namespace: object.GetNamespace(),
 		}
-		if err := c.Get(ctx, stylesheetName, &stylesheet); err != nil {
+		if err := c.Get(ctx, themeName, &theme); err != nil {
 			if errors.IsNotFound(err) {
 				apimeta.SetStatusCondition(
 					objectConditions,
@@ -78,7 +78,7 @@ func resolveTheme(
 						kdexv1alpha1.ConditionTypeReady,
 						metav1.ConditionFalse,
 						kdexv1alpha1.ConditionReasonReconcileError,
-						fmt.Sprintf("referenced KDexTheme %s not found", stylesheetName.Name),
+						fmt.Sprintf("referenced KDexTheme %s not found", themeName.Name),
 					),
 				)
 				if err := c.Status().Update(ctx, object); err != nil {
@@ -91,10 +91,10 @@ func resolveTheme(
 			return nil, true, ctrl.Result{}, err
 		}
 
-		if isReady, r1, err := isReady(ctx, c, object, &stylesheet, &stylesheet.Status.Conditions, requeueDelay); !isReady {
+		if isReady, r1, err := isReady(ctx, c, object, &theme, &theme.Status.Conditions, requeueDelay); !isReady {
 			return nil, true, r1, err
 		}
 	}
 
-	return &stylesheet, false, ctrl.Result{}, nil
+	return &theme, false, ctrl.Result{}, nil
 }

@@ -20,18 +20,25 @@ import (
 	"context"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const hostFinalizerName = "kdex.dev/kdex-web-host-finalizer"
@@ -40,8 +47,10 @@ const hostFinalizerName = "kdex.dev/kdex-web-host-finalizer"
 type KDexHostReconciler struct {
 	client.Client
 	HostStore    *store.HostStore
+	Port         int32
 	RequeueDelay time.Duration
 	Scheme       *runtime.Scheme
+	Defaults     ResourceDefaults
 }
 
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhosts,verbs=get;list;watch;create;update;patch;delete
@@ -85,7 +94,15 @@ func (r *KDexHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, nil
 	}
 
-	stylesheet, shouldReturn, r1, err := resolveTheme(ctx, r.Client, &host, &host.Status.Conditions, host.Spec.DefaultThemeRef, r.RequeueDelay)
+	theme, shouldReturn, r1, err := resolveTheme(ctx, r.Client, &host, &host.Status.Conditions, host.Spec.DefaultThemeRef, r.RequeueDelay)
+	if shouldReturn {
+		return r1, err
+	}
+
+	log.Info("got theme", "theme", theme)
+
+	shouldReturn, r1, err = r.createOrUpdateAccompanyingResources(ctx, &host, theme)
+
 	if shouldReturn {
 		return r1, err
 	}
@@ -93,8 +110,8 @@ func (r *KDexHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	log.Info("reconciled KDexHost")
 
 	hostHandler := r.HostStore.GetOrDefault(
-		host.Name, stylesheet, log.WithName("host-handler").WithValues("host", host.Name))
-	hostHandler.SetHost(&host, stylesheet)
+		host.Name, theme, log.WithName("host-handler").WithValues("host", host.Name))
+	hostHandler.SetHost(&host, theme)
 
 	apimeta.SetStatusCondition(
 		&host.Status.Conditions,
@@ -117,6 +134,10 @@ func (r *KDexHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (r *KDexHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexHost{}).
+		Owns(&appsv1.Deployment{}).
+		Owns(&corev1.Service{}).
+		Owns(&networkingv1.Ingress{}).
+		Owns(&gatewayv1.HTTPRoute{}).
 		Watches(
 			&kdexv1alpha1.KDexTheme{},
 			handler.EnqueueRequestsFromMapFunc(r.findHostsForTheme)).
@@ -124,17 +145,371 @@ func (r *KDexHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+func (r *KDexHostReconciler) createOrUpdateAccompanyingResources(
+	ctx context.Context,
+	host *kdexv1alpha1.KDexHost,
+	theme *kdexv1alpha1.KDexTheme,
+) (bool, ctrl.Result, error) {
+	if theme.Spec.Assets != nil {
+		shouldReturn, r1, err := r.createOrUpdateThemeDeployment(ctx, host, theme)
+
+		if shouldReturn {
+			return shouldReturn, r1, err
+		}
+
+		shouldReturn, r1, err = r.createOrUpdateThemeService(ctx, host, theme)
+
+		if shouldReturn {
+			return shouldReturn, r1, err
+		}
+	}
+
+	if host.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
+		return r.createOrUpdateHTTPRoute(ctx, host, theme)
+	}
+
+	return r.createOrUpdateIngress(ctx, host, theme)
+}
+
+func (r *KDexHostReconciler) createOrUpdateIngress(
+	ctx context.Context,
+	host *kdexv1alpha1.KDexHost,
+	theme *kdexv1alpha1.KDexTheme,
+) (bool, ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	ingress := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      host.Name,
+			Namespace: host.Namespace,
+		},
+	}
+
+	if _, err := ctrl.CreateOrUpdate(
+		ctx,
+		r.Client,
+		ingress,
+		func() error {
+			serviceName := "kdex-web-controller-manager"
+			pathType := networkingv1.PathTypePrefix
+			rules := make([]networkingv1.IngressRule, 0, len(host.Spec.Routing.Domains))
+
+			for _, domain := range host.Spec.Routing.Domains {
+				rules = append(rules, networkingv1.IngressRule{
+					Host: domain,
+					IngressRuleValue: networkingv1.IngressRuleValue{
+						HTTP: &networkingv1.HTTPIngressRuleValue{
+							Paths: []networkingv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: &pathType,
+									Backend: networkingv1.IngressBackend{
+										Service: &networkingv1.IngressServiceBackend{
+											Name: serviceName,
+											Port: networkingv1.ServiceBackendPort{
+												Number: r.Port,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				})
+			}
+
+			if theme.Spec.Assets != nil {
+				for _, rule := range rules {
+					rule.IngressRuleValue.HTTP.Paths = append(rule.IngressRuleValue.HTTP.Paths,
+						networkingv1.HTTPIngressPath{
+							Path:     theme.Spec.RoutePath,
+							PathType: &pathType,
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: theme.Name,
+									Port: networkingv1.ServiceBackendPort{
+										Name: theme.Name,
+									},
+								},
+							},
+						},
+					)
+				}
+			}
+
+			ingress.Annotations = host.Annotations
+			ingress.Labels = host.Labels
+			if ingress.Labels == nil {
+				ingress.Labels = make(map[string]string)
+			}
+			ingress.Labels["kdex.dev/host"] = host.Name
+			ingress.Spec = networkingv1.IngressSpec{
+				DefaultBackend: &networkingv1.IngressBackend{
+					Service: &networkingv1.IngressServiceBackend{
+						Name: serviceName,
+						Port: networkingv1.ServiceBackendPort{
+							Number: r.Port,
+						},
+					},
+				},
+				IngressClassName: host.Spec.Routing.IngressClassName,
+				Rules:            rules,
+			}
+
+			if host.Spec.Routing.TLS != nil {
+				ingress.Spec.TLS = []networkingv1.IngressTLS{
+					{
+						Hosts:      host.Spec.Routing.Domains,
+						SecretName: host.Name,
+					},
+				}
+			}
+
+			return ctrl.SetControllerReference(host, ingress, r.Scheme)
+		},
+	); err != nil {
+		log.Error(err, "unable to create or update Ingress", "ingress", ingress.Name)
+		return true, ctrl.Result{}, err
+	}
+
+	return false, ctrl.Result{}, nil
+}
+
+func (r *KDexHostReconciler) createOrUpdateHTTPRoute(
+	ctx context.Context,
+	host *kdexv1alpha1.KDexHost,
+	theme *kdexv1alpha1.KDexTheme,
+) (bool, ctrl.Result, error) {
+	panic("unimplemented")
+}
+
+func (r *KDexHostReconciler) createOrUpdateThemeDeployment(
+	ctx context.Context,
+	host *kdexv1alpha1.KDexHost,
+	theme *kdexv1alpha1.KDexTheme,
+) (bool, ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	defaults := r.Defaults
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      theme.Name,
+			Namespace: theme.Namespace,
+		},
+	}
+
+	if _, err := ctrl.CreateOrUpdate(
+		ctx,
+		r.Client,
+		deployment,
+		func() error {
+			replicas := defaults.Deployment.Replicas
+			resources := defaults.Container.Resources
+			themePullPolicy := defaults.Theme.PullPolicy
+			webserverImage := defaults.Deployment.Image
+			webserverPullPolicy := defaults.Deployment.PullPolicy
+
+			if theme.Spec.PullPolicy != "" {
+				themePullPolicy = theme.Spec.PullPolicy
+			}
+
+			if theme.Spec.WebServer != nil {
+				if theme.Spec.WebServer.Image != "" {
+					webserverImage = theme.Spec.WebServer.Image
+				}
+
+				if theme.Spec.WebServer.PullPolicy != "" {
+					webserverPullPolicy = theme.Spec.WebServer.PullPolicy
+				}
+
+				if theme.Spec.WebServer.PullPolicy != "" {
+					webserverPullPolicy = theme.Spec.WebServer.PullPolicy
+				}
+
+				if theme.Spec.WebServer.Replicas != nil {
+					replicas = theme.Spec.WebServer.Replicas
+				}
+
+				if theme.Spec.WebServer.Resources.Limits != nil ||
+					theme.Spec.WebServer.Resources.Requests != nil {
+
+					resources = theme.Spec.WebServer.Resources
+				}
+			}
+
+			scratchSize := resource.MustParse("16Ki")
+
+			deployment.Annotations = theme.Annotations
+			deployment.Labels = theme.Labels
+			if deployment.Labels == nil {
+				deployment.Labels = make(map[string]string)
+			}
+			deployment.Labels["kdex.dev/theme"] = theme.Name
+			deployment.Spec = appsv1.DeploymentSpec{
+				Replicas: replicas,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"kdex.dev/theme": theme.Name,
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"kdex.dev/theme": theme.Name,
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Env: []corev1.EnvVar{
+									{
+										Name: "POD_NAME",
+										ValueFrom: &corev1.EnvVarSource{
+											FieldRef: &corev1.ObjectFieldSelector{
+												FieldPath: "metadata.name",
+											},
+										},
+									},
+									{
+										Name:  "POD_NAMESPACE",
+										Value: host.Namespace,
+									},
+									{
+										Name: "POD_IP",
+										ValueFrom: &corev1.EnvVarSource{
+											FieldRef: &corev1.ObjectFieldSelector{
+												FieldPath: "status.podIP",
+											},
+										},
+									},
+									{
+										Name:  "CORS_DOMAINS",
+										Value: utils.DomainsToMatcher(host.Spec.Routing.Domains),
+									},
+								},
+								Image:           webserverImage,
+								ImagePullPolicy: webserverPullPolicy,
+								Name:            theme.Name,
+								Ports: []corev1.ContainerPort{
+									{
+										ContainerPort: defaults.Container.Port,
+										Name:          theme.Name,
+									},
+								},
+								Resources:       resources,
+								SecurityContext: defaults.Container.SecurityContext.DeepCopy(),
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										MountPath: "/etc/caddy.d",
+										Name:      "theme-scratch",
+									},
+									{
+										MountPath: "/public",
+										Name:      "theme-oci-image",
+									},
+								},
+							},
+						},
+						ImagePullSecrets: theme.Spec.PullSecrets,
+						SecurityContext:  defaults.Deployment.SecurityContext.DeepCopy(),
+						Volumes: []corev1.Volume{
+							{
+								Name: "theme-scratch",
+								VolumeSource: corev1.VolumeSource{
+									EmptyDir: &corev1.EmptyDirVolumeSource{
+										Medium:    corev1.StorageMediumMemory,
+										SizeLimit: &scratchSize,
+									},
+								},
+							},
+							{
+								Name: "theme-oci-image",
+								VolumeSource: corev1.VolumeSource{
+									Image: &corev1.ImageVolumeSource{
+										PullPolicy: themePullPolicy,
+										Reference:  theme.Spec.Image,
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+
+			return ctrl.SetControllerReference(host, deployment, r.Scheme)
+		},
+	); err != nil {
+		log.Error(err, "unable to create or update Deployment", "deployment", deployment)
+		return true, ctrl.Result{}, err
+	}
+
+	return false, ctrl.Result{}, nil
+}
+
+func (r *KDexHostReconciler) createOrUpdateThemeService(
+	ctx context.Context,
+	host *kdexv1alpha1.KDexHost,
+	theme *kdexv1alpha1.KDexTheme,
+) (bool, ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	defaults := r.Defaults
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      theme.Name,
+			Namespace: theme.Namespace,
+		},
+	}
+
+	if _, err := ctrl.CreateOrUpdate(
+		ctx,
+		r.Client,
+		service,
+		func() error {
+			service.Annotations = theme.Annotations
+			service.Labels = theme.Labels
+			if service.Labels == nil {
+				service.Labels = make(map[string]string)
+			}
+			service.Labels["kdex.dev/theme"] = theme.Name
+			service.Spec = corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Name:       theme.Name,
+						Port:       defaults.Container.Port,
+						Protocol:   corev1.ProtocolTCP,
+						TargetPort: intstr.FromInt32(defaults.Container.Port),
+					},
+				},
+				Selector: map[string]string{
+					"kdex.dev/theme": theme.Name,
+				},
+				Type: corev1.ServiceTypeClusterIP,
+			}
+
+			return ctrl.SetControllerReference(host, service, r.Scheme)
+		},
+	); err != nil {
+		log.Error(err, "unable to create or update Service", "service", service.Name)
+		return true, ctrl.Result{}, err
+	}
+
+	return false, ctrl.Result{}, nil
+}
+
 func (r *KDexHostReconciler) findHostsForTheme(
 	ctx context.Context,
-	stylesheet client.Object,
+	theme client.Object,
 ) []reconcile.Request {
 	log := logf.FromContext(ctx)
 
 	var hostsList kdexv1alpha1.KDexHostList
 	if err := r.List(ctx, &hostsList, &client.ListOptions{
-		Namespace: stylesheet.GetNamespace(),
+		Namespace: theme.GetNamespace(),
 	}); err != nil {
-		log.Error(err, "unable to list KDexHost for stylesheet", "name", stylesheet.GetName())
+		log.Error(err, "unable to list KDexHost for theme", "name", theme.GetName())
 		return []reconcile.Request{}
 	}
 
@@ -143,7 +518,7 @@ func (r *KDexHostReconciler) findHostsForTheme(
 		if host.Spec.DefaultThemeRef == nil {
 			continue
 		}
-		if host.Spec.DefaultThemeRef.Name == stylesheet.GetName() {
+		if host.Spec.DefaultThemeRef.Name == theme.GetName() {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      host.Name,

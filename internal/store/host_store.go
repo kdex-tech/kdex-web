@@ -33,14 +33,14 @@ func (s *HostStore) Get(name string) (*HostHandler, bool) {
 
 func (s *HostStore) GetOrDefault(
 	name string,
-	stylesheet *kdexv1alpha1.KDexTheme,
+	theme *kdexv1alpha1.KDexTheme,
 	log logr.Logger,
 ) *HostHandler {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	handler, ok := s.handlers[name]
 	if !ok {
-		handler = NewHostHandler(stylesheet, log)
+		handler = NewHostHandler(theme, log)
 		s.handlers[name] = handler
 		log.Info("tracking new host")
 	}

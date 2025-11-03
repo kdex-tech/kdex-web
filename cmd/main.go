@@ -22,10 +22,13 @@ import (
 	"flag"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +45,7 @@ import (
 	"kdex.dev/web/internal/controller"
 	"kdex.dev/web/internal/store"
 	"kdex.dev/web/internal/web/server"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -53,11 +57,13 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(kdexv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1.Install(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
 // nolint:gocyclo
 func main() {
+	var configFile string
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -67,6 +73,8 @@ func main() {
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
 	var requeueDelaySeconds int
+	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file."+
+		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -174,7 +182,9 @@ func main() {
 
 	if err := (&controller.KDexHostReconciler{
 		Client:       mgr.GetClient(),
+		Defaults:     controller.Defaults(configFile),
 		HostStore:    hostStore,
+		Port:         webserverPort(webserverAddr),
 		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
 		Scheme:       mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
@@ -236,4 +246,20 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func webserverPort(address string) int32 {
+	idx := strings.LastIndexAny(address, ":")
+
+	if idx == -1 {
+		return 80
+	}
+
+	i, err := strconv.ParseInt(address[idx+1:], 10, 32)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return int32(i)
 }

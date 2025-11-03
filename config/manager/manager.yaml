@@ -96,8 +96,14 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-        volumeMounts: []
-      volumes: []
+        volumeMounts:
+        - mountPath: /config.yaml
+          name: config
+          subPath: config.yaml
+      volumes:
+      - name: config
+        configMap:
+          name: controller-manager
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10
 ---
@@ -118,3 +124,14 @@ spec:
     port: 8090
     protocol: TCP
     targetPort: webserver
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: controller-manager
+  namespace: system
+data:
+    config.yaml: |
+      deployment:
+        image: k3d-registry:5000/kdex-tech/kdex-themeserver:latest
+        pullPolicy: Always

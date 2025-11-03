@@ -22,18 +22,18 @@ type HostHandler struct {
 	defaultLanguage      string
 	log                  logr.Logger
 	mu                   sync.RWMutex
-	stylesheet           *kdexv1alpha1.KDexTheme
+	theme                *kdexv1alpha1.KDexTheme
 	translationResources map[string]kdexv1alpha1.KDexTranslation
 }
 
 func NewHostHandler(
-	stylesheet *kdexv1alpha1.KDexTheme,
+	theme *kdexv1alpha1.KDexTheme,
 	log logr.Logger,
 ) *HostHandler {
 	th := &HostHandler{
 		defaultLanguage:      "en",
 		log:                  log,
-		stylesheet:           stylesheet,
+		theme:                theme,
 		translationResources: map[string]kdexv1alpha1.KDexTranslation{},
 	}
 
@@ -72,8 +72,8 @@ func (th *HostHandler) L10nRenderLocked(
 
 	assets := []kdexv1alpha1.ThemeAsset{}
 
-	if th.stylesheet != nil {
-		assets = append(assets, th.stylesheet.Spec.Assets...)
+	if th.theme != nil {
+		assets = append(assets, th.theme.Spec.Assets...)
 	}
 	if handler.Theme != nil {
 		assets = append(assets, handler.Theme.Spec.Assets...)
@@ -191,12 +191,12 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (th *HostHandler) SetHost(
 	host *kdexv1alpha1.KDexHost,
-	stylesheet *kdexv1alpha1.KDexTheme,
+	theme *kdexv1alpha1.KDexTheme,
 ) {
 	th.mu.Lock()
 	th.Host = host
 	th.defaultLanguage = host.Spec.DefaultLang
-	th.stylesheet = stylesheet
+	th.theme = theme
 	th.mu.Unlock() // <-- Release lock BEFORE calling RebuildMux
 
 	th.RebuildMux()

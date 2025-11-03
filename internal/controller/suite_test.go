@@ -44,6 +44,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -97,6 +98,8 @@ var _ = BeforeSuite(func() {
 		addRemoteCRD(&testEnv.CRDDirectoryPaths, tempDir, fullPath)
 	}
 
+	addRemoteCRD(&testEnv.CRDDirectoryPaths, tempDir, "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml")
+
 	// Retrieve the first found binary directory to allow running tests from IDEs
 	if getFirstFoundEnvTestBinaryDir() != "" {
 		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
@@ -106,6 +109,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = kdexv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = gatewayv1.Install(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// cfg is defined in this file globally.
@@ -126,7 +132,9 @@ var _ = BeforeSuite(func() {
 
 	hostReconciler := &KDexHostReconciler{
 		Client:       k8sManager.GetClient(),
+		Defaults:     Defaults("/config.yaml"),
 		HostStore:    hostStore,
+		Port:         8090,
 		RequeueDelay: 0,
 		Scheme:       k8sManager.GetScheme(),
 	}
