@@ -9,24 +9,36 @@ rules:
   resources:
   - services
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - apps
   resources:
   - deployments
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - gateway.networking.k8s.io
   resources:
   - httproutes
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - kdex.dev
@@ -74,6 +86,10 @@ rules:
   resources:
   - ingresses
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch

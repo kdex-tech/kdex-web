@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -46,6 +47,10 @@ func WithHost(store *store_.HostStore) func(http.Handler) http.Handler {
 				}
 			}
 
+			if bestMatchHost == nil {
+				bestMatchHost = &fallbackHostHandler
+			}
+
 			if bestMatchHost != nil {
 				ctx := context.WithValue(r.Context(), HostKey, bestMatchHost)
 				next.ServeHTTP(w, r.WithContext(ctx))
@@ -55,4 +60,14 @@ func WithHost(store *store_.HostStore) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+var fallbackHostHandler = store_.HostHandler{
+	Mux: func() *http.ServeMux {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, "Welcome to KDex!")
+		})
+		return mux
+	}(),
 }

@@ -10,12 +10,12 @@ import (
 func New(address string, store *store_.HostStore) *http.Server {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hostHandler, ok := r.Context().Value(middleware.HostKey).(*store_.HostHandler)
-		if !ok {
-			http.NotFound(w, r)
+		if ok {
+			hostHandler.ServeHTTP(w, r)
 			return
 		}
 
-		hostHandler.ServeHTTP(w, r)
+		http.NotFound(w, r)
 	})
 
 	hostHandler := middleware.WithHost(store)(handler)
