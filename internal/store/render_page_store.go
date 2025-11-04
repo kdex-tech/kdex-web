@@ -17,6 +17,12 @@ type RenderPageStore struct {
 	handlers map[string]RenderPageHandler
 }
 
+func (s *RenderPageStore) Count() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.handlers)
+}
+
 func (s *RenderPageStore) Delete(name string) {
 	s.mu.Lock()
 	delete(s.handlers, name)

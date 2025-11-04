@@ -107,6 +107,17 @@ func (r *KDexHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return r1, err
 	}
 
+	hostHandler := r.HostStore.GetOrDefault(
+		host.Name, theme, log.WithName("host-handler").WithValues("host", host.Name))
+	hostHandler.SetHost(&host, theme)
+
+	// TODO: the host should only become ready and create accompanying resources when the host us fully ready having at
+	// least a single root page
+
+	if hostHandler.RenderPages.Count() == 0 {
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+	}
+
 	shouldReturn, r1, err = r.createOrUpdateAccompanyingResources(ctx, &host, theme)
 
 	if shouldReturn {
@@ -114,10 +125,6 @@ func (r *KDexHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	log.Info("reconciled KDexHost")
-
-	hostHandler := r.HostStore.GetOrDefault(
-		host.Name, theme, log.WithName("host-handler").WithValues("host", host.Name))
-	hostHandler.SetHost(&host, theme)
 
 	apimeta.SetStatusCondition(
 		&host.Status.Conditions,
