@@ -29,7 +29,6 @@ import (
 var _ = Describe("KDexHost Controller", func() {
 	Context("When reconciling a resource", func() {
 		const namespace = "default"
-		const resourceName = "test-resource"
 
 		ctx := context.Background()
 
@@ -42,7 +41,7 @@ var _ = Describe("KDexHost Controller", func() {
 		It("should successfully reconcile the resource", func() {
 			resource := &kdexv1alpha1.KDexHost{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      resourceName,
+					Name:      focalHost,
 					Namespace: namespace,
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
@@ -58,7 +57,7 @@ var _ = Describe("KDexHost Controller", func() {
 			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
 			assertResourceReady(
-				ctx, k8sClient, resourceName, namespace,
+				ctx, k8sClient, focalHost, namespace,
 				&kdexv1alpha1.KDexHost{}, true)
 		})
 	})

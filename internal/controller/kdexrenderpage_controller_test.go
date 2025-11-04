@@ -75,7 +75,7 @@ var _ = Describe("KDexRenderPage Controller", func() {
 				},
 				Spec: kdexv1alpha1.KDexRenderPageSpec{
 					HostRef: corev1.LocalObjectReference{
-						Name: "test-host",
+						Name: focalHost,
 					},
 					PageComponents: kdexv1alpha1.PageComponents{
 						Contents: map[string]string{
@@ -103,7 +103,7 @@ var _ = Describe("KDexRenderPage Controller", func() {
 
 			hostResource := &kdexv1alpha1.KDexHost{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-host",
+					Name:      focalHost,
 					Namespace: namespace,
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{

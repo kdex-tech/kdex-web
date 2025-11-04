@@ -36,6 +36,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -64,6 +65,7 @@ func init() {
 // nolint:gocyclo
 func main() {
 	var configFile string
+	var focalHost string
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -73,8 +75,8 @@ func main() {
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
 	var requeueDelaySeconds int
-	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file."+
-		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
+	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file.")
+	flag.StringVar(&focalHost, "focal-host", "", "The name of a KDexHost resource to focus the controller instance's attention on.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -166,12 +168,19 @@ func main() {
 		metricsServerOptions.KeyName = metricsCertKey
 	}
 
+	controllerNamespace := controller.ControllerNamespace()
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		Metrics:                metricsServerOptions,
-		WebhookServer:          webhookServer,
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				controllerNamespace: {},
+			},
+		},
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         false,
+		Metrics:                metricsServerOptions,
+		Scheme:                 scheme,
+		WebhookServer:          webhookServer,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -181,12 +190,14 @@ func main() {
 	hostStore := store.NewHostStore()
 
 	if err := (&controller.KDexHostReconciler{
-		Client:       mgr.GetClient(),
-		Defaults:     controller.Defaults(configFile),
-		HostStore:    hostStore,
-		Port:         webserverPort(webserverAddr),
-		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
-		Scheme:       mgr.GetScheme(),
+		Client:              mgr.GetClient(),
+		ControllerNamespace: controllerNamespace,
+		Defaults:            controller.Defaults(configFile),
+		FocalHost:           focalHost,
+		HostStore:           hostStore,
+		Port:                webserverPort(webserverAddr),
+		RequeueDelay:        time.Duration(requeueDelaySeconds) * time.Second,
+		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexHost")
 		os.Exit(1)

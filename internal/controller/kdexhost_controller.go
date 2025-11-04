@@ -35,8 +35,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -46,11 +48,13 @@ const hostFinalizerName = "kdex.dev/kdex-web-host-finalizer"
 // KDexHostReconciler reconciles a KDexHost object
 type KDexHostReconciler struct {
 	client.Client
-	HostStore    *store.HostStore
-	Port         int32
-	RequeueDelay time.Duration
-	Scheme       *runtime.Scheme
-	Defaults     ResourceDefaults
+	ControllerNamespace string
+	Defaults            ResourceDefaults
+	FocalHost           string
+	HostStore           *store.HostStore
+	Port                int32
+	RequeueDelay        time.Duration
+	Scheme              *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
@@ -103,8 +107,6 @@ func (r *KDexHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return r1, err
 	}
 
-	log.Info("got theme", "theme", theme)
-
 	shouldReturn, r1, err = r.createOrUpdateAccompanyingResources(ctx, &host, theme)
 
 	if shouldReturn {
@@ -134,10 +136,25 @@ func (r *KDexHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *KDexHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	var enabledFilter = predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return e.Object.GetName() == r.FocalHost
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return e.ObjectNew.GetName() == r.FocalHost
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return e.Object.GetName() == r.FocalHost
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return e.Object.GetName() == r.FocalHost
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexHost{}).
+		WithEventFilter(enabledFilter).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&networkingv1.Ingress{}).
@@ -145,7 +162,7 @@ func (r *KDexHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&kdexv1alpha1.KDexTheme{},
 			handler.EnqueueRequestsFromMapFunc(r.findHostsForTheme)).
-		Named("kdexhost").
+		Named("kdexhost-" + r.FocalHost).
 		Complete(r)
 }
 
@@ -299,7 +316,7 @@ func (r *KDexHostReconciler) createOrUpdateThemeDeployment(
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      theme.Name,
-			Namespace: theme.Namespace,
+			Namespace: host.Namespace,
 		},
 	}
 
@@ -463,7 +480,7 @@ func (r *KDexHostReconciler) createOrUpdateThemeService(
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      theme.Name,
-			Namespace: theme.Namespace,
+			Namespace: host.Namespace,
 		},
 	}
 

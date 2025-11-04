@@ -49,7 +49,7 @@ var _ = Describe("KDexTranslation Controller", func() {
 				},
 				Spec: kdexv1alpha1.KDexTranslationSpec{
 					HostRef: corev1.LocalObjectReference{
-						Name: "test-host",
+						Name: focalHost,
 					},
 					Translations: []kdexv1alpha1.Translation{
 						{
@@ -78,7 +78,7 @@ var _ = Describe("KDexTranslation Controller", func() {
 
 			hostResource := &kdexv1alpha1.KDexHost{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-host",
+					Name:      focalHost,
 					Namespace: namespace,
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{

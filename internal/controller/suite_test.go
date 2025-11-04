@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -57,6 +58,8 @@ var (
 	testEnv   *envtest.Environment
 	cfg       *rest.Config
 	k8sClient client.Client
+	focalHost string
+	namespace string
 )
 
 func TestControllers(t *testing.T) {
@@ -123,7 +126,15 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	focalHost = "test-host"
+	namespace = "default"
+
 	k8sManager, err := manager.New(cfg, manager.Options{
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				namespace: {},
+			},
+		},
 		Scheme: scheme.Scheme,
 	})
 	Expect(err).NotTo(HaveOccurred())
@@ -131,12 +142,14 @@ var _ = BeforeSuite(func() {
 	hostStore := store.NewHostStore()
 
 	hostReconciler := &KDexHostReconciler{
-		Client:       k8sManager.GetClient(),
-		Defaults:     Defaults("/config.yaml"),
-		HostStore:    hostStore,
-		Port:         8090,
-		RequeueDelay: 0,
-		Scheme:       k8sManager.GetScheme(),
+		Client:              k8sManager.GetClient(),
+		ControllerNamespace: namespace,
+		Defaults:            Defaults("/config.yaml"),
+		FocalHost:           focalHost,
+		HostStore:           hostStore,
+		Port:                8090,
+		RequeueDelay:        0,
+		Scheme:              k8sManager.GetScheme(),
 	}
 
 	err = hostReconciler.SetupWithManager(k8sManager)
