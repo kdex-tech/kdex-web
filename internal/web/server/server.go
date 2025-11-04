@@ -5,6 +5,7 @@ import (
 
 	store_ "kdex.dev/web/internal/store"
 	"kdex.dev/web/internal/web/middleware"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func New(address string, store *store_.HostStore) *http.Server {
@@ -14,6 +15,10 @@ func New(address string, store *store_.HostStore) *http.Server {
 			hostHandler.ServeHTTP(w, r)
 			return
 		}
+
+		log := logf.FromContext(r.Context())
+
+		log.Info("no host was found")
 
 		http.NotFound(w, r)
 	})

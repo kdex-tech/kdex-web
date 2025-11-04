@@ -12,6 +12,7 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
 	kdexhttp "kdex.dev/web/internal/http"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type HostHandler struct {
@@ -134,7 +135,19 @@ func (th *HostHandler) RebuildMux() {
 
 	l10nPageMaps := th.generatePageMapsLocked()
 
-	for _, handler := range th.RenderPages.List() {
+	pageList := th.RenderPages.List()
+
+	if len(pageList) == 0 {
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			log := logf.FromContext(r.Context())
+
+			log.Info("no pages found", "host", th.Host.Name)
+
+			http.NotFound(w, r)
+		})
+	}
+
+	for _, handler := range pageList {
 		page := handler.Page
 
 		l10nRenders := th.L10nRendersLocked(handler, l10nPageMaps)
