@@ -13,34 +13,34 @@ import (
 	"kdex.dev/crds/render"
 )
 
-func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
+func Test_PageStore_BuildMenuEntries(t *testing.T) {
 	tests := []struct {
 		name              string
-		items             *map[string]RenderPageHandler
+		items             *map[string]PageHandler
 		isDefaultLanguage bool
 		want              *map[string]*render.PageEntry
 	}{
 		{
 			name:  "empty",
-			items: &map[string]RenderPageHandler{},
+			items: &map[string]PageHandler{},
 			want:  nil,
 		},
 		{
 			name:              "simple",
 			isDefaultLanguage: true,
-			items: &map[string]RenderPageHandler{
+			items: &map[string]PageHandler{
 				"foo": {
-					Page: kdexv1alpha1.KDexRenderPage{
+					Page: kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
-						Spec: kdexv1alpha1.KDexRenderPageSpec{
+						Spec: kdexv1alpha1.KDexPageBindingSpec{
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/foo",
 							},
-							PageComponents: kdexv1alpha1.PageComponents{
-								Title: "Foo",
-							},
+							// PageComponents: kdexv1alpha1.PageComponents{
+							// 	Title: "Foo",
+							// },
 						},
 					},
 				},
@@ -57,19 +57,19 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 		{
 			name:              "more complex",
 			isDefaultLanguage: true,
-			items: &map[string]RenderPageHandler{
+			items: &map[string]PageHandler{
 				"foo": {
-					Page: kdexv1alpha1.KDexRenderPage{
+					Page: kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
-						Spec: kdexv1alpha1.KDexRenderPageSpec{
+						Spec: kdexv1alpha1.KDexPageBindingSpec{
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/foo",
 							},
-							PageComponents: kdexv1alpha1.PageComponents{
-								Title: "Foo",
-							},
+							// PageComponents: kdexv1alpha1.PageComponents{
+							// 	Title: "Foo",
+							// },
 							ParentPageRef: &corev1.LocalObjectReference{
 								Name: "home",
 							},
@@ -77,35 +77,35 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 				"home": {
-					Page: kdexv1alpha1.KDexRenderPage{
+					Page: kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "home",
 						},
-						Spec: kdexv1alpha1.KDexRenderPageSpec{
+						Spec: kdexv1alpha1.KDexPageBindingSpec{
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/home",
 							},
-							PageComponents: kdexv1alpha1.PageComponents{
-								Title: "Home",
-							},
+							// PageComponents: kdexv1alpha1.PageComponents{
+							// 	Title: "Home",
+							// },
 						},
 					},
 				},
 				"contact": {
-					Page: kdexv1alpha1.KDexRenderPage{
+					Page: kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "contact",
 						},
-						Spec: kdexv1alpha1.KDexRenderPageSpec{
+						Spec: kdexv1alpha1.KDexPageBindingSpec{
 							NavigationHints: &kdexv1alpha1.NavigationHints{
 								Weight: resource.MustParse("100"),
 							},
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/contact",
 							},
-							PageComponents: kdexv1alpha1.PageComponents{
-								Title: "Contact Us",
-							},
+							// PageComponents: kdexv1alpha1.PageComponents{
+							// 	Title: "Contact Us",
+							// },
 						},
 					},
 				},
@@ -136,19 +136,19 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 		{
 			name:              "none default language",
 			isDefaultLanguage: false,
-			items: &map[string]RenderPageHandler{
+			items: &map[string]PageHandler{
 				"foo": {
-					Page: kdexv1alpha1.KDexRenderPage{
+					Page: kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
-						Spec: kdexv1alpha1.KDexRenderPageSpec{
+						Spec: kdexv1alpha1.KDexPageBindingSpec{
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/foo",
 							},
-							PageComponents: kdexv1alpha1.PageComponents{
-								Title: "Foo",
-							},
+							// PageComponents: kdexv1alpha1.PageComponents{
+							// 	Title: "Foo",
+							// },
 						},
 					},
 				},
@@ -165,7 +165,7 @@ func Test_RenderPageStore_BuildMenuEntries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rps := RenderPageStore{
+			rps := PageStore{
 				handlers: *tt.items,
 			}
 			tag := language.English

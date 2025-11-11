@@ -43,10 +43,11 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+
 	"kdex.dev/web/internal/controller"
 	"kdex.dev/web/internal/store"
 	"kdex.dev/web/internal/web/server"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -66,17 +67,24 @@ func init() {
 func main() {
 	var configFile string
 	var focalHost string
+	var requeueDelaySeconds int
+	var serviceName string
+	var webserverAddr string
+
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
-	var webserverAddr string
 	var probeAddr string
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
-	var requeueDelaySeconds int
+
 	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file.")
 	flag.StringVar(&focalHost, "focal-host", "", "The name of a KDexHost resource to focus the controller instance's attention on.")
+	flag.IntVar(&requeueDelaySeconds, "requeue-delay-seconds", 15, "Set the delay for requeuing reconciliation loops")
+	flag.StringVar(&serviceName, "service-name", "", "The name of the controller's service so that we can automatically configure an ingress/httproute that points towards it.")
+	flag.StringVar(&webserverAddr, "webserver-bind-address", ":8090", "The address the webserver binds to.")
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -85,14 +93,13 @@ func main() {
 	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
 	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
 	flag.StringVar(&webhookCertKey, "webhook-cert-key", "tls.key", "The name of the webhook key file.")
-	flag.StringVar(&webserverAddr, "webserver-bind-address", ":8090", "The address the webserver binds to.")
 	flag.StringVar(&metricsCertPath, "metrics-cert-path", "",
 		"The directory that contains the metrics server certificate.")
 	flag.StringVar(&metricsCertName, "metrics-cert-name", "tls.crt", "The name of the metrics server certificate file.")
 	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.IntVar(&requeueDelaySeconds, "requeue-delay-seconds", 15, "Set the delay for requeuing reconciliation loops")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -189,7 +196,7 @@ func main() {
 
 	hostStore := store.NewHostStore()
 
-	if err := (&controller.KDexHostReconciler{
+	if err := (&controller.KDexHostControllerReconciler{
 		Client:              mgr.GetClient(),
 		ControllerNamespace: controllerNamespace,
 		Defaults:            controller.Defaults(configFile),
@@ -198,17 +205,9 @@ func main() {
 		Port:                webserverPort(webserverAddr),
 		RequeueDelay:        time.Duration(requeueDelaySeconds) * time.Second,
 		Scheme:              mgr.GetScheme(),
+		ServiceName:         serviceName,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "KDexHost")
-		os.Exit(1)
-	}
-	if err := (&controller.KDexRenderPageReconciler{
-		Client:       mgr.GetClient(),
-		HostStore:    hostStore,
-		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
-		Scheme:       mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "KDexRenderPage")
+		setupLog.Error(err, "unable to create controller", "controller", "KDexHostController")
 		os.Exit(1)
 	}
 	if err := (&controller.KDexTranslationReconciler{
@@ -218,13 +217,6 @@ func main() {
 		Scheme:       mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexTranslation")
-		os.Exit(1)
-	}
-	if err := (&controller.KDexHostControllerReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "KDexHostController")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

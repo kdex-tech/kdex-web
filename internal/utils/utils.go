@@ -6,7 +6,7 @@ import (
 )
 
 func DomainsToMatcher(domains []string) string {
-	var matcherBuffer bytes.Buffer
+	var buffer bytes.Buffer
 	var joiner rune
 
 	for _, domain := range domains {
@@ -15,11 +15,11 @@ func DomainsToMatcher(domains []string) string {
 			domain = "." + domain
 		}
 		if joiner != 0 {
-			matcherBuffer.WriteRune(joiner)
+			buffer.WriteRune(joiner)
 		}
-		matcherBuffer.WriteString(domain)
+		buffer.WriteString(domain)
 		joiner = '|'
 	}
 
-	return matcherBuffer.String()
+	return buffer.String()
 }

@@ -10,20 +10,20 @@ import (
 	"kdex.dev/crds/render"
 )
 
-type RenderPageStore struct {
+type PageStore struct {
 	log      logr.Logger
 	mu       sync.RWMutex
 	onUpdate func()
-	handlers map[string]RenderPageHandler
+	handlers map[string]PageHandler
 }
 
-func (s *RenderPageStore) Count() int {
+func (s *PageStore) Count() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.handlers)
 }
 
-func (s *RenderPageStore) Delete(name string) {
+func (s *PageStore) Delete(name string) {
 	s.mu.Lock()
 	delete(s.handlers, name)
 	s.mu.Unlock()
@@ -32,24 +32,24 @@ func (s *RenderPageStore) Delete(name string) {
 	}
 }
 
-func (s *RenderPageStore) Get(name string) (RenderPageHandler, bool) {
+func (s *PageStore) Get(name string) (PageHandler, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	page, ok := s.handlers[name]
 	return page, ok
 }
 
-func (s *RenderPageStore) List() []RenderPageHandler {
+func (s *PageStore) List() []PageHandler {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	pages := []RenderPageHandler{}
+	pages := []PageHandler{}
 	for _, page := range s.handlers {
 		pages = append(pages, page)
 	}
 	return pages
 }
 
-func (s *RenderPageStore) Set(handler RenderPageHandler) {
+func (s *PageStore) Set(handler PageHandler) {
 	s.log.Info("set render page", "name", handler.Page.Name)
 	s.mu.Lock()
 	s.handlers[handler.Page.Name] = handler
@@ -59,11 +59,11 @@ func (s *RenderPageStore) Set(handler RenderPageHandler) {
 	}
 }
 
-func (s *RenderPageStore) BuildMenuEntries(
+func (s *PageStore) BuildMenuEntries(
 	entry *render.PageEntry,
 	l *language.Tag,
 	isDefaultLanguage bool,
-	parent *kdexv1alpha1.KDexRenderPage,
+	parent *kdexv1alpha1.KDexPageBinding,
 ) {
 	for _, handler := range s.List() {
 		page := handler.Page
@@ -80,7 +80,7 @@ func (s *RenderPageStore) BuildMenuEntries(
 				entry.Children = &map[string]*render.PageEntry{}
 			}
 
-			label := page.Spec.PageComponents.Title
+			label := page.Spec.Label
 			href := "/" + l.String() + page.Spec.BasePath
 
 			pageEntry := render.PageEntry{

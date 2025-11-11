@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -89,34 +88,69 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	kdexv1alpha1.SetConditions(
+		&translation.Status.Conditions,
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionTrue,
+			Ready:       metav1.ConditionUnknown,
+		},
+		kdexv1alpha1.ConditionReasonReconciling,
+		"Reconciling",
+	)
+	if err := r.Status().Update(ctx, &translation); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Defer status update
+	defer func() {
+		translation.Status.ObservedGeneration = translation.Generation
+		if err := r.Status().Update(ctx, &translation); err != nil {
+			log.Info("failed to update status", "err", err)
+		}
+	}()
+
 	_, shouldReturn, r1, err := resolveHost(ctx, r.Client, &translation, &translation.Status.Conditions, &translation.Spec.HostRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
 
-	log.Info("reconciled KDexTranslation")
-
 	hostHandler, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
 
 	if !ok {
+		kdexv1alpha1.SetConditions(
+			&translation.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			"Host not found",
+		)
+		if err := r.Status().Update(ctx, &translation); err != nil {
+			return ctrl.Result{}, err
+		}
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	hostHandler.AddOrUpdateTranslation(translation)
+	hostHandler.AddOrUpdateTranslation(&translation)
 
-	apimeta.SetStatusCondition(
+	kdexv1alpha1.SetConditions(
 		&translation.Status.Conditions,
-		*kdexv1alpha1.NewCondition(
-			kdexv1alpha1.ConditionTypeReady,
-			metav1.ConditionTrue,
-			kdexv1alpha1.ConditionReasonReconcileSuccess,
-			"all references resolved successfully",
-		),
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionFalse,
+			Ready:       metav1.ConditionTrue,
+		},
+		kdexv1alpha1.ConditionReasonReconcileSuccess,
+		"Reconciliation successful",
 	)
-
 	if err := r.Status().Update(ctx, &translation); err != nil {
 		return ctrl.Result{}, err
 	}
+
+	log.Info("reconciled KDexTranslation")
 
 	return ctrl.Result{}, nil
 }

@@ -17,16 +17,47 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("KDexHostController Controller", func() {
 	Context("When reconciling a resource", func() {
+		const namespace = "default"
+
+		ctx := context.Background()
+
+		AfterEach(func() {
+			By("Cleanup all the test resource instances")
+			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexHostController{}, client.InNamespace(namespace))).To(Succeed())
+			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexHost{}, client.InNamespace(namespace))).To(Succeed())
+		})
 
 		It("should successfully reconcile the resource", func() {
+			// resource := &kdexv1alpha1.KDexHost{
+			// 	ObjectMeta: metav1.ObjectMeta{
+			// 		Name:      focalHost,
+			// 		Namespace: namespace,
+			// 	},
+			// 	Spec: kdexv1alpha1.KDexHostSpec{
+			// 		AppPolicy: kdexv1alpha1.NonStrictAppPolicy,
+			// 		Routing: kdexv1alpha1.Routing{
+			// 			Domains:  []string{"foo.bar"},
+			// 			Strategy: kdexv1alpha1.IngressRoutingStrategy,
+			// 		},
+			// 		Organization: "KDex Tech Inc.",
+			// 	},
+			// }
 
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+			// Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+			// assertResourceReady(
+			// 	ctx, k8sClient, focalHost, namespace,
+			// 	&kdexv1alpha1.KDexHost{}, true)
 		})
 	})
 })

@@ -21,7 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,7 +37,6 @@ var _ = Describe("KDexTranslation Controller", func() {
 		AfterEach(func() {
 			By("Cleanup all the test resource instances")
 			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexHost{}, client.InNamespace(namespace))).To(Succeed())
-			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexRenderPage{}, client.InNamespace(namespace))).To(Succeed())
 			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexTranslation{}, client.InNamespace(namespace))).To(Succeed())
 		})
 
@@ -48,7 +47,7 @@ var _ = Describe("KDexTranslation Controller", func() {
 					Namespace: namespace,
 				},
 				Spec: kdexv1alpha1.KDexTranslationSpec{
-					HostRef: corev1.LocalObjectReference{
+					HostRef: v1.LocalObjectReference{
 						Name: focalHost,
 					},
 					Translations: []kdexv1alpha1.Translation{
@@ -82,12 +81,12 @@ var _ = Describe("KDexTranslation Controller", func() {
 					Namespace: namespace,
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy: kdexv1alpha1.NonStrictAppPolicy,
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
 					Routing: kdexv1alpha1.Routing{
 						Domains:  []string{"foo.bar"},
 						Strategy: kdexv1alpha1.IngressRoutingStrategy,
 					},
-					Organization: "KDex Tech Inc.",
 				},
 			}
 

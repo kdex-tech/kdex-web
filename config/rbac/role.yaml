@@ -44,7 +44,7 @@ rules:
   - kdex.dev
   resources:
   - kdexhost
-  - kdexthemes
+  - kdexhosts
   verbs:
   - get
   - list
@@ -52,8 +52,7 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
-  - kdexhosts
-  - kdexrenderpages
+  - kdexhostcontrollers
   - kdextranslations
   verbs:
   - create
@@ -66,21 +65,26 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
-  - kdexhosts/finalizers
-  - kdexrenderpages/finalizers
+  - kdexhostcontrollers/finalizers
   - kdextranslations/finalizers
   verbs:
   - update
 - apiGroups:
   - kdex.dev
   resources:
-  - kdexhosts/status
-  - kdexrenderpages/status
+  - kdexhostcontrollers/status
   - kdextranslations/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - kdex.dev
+  resources:
+  - kdexscriptlibraries
+  - kdexthemes
+  verbs:
+  - get
 - apiGroups:
   - networking.k8s.io
   resources:

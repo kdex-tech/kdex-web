@@ -141,7 +141,7 @@ var _ = BeforeSuite(func() {
 
 	hostStore := store.NewHostStore()
 
-	hostReconciler := &KDexHostReconciler{
+	hostControllerReconciler := &KDexHostControllerReconciler{
 		Client:              k8sManager.GetClient(),
 		ControllerNamespace: namespace,
 		Defaults:            Defaults("/config.yaml"),
@@ -150,19 +150,10 @@ var _ = BeforeSuite(func() {
 		Port:                8090,
 		RequeueDelay:        0,
 		Scheme:              k8sManager.GetScheme(),
+		ServiceName:         focalHost,
 	}
 
-	err = hostReconciler.SetupWithManager(k8sManager)
-	Expect(err).NotTo(HaveOccurred())
-
-	renderPageReconciler := &KDexRenderPageReconciler{
-		Client:       k8sClient,
-		HostStore:    hostStore,
-		RequeueDelay: 0,
-		Scheme:       k8sClient.Scheme(),
-	}
-
-	err = renderPageReconciler.SetupWithManager(k8sManager)
+	err = hostControllerReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	translationReconciler := &KDexTranslationReconciler{

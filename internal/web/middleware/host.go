@@ -22,15 +22,15 @@ func WithHost(store *store_.HostStore) func(http.Handler) http.Handler {
 				hostHeader = strings.Split(hostHeader, ":")[0]
 			}
 
-			hosts := store.List()
+			handlers := store.List()
 
 			var bestMatchHost *store_.HostHandler
 			var bestMatchLength = -1
 
-			for _, host := range hosts {
-				for _, domain := range host.Host.Spec.Routing.Domains {
+			for _, handler := range handlers {
+				for _, domain := range handler.Domains() {
 					if domain == hostHeader {
-						ctx := context.WithValue(r.Context(), HostKey, host)
+						ctx := context.WithValue(r.Context(), HostKey, handler)
 						next.ServeHTTP(w, r.WithContext(ctx))
 						return
 					}
@@ -40,7 +40,7 @@ func WithHost(store *store_.HostStore) func(http.Handler) http.Handler {
 						if strings.HasSuffix(hostHeader, suffix) && len(hostHeader) > len(suffix) {
 							if len(domain) > bestMatchLength {
 								bestMatchLength = len(domain)
-								bestMatchHost = host
+								bestMatchHost = handler
 							}
 						}
 					}

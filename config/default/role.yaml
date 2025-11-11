@@ -53,7 +53,6 @@ rules:
   - kdex.dev
   resources:
   - kdexhosts
-  - kdexrenderpages
   - kdextranslations
   verbs:
   - create
@@ -67,15 +66,12 @@ rules:
   - kdex.dev
   resources:
   - kdexhosts/finalizers
-  - kdexrenderpages/finalizers
-  - kdextranslations/finalizers
   verbs:
   - update
 - apiGroups:
   - kdex.dev
   resources:
   - kdexhosts/status
-  - kdexrenderpages/status
   - kdextranslations/status
   verbs:
   - get

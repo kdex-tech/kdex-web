@@ -31,19 +31,23 @@ func (s *HostStore) Get(name string) (*HostHandler, bool) {
 	return handler, ok
 }
 
-func (s *HostStore) GetOrDefault(
-	name string,
+func (s *HostStore) GetOrUpdate(
+	host *kdexv1alpha1.KDexHost,
+	scriptLibrary *kdexv1alpha1.KDexScriptLibrary,
 	theme *kdexv1alpha1.KDexTheme,
 	log logr.Logger,
 ) *HostHandler {
-	s.mu.RLock()
+	s.mu.Lock()
 	defer s.mu.RUnlock()
-	handler, ok := s.handlers[name]
+	handler, ok := s.handlers[host.Name]
 	if !ok {
-		handler = NewHostHandler(theme, log)
-		s.handlers[name] = handler
-		log.Info("tracking new host")
+		handler = NewHostHandler(log)
+		s.handlers[host.Name] = handler
+		log.Info("adding new host", "host", host.Name)
+	} else {
+		log.Info("updating existing host", "host", host.Name)
 	}
+	handler.SetHost(host, scriptLibrary, theme)
 	return handler
 }
 

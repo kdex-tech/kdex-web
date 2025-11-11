@@ -7,7 +7,6 @@ import (
 	G "github.com/onsi/gomega"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	"golang.org/x/text/message/catalog"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
@@ -42,12 +41,12 @@ const (
 
 func TestHostHandler_L10nRenderLocked(t *testing.T) {
 	tests := []struct {
-		name         string
-		host         kdexv1alpha1.KDexHost
-		page         kdexv1alpha1.KDexRenderPage
-		lang         string
-		translations *catalog.Builder
-		want         []string
+		host        kdexv1alpha1.KDexHost
+		lang        string
+		name        string
+		page        kdexv1alpha1.KDexPageBinding
+		translation *kdexv1alpha1.KDexTranslation
+		want        []string
 	}{
 		{
 			name: "english translation",
@@ -56,43 +55,62 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang: "en",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
 					Routing: kdexv1alpha1.Routing{
 						Domains: []string{"foo.bar"},
 					},
-					Organization: "KDex Tech Inc.",
 				},
 			},
-			page: kdexv1alpha1.KDexRenderPage{
+			page: kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-render-page",
+					Name: "sample-page-binding",
 				},
-				Spec: kdexv1alpha1.KDexRenderPageSpec{
-					PageComponents: kdexv1alpha1.PageComponents{
-						Contents: map[string]string{
-							"main": "MAIN",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							RawHTML: "MAIN",
+							Slot:    "main",
 						},
-						Footer: "FOOTER",
-						Header: `{{ l10n "key" }}`,
-						Navigations: map[string]string{
-							"main": "NAV",
-						},
-						PrimaryTemplate: primaryTemplate,
-						Title:           "TITLE",
 					},
+					// PageComponents: kdexv1alpha1.PageComponents{
+					// 	Footer: "FOOTER",
+					// 	Header: `{{ l10n "key" }}`,
+					// 	Navigations: map[string]string{
+					// 		"main": "NAV",
+					// 	},
+					// 	PrimaryTemplate: primaryTemplate,
+					// 	Title:           "TITLE",
+					// },
 					Paths: kdexv1alpha1.Paths{
 						BasePath: "/",
 					},
 				},
 			},
 			lang: "en",
-			translations: func() *catalog.Builder {
-				b := catalog.NewBuilder()
-				b.SetString(language.English, "key", "ENGLISH_TRANSLATION")
-				b.SetString(language.French, "key", "FRENCH_TRANSLATION")
-				return b
-			}(),
+			translation: &kdexv1alpha1.KDexTranslation{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "test-translation",
+					Namespace: "foo",
+				},
+				Spec: kdexv1alpha1.KDexTranslationSpec{
+					Translations: []kdexv1alpha1.Translation{
+						{
+							Lang: "en",
+							KeysAndValues: map[string]string{
+								"key": "ENGLISH_TRANSLATION",
+							},
+						},
+						{
+							Lang: "fr",
+							KeysAndValues: map[string]string{
+								"key": "FRENCH_TRANSLATION",
+							},
+						},
+					},
+				},
+			},
 			want: []string{"FOOTER", "ENGLISH_TRANSLATION", "NAV", "MAIN", "TITLE"},
 		},
 		{
@@ -102,43 +120,59 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang: "en",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
 					Routing: kdexv1alpha1.Routing{
 						Domains: []string{"foo.bar"},
 					},
-					Organization: "KDex Tech Inc.",
 				},
 			},
-			page: kdexv1alpha1.KDexRenderPage{
+			page: kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-render-page",
 				},
-				Spec: kdexv1alpha1.KDexRenderPageSpec{
-					PageComponents: kdexv1alpha1.PageComponents{
-						Contents: map[string]string{
-							"main": "MAIN",
-						},
-						Footer: "FOOTER",
-						Header: `{{ l10n "key" }}`,
-						Navigations: map[string]string{
-							"main": "NAV",
-						},
-						PrimaryTemplate: primaryTemplate,
-						Title:           "TITLE",
-					},
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					// PageComponents: kdexv1alpha1.PageComponents{
+					// 	Contents: map[string]string{
+					// 		"main": "MAIN",
+					// 	},
+					// 	Footer: "FOOTER",
+					// 	Header: `{{ l10n "key" }}`,
+					// 	Navigations: map[string]string{
+					// 		"main": "NAV",
+					// 	},
+					// 	PrimaryTemplate: primaryTemplate,
+					// 	Title:           "TITLE",
+					// },
 					Paths: kdexv1alpha1.Paths{
 						BasePath: "/",
 					},
 				},
 			},
 			lang: "fr",
-			translations: func() *catalog.Builder {
-				b := catalog.NewBuilder()
-				b.SetString(language.English, "key", "ENGLISH_TRANSLATION")
-				b.SetString(language.French, "key", "FRENCH_TRANSLATION")
-				return b
-			}(),
+			translation: &kdexv1alpha1.KDexTranslation{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "test-translation",
+					Namespace: "foo",
+				},
+				Spec: kdexv1alpha1.KDexTranslationSpec{
+					Translations: []kdexv1alpha1.Translation{
+						{
+							Lang: "en",
+							KeysAndValues: map[string]string{
+								"key": "ENGLISH_TRANSLATION",
+							},
+						},
+						{
+							Lang: "fr",
+							KeysAndValues: map[string]string{
+								"key": "FRENCH_TRANSLATION",
+							},
+						},
+					},
+				},
+			},
 			want: []string{"FOOTER", "FRENCH_TRANSLATION", "NAV", "MAIN", "TITLE"},
 		},
 		{
@@ -148,31 +182,31 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang: "en",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
 					Routing: kdexv1alpha1.Routing{
 						Domains: []string{"foo.bar"},
 					},
-					Organization: "KDex Tech Inc.",
 				},
 			},
-			page: kdexv1alpha1.KDexRenderPage{
+			page: kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-render-page",
 				},
-				Spec: kdexv1alpha1.KDexRenderPageSpec{
-					PageComponents: kdexv1alpha1.PageComponents{
-						Contents: map[string]string{
-							"main": "MAIN",
-						},
-						Footer: "FOOTER",
-						Header: `{{ l10n "key" }}`,
-						Navigations: map[string]string{
-							"main": "NAV",
-						},
-						PrimaryTemplate: primaryTemplate,
-						Title:           "TITLE",
-					},
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					// PageComponents: kdexv1alpha1.PageComponents{
+					// 	Contents: map[string]string{
+					// 		"main": "MAIN",
+					// 	},
+					// 	Footer: "FOOTER",
+					// 	Header: `{{ l10n "key" }}`,
+					// 	Navigations: map[string]string{
+					// 		"main": "NAV",
+					// 	},
+					// 	PrimaryTemplate: primaryTemplate,
+					// 	Title:           "TITLE",
+					// },
 					Paths: kdexv1alpha1.Paths{
 						BasePath: "/",
 					},
@@ -186,16 +220,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(nil, logr.Discard())
-			th.SetHost(&tt.host, nil)
-			th.SetTranslations(tt.translations)
-			got, gotErr := th.L10nRenderLocked(RenderPageHandler{
+			th := NewHostHandler(logr.Discard())
+			th.SetHost(&tt.host, nil, nil)
+			th.AddOrUpdateTranslation(tt.translation)
+			got, gotErr := th.L10nRenderLocked(PageHandler{
 				Page: tt.page,
-				Theme: &kdexv1alpha1.KDexTheme{
-					Spec: kdexv1alpha1.KDexThemeSpec{
-						Assets: []kdexv1alpha1.ThemeAsset{},
-					},
-				},
 			}, &map[string]*render.PageEntry{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
@@ -209,11 +238,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 
 func TestHostHandler_L10nRendersLocked(t *testing.T) {
 	tests := []struct {
-		name         string
-		host         kdexv1alpha1.KDexHost
-		translations *catalog.Builder
-		page         kdexv1alpha1.KDexRenderPage
-		want         map[string][]string
+		name        string
+		host        kdexv1alpha1.KDexHost
+		translation *kdexv1alpha1.KDexTranslation
+		page        kdexv1alpha1.KDexPageBinding
+		want        map[string][]string
 	}{
 		{
 			name: "translations",
@@ -222,42 +251,58 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang: "en",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
 					Routing: kdexv1alpha1.Routing{
 						Domains: []string{"foo.bar"},
 					},
-					Organization: "KDex Tech Inc.",
 				},
 			},
-			page: kdexv1alpha1.KDexRenderPage{
+			page: kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-render-page",
 				},
-				Spec: kdexv1alpha1.KDexRenderPageSpec{
-					PageComponents: kdexv1alpha1.PageComponents{
-						Contents: map[string]string{
-							"main": "MAIN",
-						},
-						Footer: "FOOTER",
-						Header: `{{ l10n "key" }}`,
-						Navigations: map[string]string{
-							"main": "NAV",
-						},
-						PrimaryTemplate: primaryTemplate,
-						Title:           "TITLE",
-					},
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					// PageComponents: kdexv1alpha1.PageComponents{
+					// 	Contents: map[string]string{
+					// 		"main": "MAIN",
+					// 	},
+					// 	Footer: "FOOTER",
+					// 	Header: `{{ l10n "key" }}`,
+					// 	Navigations: map[string]string{
+					// 		"main": "NAV",
+					// 	},
+					// 	PrimaryTemplate: primaryTemplate,
+					// 	Title:           "TITLE",
+					// },
 					Paths: kdexv1alpha1.Paths{
 						BasePath: "/",
 					},
 				},
 			},
-			translations: func() *catalog.Builder {
-				b := catalog.NewBuilder()
-				b.SetString(language.English, "key", "ENGLISH_TRANSLATION")
-				b.SetString(language.French, "key", "FRENCH_TRANSLATION")
-				return b
-			}(),
+			translation: &kdexv1alpha1.KDexTranslation{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "test-translation",
+					Namespace: "foo",
+				},
+				Spec: kdexv1alpha1.KDexTranslationSpec{
+					Translations: []kdexv1alpha1.Translation{
+						{
+							Lang: "en",
+							KeysAndValues: map[string]string{
+								"key": "ENGLISH_TRANSLATION",
+							},
+						},
+						{
+							Lang: "fr",
+							KeysAndValues: map[string]string{
+								"key": "FRENCH_TRANSLATION",
+							},
+						},
+					},
+				},
+			},
 			want: map[string][]string{
 				"en": {
 					"FOOTER", "ENGLISH_TRANSLATION", "NAV", "MAIN", "TITLE",
@@ -272,16 +317,11 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(nil, logr.Discard())
-			th.SetHost(&tt.host, nil)
-			th.SetTranslations(tt.translations)
-			got := th.L10nRendersLocked(RenderPageHandler{
+			th := NewHostHandler(logr.Discard())
+			th.SetHost(&tt.host, nil, nil)
+			th.AddOrUpdateTranslation(tt.translation)
+			got := th.L10nRendersLocked(PageHandler{
 				Page: tt.page,
-				Theme: &kdexv1alpha1.KDexTheme{
-					Spec: kdexv1alpha1.KDexThemeSpec{
-						Assets: []kdexv1alpha1.ThemeAsset{},
-					},
-				},
 			}, map[language.Tag]*map[string]*render.PageEntry{})
 
 			for key, values := range tt.want {
@@ -302,7 +342,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 	tests := []struct {
 		name        string
 		host        kdexv1alpha1.KDexHost
-		translation kdexv1alpha1.KDexTranslation
+		translation *kdexv1alpha1.KDexTranslation
 		langTests   map[string]KeyAndExpected
 	}{
 		{
@@ -312,15 +352,15 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
-					AppPolicy:   kdexv1alpha1.NonStrictAppPolicy,
-					DefaultLang: "en",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
 					Routing: kdexv1alpha1.Routing{
 						Domains: []string{"foo.bar"},
 					},
-					Organization: "KDex Tech Inc.",
 				},
 			},
-			translation: kdexv1alpha1.KDexTranslation{
+			translation: &kdexv1alpha1.KDexTranslation{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-translation",
 				},
@@ -363,8 +403,8 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(nil, logr.Discard())
-			th.SetHost(&tt.host, nil)
+			th := NewHostHandler(logr.Discard())
+			th.SetHost(&tt.host, nil, nil)
 			th.AddOrUpdateTranslation(tt.translation)
 
 			for lang, expected := range tt.langTests {
