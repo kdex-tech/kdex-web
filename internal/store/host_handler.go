@@ -174,12 +174,12 @@ func (th *HostHandler) RebuildMux() {
 			}
 		}
 
-		mux.HandleFunc("GET "+page.Spec.BasePath, handler)
-		mux.HandleFunc("GET /{l10n}"+page.Spec.BasePath, handler)
+		mux.HandleFunc("GET "+page.Spec.Paths.BasePath, handler)
+		mux.HandleFunc("GET /{l10n}"+page.Spec.Paths.BasePath, handler)
 
 		if page.Spec.PatternPath != "" {
-			mux.HandleFunc("GET "+page.Spec.PatternPath, handler)
-			mux.HandleFunc("GET /{l10n}"+page.Spec.PatternPath, handler)
+			mux.HandleFunc("GET "+page.Spec.Paths.PatternPath, handler)
+			mux.HandleFunc("GET /{l10n}"+page.Spec.Paths.PatternPath, handler)
 		}
 	}
 

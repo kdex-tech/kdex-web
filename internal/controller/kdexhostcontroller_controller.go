@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -133,32 +132,32 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return r1, err
 	}
 
-	hostHandler := r.HostStore.GetOrUpdate(host, scriptLibrary, theme, log)
+	r.HostStore.GetOrUpdate(host, scriptLibrary, theme, log)
 
-	hasRootPage := hasRootPage(hostHandler.Pages)
+	// hasRootPage := hasRootPage(hostHandler.Pages)
 
-	if hostHandler.Pages.Count() == 0 || !hasRootPage {
-		err := fmt.Errorf("no pages to render for host %s", host.Name)
+	// if hostHandler.Pages.Count() == 0 || !hasRootPage {
+	// 	err := fmt.Errorf("no pages to render for host %s", host.Name)
 
-		if !hasRootPage {
-			err = fmt.Errorf("no root page for host %s", host.Name)
-		}
+	// 	if !hasRootPage {
+	// 		err = fmt.Errorf("no root page for host %s", host.Name)
+	// 	}
 
-		kdexv1alpha1.SetConditions(
-			&hostController.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionTrue,
-				Progressing: metav1.ConditionFalse,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconcileError,
-			err.Error(),
-		)
-		if err := r.Status().Update(ctx, &hostController); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, err
-	}
+	// 	kdexv1alpha1.SetConditions(
+	// 		&hostController.Status.Conditions,
+	// 		kdexv1alpha1.ConditionStatuses{
+	// 			Degraded:    metav1.ConditionTrue,
+	// 			Progressing: metav1.ConditionFalse,
+	// 			Ready:       metav1.ConditionFalse,
+	// 		},
+	// 		kdexv1alpha1.ConditionReasonReconcileError,
+	// 		err.Error(),
+	// 	)
+	// 	if err := r.Status().Update(ctx, &hostController); err != nil {
+	// 		return ctrl.Result{}, err
+	// 	}
+	// 	return ctrl.Result{}, err
+	// }
 
 	shouldReturn, r1, err = r.createOrUpdateAccompanyingResources(ctx, &hostController, host, theme)
 
@@ -287,7 +286,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 				})
 			}
 
-			if theme.Spec.Assets != nil {
+			if theme != nil {
 				for _, rule := range rules {
 					rule.IngressRuleValue.HTTP.Paths = append(rule.IngressRuleValue.HTTP.Paths,
 						networkingv1.HTTPIngressPath{

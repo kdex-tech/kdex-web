@@ -21,7 +21,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/api/core/v1"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,7 +49,7 @@ var _ = Describe("KDexTranslation Controller", func() {
 					Namespace: namespace,
 				},
 				Spec: kdexv1alpha1.KDexTranslationSpec{
-					HostRef: v1.LocalObjectReference{
+					HostRef: corev1.LocalObjectReference{
 						Name: focalHost,
 					},
 					Translations: []kdexv1alpha1.Translation{
@@ -75,26 +77,92 @@ var _ = Describe("KDexTranslation Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexTranslation{}, false)
 
-			hostResource := &kdexv1alpha1.KDexHost{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      focalHost,
-					Namespace: namespace,
-				},
-				Spec: kdexv1alpha1.KDexHostSpec{
-					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-					Organization: "KDex Tech Inc.",
-					Routing: kdexv1alpha1.Routing{
-						Domains:  []string{"foo.bar"},
-						Strategy: kdexv1alpha1.IngressRoutingStrategy,
+			addOrUpdatePageArchetype(
+				ctx, k8sClient, kdexv1alpha1.KDexPageArchetype{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "default",
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: `<html></html>`,
 					},
 				},
-			}
-
-			Expect(k8sClient.Create(ctx, hostResource)).To(Succeed())
+			)
+			addOrUpdateHost(
+				ctx, k8sClient, kdexv1alpha1.KDexHost{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      focalHost,
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						DefaultLang:  "en",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains:  []string{"foo.bar"},
+							Strategy: kdexv1alpha1.IngressRoutingStrategy,
+						},
+					},
+				},
+			)
+			addOrUpdatePageBinding(
+				ctx, k8sClient, kdexv1alpha1.KDexPageBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "default",
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexPageBindingSpec{
+						ContentEntries: []kdexv1alpha1.ContentEntry{
+							{
+								RawHTML: `<p>Hello</p>`,
+							},
+						},
+						HostRef: corev1.LocalObjectReference{
+							Name: focalHost,
+						},
+						Label: "test",
+						PageArchetypeRef: corev1.LocalObjectReference{
+							Name: "default",
+						},
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/",
+						},
+					},
+				},
+			)
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      focalHost,
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						HostRef: corev1.LocalObjectReference{
+							Name: focalHost,
+						},
+					},
+				},
+			)
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexTranslation{}, true)
+
+			host, ok := hostStore.Get(focalHost)
+			Expect(ok).To(BeTrue())
+
+			mp_en := message.NewPrinter(
+				language.English,
+				message.Catalog(host.Translations),
+			)
+			Expect(mp_en.Sprintf("key-1")).To(Equal("KEY_1_ENGLISH"))
+
+			mp_fr := message.NewPrinter(
+				language.French,
+				message.Catalog(host.Translations),
+			)
+			Expect(mp_fr.Sprintf("key-1")).To(Equal("KEY_1_FRENCH"))
 		})
 	})
 })

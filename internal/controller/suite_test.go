@@ -53,6 +53,7 @@ var (
 	cancel    context.CancelFunc
 	testEnv   *envtest.Environment
 	cfg       *rest.Config
+	hostStore *store.HostStore
 	k8sClient client.Client
 	focalHost string
 	namespace string
@@ -135,7 +136,42 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
-	hostStore := store.NewHostStore()
+	mockHostReconciler := &MockHostReconciler{
+		Client: k8sManager.GetClient(),
+		Scheme: k8sManager.GetScheme(),
+	}
+	err = mockHostReconciler.SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
+	mockPageArchetypeReconciler := &MockPageArchetypeReconciler{
+		Client: k8sManager.GetClient(),
+		Scheme: k8sManager.GetScheme(),
+	}
+	err = mockPageArchetypeReconciler.SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
+	mockPageFooterReconciler := &MockPageFooterReconciler{
+		Client: k8sManager.GetClient(),
+		Scheme: k8sManager.GetScheme(),
+	}
+	err = mockPageFooterReconciler.SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
+	mockPageHeaderReconciler := &MockPageHeaderReconciler{
+		Client: k8sManager.GetClient(),
+		Scheme: k8sManager.GetScheme(),
+	}
+	err = mockPageHeaderReconciler.SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
+	mockPageNavigationReconciler := &MockPageNavigationReconciler{
+		Client: k8sManager.GetClient(),
+		Scheme: k8sManager.GetScheme(),
+	}
+	err = mockPageNavigationReconciler.SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
+	hostStore = store.NewHostStore()
 
 	hostControllerReconciler := &KDexHostControllerReconciler{
 		Client:              k8sManager.GetClient(),
@@ -148,8 +184,16 @@ var _ = BeforeSuite(func() {
 		Scheme:              k8sManager.GetScheme(),
 		ServiceName:         focalHost,
 	}
-
 	err = hostControllerReconciler.SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
+	pageBindingControllerReconciler := &KDexPageBindingReconciler{
+		Client:       k8sManager.GetClient(),
+		HostStore:    hostStore,
+		RequeueDelay: 0,
+		Scheme:       k8sManager.GetScheme(),
+	}
+	err = pageBindingControllerReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	translationReconciler := &KDexTranslationReconciler{
@@ -158,7 +202,6 @@ var _ = BeforeSuite(func() {
 		RequeueDelay: 0,
 		Scheme:       k8sClient.Scheme(),
 	}
-
 	err = translationReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 

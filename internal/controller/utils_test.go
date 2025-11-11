@@ -69,6 +69,29 @@ func addOrUpdateHost(
 	}).Should(Succeed())
 }
 
+func addOrUpdateHostController(
+	ctx context.Context,
+	k8sClient client.Client,
+	hostController kdexv1alpha1.KDexHostController,
+) {
+	Eventually(func(g Gomega) error {
+		list := &kdexv1alpha1.KDexHostControllerList{}
+		err := k8sClient.List(ctx, list, &client.ListOptions{
+			Namespace:     hostController.Namespace,
+			FieldSelector: fields.OneTermEqualSelector("metadata.name", hostController.Name),
+		})
+		g.Expect(err).NotTo(HaveOccurred())
+		if len(list.Items) > 0 {
+			existing := list.Items[0]
+			existing.Spec = hostController.Spec
+			g.Expect(k8sClient.Update(ctx, &existing)).To(Succeed())
+		} else {
+			g.Expect(k8sClient.Create(ctx, &hostController)).To(Succeed())
+		}
+		return nil
+	}).Should(Succeed())
+}
+
 func addOrUpdatePageArchetype(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -87,6 +110,29 @@ func addOrUpdatePageArchetype(
 			g.Expect(k8sClient.Update(ctx, &existing)).To(Succeed())
 		} else {
 			g.Expect(k8sClient.Create(ctx, &pageArchetype)).To(Succeed())
+		}
+		return nil
+	}).Should(Succeed())
+}
+
+func addOrUpdatePageBinding(
+	ctx context.Context,
+	k8sClient client.Client,
+	pageBinding kdexv1alpha1.KDexPageBinding,
+) {
+	Eventually(func(g Gomega) error {
+		list := &kdexv1alpha1.KDexPageBindingList{}
+		err := k8sClient.List(ctx, list, &client.ListOptions{
+			Namespace:     pageBinding.Namespace,
+			FieldSelector: fields.OneTermEqualSelector("metadata.name", pageBinding.Name),
+		})
+		g.Expect(err).NotTo(HaveOccurred())
+		if len(list.Items) > 0 {
+			existing := list.Items[0]
+			existing.Spec = pageBinding.Spec
+			g.Expect(k8sClient.Update(ctx, &existing)).To(Succeed())
+		} else {
+			g.Expect(k8sClient.Create(ctx, &pageBinding)).To(Succeed())
 		}
 		return nil
 	}).Should(Succeed())

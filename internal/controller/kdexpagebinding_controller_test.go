@@ -105,14 +105,14 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
-						Name: "non-existent-host",
+						Name: focalHost,
 					},
 					Label: "foo",
 					PageArchetypeRef: corev1.LocalObjectReference{
 						Name: "non-existent-page-archetype",
 					},
 					Paths: kdexv1alpha1.Paths{
-						BasePath: "/foo",
+						BasePath: "/",
 					},
 				},
 			}
@@ -123,11 +123,23 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, false)
 
+			addOrUpdatePageArchetype(
+				ctx, k8sClient,
+				kdexv1alpha1.KDexPageArchetype{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "non-existent-page-archetype",
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: "<h1>Hello, World!</h1>",
+					},
+				},
+			)
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-host",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostSpec{
@@ -143,20 +155,16 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-
-			assertResourceReady(
-				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexPageBinding{}, false)
-
-			addOrUpdatePageArchetype(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexPageArchetype{
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-page-archetype",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: "<h1>Hello, World!</h1>",
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						HostRef: corev1.LocalObjectReference{
+							Name: focalHost,
+						},
 					},
 				},
 			)
@@ -180,7 +188,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
-						Name: "non-existent-host",
+						Name: focalHost,
 					},
 					Label: "foo",
 					OverrideFooterRef: &corev1.LocalObjectReference{
@@ -207,11 +215,23 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, false)
 
+			addOrUpdatePageArchetype(
+				ctx, k8sClient,
+				kdexv1alpha1.KDexPageArchetype{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "non-existent-page-archetype",
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: "<h1>Hello, World!</h1>",
+					},
+				},
+			)
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-host",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostSpec{
@@ -227,20 +247,19 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-
-			addOrUpdatePageArchetype(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexPageArchetype{
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-page-archetype",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: "<h1>Hello, World!</h1>",
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						HostRef: corev1.LocalObjectReference{
+							Name: focalHost,
+						},
 					},
 				},
 			)
-
 			addOrUpdatePageFooter(ctx, k8sClient,
 				kdexv1alpha1.KDexPageFooter{
 					ObjectMeta: metav1.ObjectMeta{
@@ -252,7 +271,6 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-
 			addOrUpdatePageHeader(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexPageHeader{
@@ -265,7 +283,6 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-
 			addOrUpdatePageNavigation(ctx, k8sClient,
 				kdexv1alpha1.KDexPageNavigation{
 					ObjectMeta: metav1.ObjectMeta{
@@ -297,7 +314,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
-						Name: "non-existent-host",
+						Name: focalHost,
 					},
 					Label: "foo",
 					PageArchetypeRef: corev1.LocalObjectReference{
@@ -307,18 +324,30 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name: "non-existent-page-binding",
 					},
 					Paths: kdexv1alpha1.Paths{
-						BasePath: "/foo",
+						BasePath: "/child",
 					},
 				},
 			}
 
 			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
+			addOrUpdatePageArchetype(
+				ctx, k8sClient,
+				kdexv1alpha1.KDexPageArchetype{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "non-existent-page-archetype",
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: "<h1>Hello, World!</h1>",
+					},
+				},
+			)
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-host",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostSpec{
@@ -334,16 +363,16 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-
-			addOrUpdatePageArchetype(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexPageArchetype{
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-page-archetype",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: "<h1>Hello, World!</h1>",
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						HostRef: corev1.LocalObjectReference{
+							Name: focalHost,
+						},
 					},
 				},
 			)
@@ -365,14 +394,14 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
-						Name: "non-existent-host",
+						Name: focalHost,
 					},
 					Label: "foo",
 					PageArchetypeRef: corev1.LocalObjectReference{
 						Name: "non-existent-page-archetype",
 					},
 					Paths: kdexv1alpha1.Paths{
-						BasePath: "/parent",
+						BasePath: "/",
 					},
 				},
 			}
@@ -398,7 +427,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
-						Name: "non-existent-host",
+						Name: focalHost,
 					},
 					Label: "foo",
 					OverrideHeaderRef: &corev1.LocalObjectReference{
@@ -419,11 +448,23 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, false)
 
+			addOrUpdatePageArchetype(
+				ctx, k8sClient,
+				kdexv1alpha1.KDexPageArchetype{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "non-existent-page-archetype",
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: "<h1>Hello, World!</h1>",
+					},
+				},
+			)
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-host",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostSpec{
@@ -439,20 +480,19 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-
-			addOrUpdatePageArchetype(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexPageArchetype{
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-page-archetype",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: "<h1>Hello, World!</h1>",
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						HostRef: corev1.LocalObjectReference{
+							Name: focalHost,
+						},
 					},
 				},
 			)
-
 			addOrUpdatePageHeader(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexPageHeader{
@@ -525,7 +565,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
-						Name: "non-existent-host",
+						Name: focalHost,
 					},
 					Label: "foo",
 					PageArchetypeRef: corev1.LocalObjectReference{
@@ -543,11 +583,26 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, false)
 
+			addOrUpdatePageArchetype(
+				ctx, k8sClient,
+				kdexv1alpha1.KDexPageArchetype{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "non-existent-page-archetype",
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: "<h1>Hello, World!</h1>",
+						DefaultHeaderRef: &corev1.LocalObjectReference{
+							Name: "non-existent-header",
+						},
+					},
+				},
+			)
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-host",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostSpec{
@@ -563,18 +618,15 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-
-			addOrUpdatePageArchetype(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexPageArchetype{
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-page-archetype",
+						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: "<h1>Hello, World!</h1>",
-						DefaultHeaderRef: &corev1.LocalObjectReference{
-							Name: "non-existent-header",
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						HostRef: corev1.LocalObjectReference{
+							Name: focalHost,
 						},
 					},
 				},

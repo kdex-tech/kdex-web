@@ -61,7 +61,6 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// handle finalizer
 	if pageBinding.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(&pageBinding, pageBindingFinalizerName) {
 			controllerutil.AddFinalizer(&pageBinding, pageBindingFinalizerName)
@@ -216,13 +215,15 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		return r1, err
 	}
 
-	headerScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, header.Spec.ScriptLibraryRef, r.RequeueDelay)
-	if shouldReturn {
-		return r1, err
-	}
+	if header != nil {
+		headerScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, header.Spec.ScriptLibraryRef, r.RequeueDelay)
+		if shouldReturn {
+			return r1, err
+		}
 
-	if headerScriptLibrary != nil {
-		scriptLibraries = append(scriptLibraries, *headerScriptLibrary)
+		if headerScriptLibrary != nil {
+			scriptLibraries = append(scriptLibraries, *headerScriptLibrary)
+		}
 	}
 
 	footerRef := pageBinding.Spec.OverrideFooterRef
@@ -234,13 +235,15 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		return r1, err
 	}
 
-	footerScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, footer.Spec.ScriptLibraryRef, r.RequeueDelay)
-	if shouldReturn {
-		return r1, err
-	}
+	if footer != nil {
+		footerScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, footer.Spec.ScriptLibraryRef, r.RequeueDelay)
+		if shouldReturn {
+			return r1, err
+		}
 
-	if footerScriptLibrary != nil {
-		scriptLibraries = append(scriptLibraries, *footerScriptLibrary)
+		if footerScriptLibrary != nil {
+			scriptLibraries = append(scriptLibraries, *footerScriptLibrary)
+		}
 	}
 
 	pageBindingScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, pageBinding.Spec.ScriptLibraryRef, r.RequeueDelay)

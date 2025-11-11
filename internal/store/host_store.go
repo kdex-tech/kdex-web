@@ -38,7 +38,7 @@ func (s *HostStore) GetOrUpdate(
 	log logr.Logger,
 ) *HostHandler {
 	s.mu.Lock()
-	defer s.mu.RUnlock()
+	defer s.mu.Unlock()
 	handler, ok := s.handlers[host.Name]
 	if !ok {
 		handler = NewHostHandler(log)
