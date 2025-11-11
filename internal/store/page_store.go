@@ -97,7 +97,7 @@ func (s *PageStore) BuildMenuEntries(
 
 			(*entry.Children)[label] = &pageEntry
 
-			s.BuildMenuEntries(&pageEntry, l, isDefaultLanguage, &page)
+			s.BuildMenuEntries(&pageEntry, l, isDefaultLanguage, page)
 		}
 	}
 }

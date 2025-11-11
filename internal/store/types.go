@@ -6,13 +6,18 @@ import (
 
 type PageHandler struct {
 	// root object
-	Page kdexv1alpha1.KDexPageBinding
+	Page *kdexv1alpha1.KDexPageBinding
 
 	// dereferenced resources
-	Apps            []kdexv1alpha1.KDexApp
+	Content         map[string]ResolvedContentEntry
 	Footer          *kdexv1alpha1.KDexPageFooter
 	Header          *kdexv1alpha1.KDexPageHeader
-	Navigations     map[string]kdexv1alpha1.KDexPageNavigation
+	Navigations     map[string]*kdexv1alpha1.KDexPageNavigation
 	PageArchetype   *kdexv1alpha1.KDexPageArchetype
 	ScriptLibraries []kdexv1alpha1.KDexScriptLibrary
+}
+
+type ResolvedContentEntry struct {
+	Content string
+	App     *kdexv1alpha1.KDexApp
 }

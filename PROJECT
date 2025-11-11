@@ -17,4 +17,8 @@ resources:
   domain: kdex.dev
   kind: KDexHostController
   version: v1alpha1
+- controller: true
+  domain: kdex.dev
+  kind: KDexPageBinding
+  version: v1alpha1
 version: "3"

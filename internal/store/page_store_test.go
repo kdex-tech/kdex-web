@@ -30,7 +30,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 			isDefaultLanguage: true,
 			items: &map[string]PageHandler{
 				"foo": {
-					Page: kdexv1alpha1.KDexPageBinding{
+					Page: &kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
@@ -59,7 +59,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 			isDefaultLanguage: true,
 			items: &map[string]PageHandler{
 				"foo": {
-					Page: kdexv1alpha1.KDexPageBinding{
+					Page: &kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
@@ -77,7 +77,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 				"home": {
-					Page: kdexv1alpha1.KDexPageBinding{
+					Page: &kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "home",
 						},
@@ -92,7 +92,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 				"contact": {
-					Page: kdexv1alpha1.KDexPageBinding{
+					Page: &kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "contact",
 						},
@@ -138,7 +138,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 			isDefaultLanguage: false,
 			items: &map[string]PageHandler{
 				"foo": {
-					Page: kdexv1alpha1.KDexPageBinding{
+					Page: &kdexv1alpha1.KDexPageBinding{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
