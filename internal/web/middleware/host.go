@@ -66,7 +66,11 @@ var fallbackHostHandler = store_.HostHandler{
 	Mux: func() *http.ServeMux {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, "Welcome to KDex!")
+			_, err := fmt.Fprintf(w, "Welcome to KDex!")
+
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		})
 		return mux
 	}(),

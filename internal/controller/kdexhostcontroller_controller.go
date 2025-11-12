@@ -34,8 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	cr_handler "sigs.k8s.io/controller-runtime/pkg/handler"
+	cr_log "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -69,7 +69,7 @@ type KDexHostControllerReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,verbs=get
 
 func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := logf.FromContext(ctx)
+	log := cr_log.FromContext(ctx)
 
 	var hostController kdexv1alpha1.KDexHostController
 	if err := r.Get(ctx, req.NamespacedName, &hostController); err != nil {
@@ -210,7 +210,7 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&networkingv1.Ingress{}).
 		Watches(
 			&kdexv1alpha1.KDexHost{},
-			handler.EnqueueRequestsFromMapFunc(r.findHostControllersForHost),
+			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForHost),
 		).
 		Named("kdexhostcontroller").
 		Complete(r)
@@ -222,16 +222,16 @@ func (r *KDexHostControllerReconciler) createOrUpdateAccompanyingResources(
 	host *kdexv1alpha1.KDexHost,
 	theme *kdexv1alpha1.KDexTheme,
 ) (bool, ctrl.Result, error) {
-	shouldReturn, r1, err := r.createOrUpdateThemeDeployment(ctx, hostController, host, theme)
+	shouldReturn, err := r.createOrUpdateThemeDeployment(ctx, hostController, host, theme)
 
 	if shouldReturn {
-		return shouldReturn, r1, err
+		return shouldReturn, ctrl.Result{}, err
 	}
 
-	shouldReturn, r1, err = r.createOrUpdateThemeService(ctx, hostController, host, theme)
+	shouldReturn, err = r.createOrUpdateThemeService(ctx, hostController, host, theme)
 
 	if shouldReturn {
-		return shouldReturn, r1, err
+		return shouldReturn, ctrl.Result{}, err
 	}
 
 	if host.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
@@ -288,7 +288,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 
 			if theme != nil {
 				for _, rule := range rules {
-					rule.IngressRuleValue.HTTP.Paths = append(rule.IngressRuleValue.HTTP.Paths,
+					rule.HTTP.Paths = append(rule.HTTP.Paths,
 						networkingv1.HTTPIngressPath{
 							Path:     theme.Spec.RoutePath,
 							PathType: &pathType,
@@ -371,9 +371,9 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 	hostController *kdexv1alpha1.KDexHostController,
 	host *kdexv1alpha1.KDexHost,
 	theme *kdexv1alpha1.KDexTheme,
-) (bool, ctrl.Result, error) {
+) (bool, error) {
 	if theme == nil {
-		return false, ctrl.Result{}, nil
+		return false, nil
 	}
 
 	deployment := &appsv1.Deployment{
@@ -538,13 +538,13 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 		)
 
 		if err := r.Status().Update(ctx, hostController); err != nil {
-			return true, ctrl.Result{}, err
+			return true, err
 		}
 
-		return true, ctrl.Result{}, err
+		return true, err
 	}
 
-	return false, ctrl.Result{}, nil
+	return false, nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
@@ -552,9 +552,9 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 	hostController *kdexv1alpha1.KDexHostController,
 	host *kdexv1alpha1.KDexHost,
 	theme *kdexv1alpha1.KDexTheme,
-) (bool, ctrl.Result, error) {
+) (bool, error) {
 	if theme == nil {
-		return false, ctrl.Result{}, nil
+		return false, nil
 	}
 
 	service := &corev1.Service{
@@ -607,21 +607,21 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 		)
 
 		if err := r.Status().Update(ctx, hostController); err != nil {
-			return true, ctrl.Result{}, err
+			return true, err
 		}
 
-		return true, ctrl.Result{}, err
+		return true, err
 	}
 
-	return false, ctrl.Result{}, nil
+	return false, nil
 }
 
-func hasRootPage(pageStore *store.PageStore) bool {
-	for _, handler := range pageStore.List() {
-		if handler.Page.Spec.Paths.BasePath == "/" {
-			return true
-		}
-	}
+// func hasRootPage(pageStore *store.PageStore) bool {
+// 	for _, handler := range pageStore.List() {
+// 		if handler.Page.Spec.BasePath == "/" {
+// 			return true
+// 		}
+// 	}
 
-	return false
-}
+// 	return false
+// }

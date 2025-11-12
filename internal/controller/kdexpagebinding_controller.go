@@ -141,6 +141,7 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+//nolint:gocyclo
 func (r *KDexPageBindingReconciler) innerReconcile(
 	ctx context.Context, pageBinding *kdexv1alpha1.KDexPageBinding,
 ) (ctrl.Result, error) {

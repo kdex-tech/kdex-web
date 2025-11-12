@@ -447,7 +447,7 @@ func resolveScriptLibrary(
 	return &scriptLibrary, false, ctrl.Result{}, nil
 }
 
-func resolveSecret(
+func ResolveSecret(
 	ctx context.Context,
 	c client.Client,
 	object client.Object,

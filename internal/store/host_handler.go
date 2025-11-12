@@ -150,7 +150,7 @@ func (th *HostHandler) L10nRenderLocked(
 	l language.Tag,
 ) (string, error) {
 	renderer := render.Renderer{
-		BasePath:        handler.Page.Spec.Paths.BasePath,
+		BasePath:        handler.Page.Spec.BasePath,
 		BrandName:       th.host.Spec.BrandName,
 		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: th.defaultLanguage,
@@ -166,7 +166,7 @@ func (th *HostHandler) L10nRenderLocked(
 		Navigations:     handler.NavigationToHTMLMap(),
 		Organization:    th.host.Spec.Organization,
 		PageMap:         pageMap,
-		PatternPath:     handler.Page.Spec.Paths.PatternPath,
+		PatternPath:     handler.Page.Spec.PatternPath,
 		TemplateContent: handler.Archetype.Spec.Content,
 		TemplateName:    handler.Page.Name,
 		Theme:           th.ThemeToString(),
@@ -202,11 +202,11 @@ func (th *HostHandler) MetaToString(handler PageHandler) string {
 	buffer.WriteString(`<meta name="kdex-ui"`)
 	buffer.WriteRune('\n')
 	buffer.WriteString(` data-page-basepath="`)
-	buffer.WriteString(handler.Page.Spec.Paths.BasePath)
+	buffer.WriteString(handler.Page.Spec.BasePath)
 	buffer.WriteRune('"')
 	buffer.WriteRune('\n')
 	buffer.WriteString(` data-page-patternpath="`)
-	buffer.WriteString(handler.Page.Spec.Paths.PatternPath)
+	buffer.WriteString(handler.Page.Spec.PatternPath)
 	buffer.WriteRune('"')
 	buffer.WriteRune('\n')
 	buffer.WriteString(`/>`)
@@ -275,12 +275,12 @@ func (th *HostHandler) RebuildMux() {
 			}
 		}
 
-		mux.HandleFunc("GET "+page.Spec.Paths.BasePath, handler)
-		mux.HandleFunc("GET /{l10n}"+page.Spec.Paths.BasePath, handler)
+		mux.HandleFunc("GET "+page.Spec.BasePath, handler)
+		mux.HandleFunc("GET /{l10n}"+page.Spec.BasePath, handler)
 
 		if page.Spec.PatternPath != "" {
-			mux.HandleFunc("GET "+page.Spec.Paths.PatternPath, handler)
-			mux.HandleFunc("GET /{l10n}"+page.Spec.Paths.PatternPath, handler)
+			mux.HandleFunc("GET "+page.Spec.PatternPath, handler)
+			mux.HandleFunc("GET /{l10n}"+page.Spec.PatternPath, handler)
 		}
 	}
 

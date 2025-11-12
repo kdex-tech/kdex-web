@@ -80,9 +80,13 @@ func main() {
 	var tlsOpts []func(*tls.Config)
 
 	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file.")
-	flag.StringVar(&focalHost, "focal-host", "", "The name of a KDexHost resource to focus the controller instance's attention on.")
+	flag.StringVar(
+		&focalHost, "focal-host", "",
+		"The name of a KDexHost resource to focus the controller instance's attention on.")
 	flag.IntVar(&requeueDelaySeconds, "requeue-delay-seconds", 15, "Set the delay for requeuing reconciliation loops")
-	flag.StringVar(&serviceName, "service-name", "", "The name of the controller's service so that we can automatically configure an ingress/httproute that points towards it.")
+	flag.StringVar(
+		&serviceName, "service-name", "",
+		"The name of the controller service so it can self configure an ingress/httproute with itself as backend.")
 	flag.StringVar(&webserverAddr, "webserver-bind-address", ":8090", "The address the webserver binds to.")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
@@ -131,7 +135,8 @@ func main() {
 
 	if len(webhookCertPath) > 0 {
 		setupLog.Info("Initializing webhook certificate watcher using provided certificates",
-			"webhook-cert-path", webhookCertPath, "webhook-cert-name", webhookCertName, "webhook-cert-key", webhookCertKey)
+			"webhook-cert-path", webhookCertPath, "webhook-cert-name", webhookCertName,
+			"webhook-cert-key", webhookCertKey)
 
 		webhookServerOptions.CertDir = webhookCertPath
 		webhookServerOptions.CertName = webhookCertName
@@ -168,7 +173,8 @@ func main() {
 	// - [PROMETHEUS-WITH-CERTS] at config/prometheus/kustomization.yaml for TLS certification.
 	if len(metricsCertPath) > 0 {
 		setupLog.Info("Initializing metrics certificate watcher using provided certificates",
-			"metrics-cert-path", metricsCertPath, "metrics-cert-name", metricsCertName, "metrics-cert-key", metricsCertKey)
+			"metrics-cert-path", metricsCertPath, "metrics-cert-name", metricsCertName,
+			"metrics-cert-key", metricsCertKey)
 
 		metricsServerOptions.CertDir = metricsCertPath
 		metricsServerOptions.CertName = metricsCertName
