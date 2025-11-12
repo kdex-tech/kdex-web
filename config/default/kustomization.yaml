@@ -16,7 +16,7 @@ namePrefix: kdex-web-
 
 resources:
 - service_account.yaml
-- role.yaml
+- ../rbac/role.yaml
 - role_binding.yaml
 - manager.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
