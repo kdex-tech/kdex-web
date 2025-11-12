@@ -35,12 +35,10 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 							Name: "foo",
 						},
 						Spec: kdexv1alpha1.KDexPageBindingSpec{
+							Label: "Foo",
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/foo",
 							},
-							// PageComponents: kdexv1alpha1.PageComponents{
-							// 	Title: "Foo",
-							// },
 						},
 					},
 				},
@@ -64,12 +62,10 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 							Name: "foo",
 						},
 						Spec: kdexv1alpha1.KDexPageBindingSpec{
+							Label: "Foo",
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/foo",
 							},
-							// PageComponents: kdexv1alpha1.PageComponents{
-							// 	Title: "Foo",
-							// },
 							ParentPageRef: &corev1.LocalObjectReference{
 								Name: "home",
 							},
@@ -82,12 +78,10 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 							Name: "home",
 						},
 						Spec: kdexv1alpha1.KDexPageBindingSpec{
+							Label: "Home",
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/home",
 							},
-							// PageComponents: kdexv1alpha1.PageComponents{
-							// 	Title: "Home",
-							// },
 						},
 					},
 				},
@@ -97,15 +91,13 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 							Name: "contact",
 						},
 						Spec: kdexv1alpha1.KDexPageBindingSpec{
+							Label: "Contact Us",
 							NavigationHints: &kdexv1alpha1.NavigationHints{
 								Weight: resource.MustParse("100"),
 							},
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/contact",
 							},
-							// PageComponents: kdexv1alpha1.PageComponents{
-							// 	Title: "Contact Us",
-							// },
 						},
 					},
 				},
@@ -143,12 +135,10 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 							Name: "foo",
 						},
 						Spec: kdexv1alpha1.KDexPageBindingSpec{
+							Label: "Foo",
 							Paths: kdexv1alpha1.Paths{
 								BasePath: "/foo",
 							},
-							// PageComponents: kdexv1alpha1.PageComponents{
-							// 	Title: "Foo",
-							// },
 						},
 					},
 				},

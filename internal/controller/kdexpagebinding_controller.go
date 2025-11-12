@@ -295,11 +295,11 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 	}
 
 	hostHandler.Pages.Set(store.PageHandler{
+		Archetype:       archetype,
 		Content:         contents,
 		Footer:          footer,
 		Header:          header,
 		Navigations:     navigations,
-		PageArchetype:   archetype,
 		Page:            pageBinding,
 		ScriptLibraries: scriptLibraries,
 	})

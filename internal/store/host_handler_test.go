@@ -44,7 +44,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		host        kdexv1alpha1.KDexHost
 		lang        string
 		name        string
-		page        kdexv1alpha1.KDexPageBinding
+		pageHandler PageHandler
 		translation *kdexv1alpha1.KDexTranslation
 		want        []string
 	}{
@@ -55,6 +55,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
+					BrandName:    "KDex Tech",
 					DefaultLang:  "en",
 					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
 					Organization: "KDex Tech Inc.",
@@ -63,28 +64,44 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			page: kdexv1alpha1.KDexPageBinding{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-page-binding",
-				},
-				Spec: kdexv1alpha1.KDexPageBindingSpec{
-					ContentEntries: []kdexv1alpha1.ContentEntry{
-						{
-							RawHTML: "MAIN",
-							Slot:    "main",
+			pageHandler: PageHandler{
+				Page: &kdexv1alpha1.KDexPageBinding{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "sample-page-binding",
+					},
+					Spec: kdexv1alpha1.KDexPageBindingSpec{
+						Label: "TITLE",
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/",
 						},
 					},
-					// PageComponents: kdexv1alpha1.PageComponents{
-					// 	Footer: "FOOTER",
-					// 	Header: `{{ l10n "key" }}`,
-					// 	Navigations: map[string]string{
-					// 		"main": "NAV",
-					// 	},
-					// 	PrimaryTemplate: primaryTemplate,
-					// 	Title:           "TITLE",
-					// },
-					Paths: kdexv1alpha1.Paths{
-						BasePath: "/",
+				},
+				Archetype: &kdexv1alpha1.KDexPageArchetype{
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: primaryTemplate,
+					},
+				},
+				Content: map[string]ResolvedContentEntry{
+					"main": {
+						Content: "MAIN",
+						Slot:    "main",
+					},
+				},
+				Footer: &kdexv1alpha1.KDexPageFooter{
+					Spec: kdexv1alpha1.KDexPageFooterSpec{
+						Content: "FOOTER",
+					},
+				},
+				Header: &kdexv1alpha1.KDexPageHeader{
+					Spec: kdexv1alpha1.KDexPageHeaderSpec{
+						Content: `{{ l10n "key" }}`,
+					},
+				},
+				Navigations: map[string]*kdexv1alpha1.KDexPageNavigation{
+					"main": {
+						Spec: kdexv1alpha1.KDexPageNavigationSpec{
+							Content: "NAV",
+						},
 					},
 				},
 			},
@@ -114,12 +131,13 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			want: []string{"FOOTER", "ENGLISH_TRANSLATION", "NAV", "MAIN", "TITLE"},
 		},
 		{
-			name: "english translation",
+			name: "french translation",
 			host: kdexv1alpha1.KDexHost{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
+					BrandName:    "KDex Tech",
 					DefaultLang:  "en",
 					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
 					Organization: "KDex Tech Inc.",
@@ -128,25 +146,44 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			page: kdexv1alpha1.KDexPageBinding{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-render-page",
+			pageHandler: PageHandler{
+				Page: &kdexv1alpha1.KDexPageBinding{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "sample-render-page",
+					},
+					Spec: kdexv1alpha1.KDexPageBindingSpec{
+						Label: "TITLE",
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/",
+						},
+					},
 				},
-				Spec: kdexv1alpha1.KDexPageBindingSpec{
-					// PageComponents: kdexv1alpha1.PageComponents{
-					// 	Contents: map[string]string{
-					// 		"main": "MAIN",
-					// 	},
-					// 	Footer: "FOOTER",
-					// 	Header: `{{ l10n "key" }}`,
-					// 	Navigations: map[string]string{
-					// 		"main": "NAV",
-					// 	},
-					// 	PrimaryTemplate: primaryTemplate,
-					// 	Title:           "TITLE",
-					// },
-					Paths: kdexv1alpha1.Paths{
-						BasePath: "/",
+				Archetype: &kdexv1alpha1.KDexPageArchetype{
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: primaryTemplate,
+					},
+				},
+				Content: map[string]ResolvedContentEntry{
+					"main": {
+						Content: "MAIN",
+						Slot:    "main",
+					},
+				},
+				Footer: &kdexv1alpha1.KDexPageFooter{
+					Spec: kdexv1alpha1.KDexPageFooterSpec{
+						Content: "FOOTER",
+					},
+				},
+				Header: &kdexv1alpha1.KDexPageHeader{
+					Spec: kdexv1alpha1.KDexPageHeaderSpec{
+						Content: `{{ l10n "key" }}`,
+					},
+				},
+				Navigations: map[string]*kdexv1alpha1.KDexPageNavigation{
+					"main": {
+						Spec: kdexv1alpha1.KDexPageNavigationSpec{
+							Content: "NAV",
+						},
 					},
 				},
 			},
@@ -182,6 +219,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					Name: "sample-host",
 				},
 				Spec: kdexv1alpha1.KDexHostSpec{
+					BrandName:    "KDex Tech",
 					DefaultLang:  "en",
 					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
 					Organization: "KDex Tech Inc.",
@@ -190,25 +228,44 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			page: kdexv1alpha1.KDexPageBinding{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-render-page",
+			pageHandler: PageHandler{
+				Page: &kdexv1alpha1.KDexPageBinding{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "sample-render-page",
+					},
+					Spec: kdexv1alpha1.KDexPageBindingSpec{
+						Label: "TITLE",
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/",
+						},
+					},
 				},
-				Spec: kdexv1alpha1.KDexPageBindingSpec{
-					// PageComponents: kdexv1alpha1.PageComponents{
-					// 	Contents: map[string]string{
-					// 		"main": "MAIN",
-					// 	},
-					// 	Footer: "FOOTER",
-					// 	Header: `{{ l10n "key" }}`,
-					// 	Navigations: map[string]string{
-					// 		"main": "NAV",
-					// 	},
-					// 	PrimaryTemplate: primaryTemplate,
-					// 	Title:           "TITLE",
-					// },
-					Paths: kdexv1alpha1.Paths{
-						BasePath: "/",
+				Archetype: &kdexv1alpha1.KDexPageArchetype{
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: primaryTemplate,
+					},
+				},
+				Content: map[string]ResolvedContentEntry{
+					"main": {
+						Content: "MAIN",
+						Slot:    "main",
+					},
+				},
+				Footer: &kdexv1alpha1.KDexPageFooter{
+					Spec: kdexv1alpha1.KDexPageFooterSpec{
+						Content: "FOOTER",
+					},
+				},
+				Header: &kdexv1alpha1.KDexPageHeader{
+					Spec: kdexv1alpha1.KDexPageHeaderSpec{
+						Content: `{{ l10n "key" }}`,
+					},
+				},
+				Navigations: map[string]*kdexv1alpha1.KDexPageNavigation{
+					"main": {
+						Spec: kdexv1alpha1.KDexPageNavigationSpec{
+							Content: "NAV",
+						},
 					},
 				},
 			},
@@ -223,9 +280,8 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			th := NewHostHandler(logr.Discard())
 			th.SetHost(&tt.host, nil, nil)
 			th.AddOrUpdateTranslation(tt.translation)
-			got, gotErr := th.L10nRenderLocked(PageHandler{
-				Page: &tt.page,
-			}, &map[string]*render.PageEntry{}, language.Make(tt.lang))
+
+			got, gotErr := th.L10nRenderLocked(tt.pageHandler, &map[string]*render.PageEntry{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 
@@ -240,8 +296,8 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 	tests := []struct {
 		name        string
 		host        kdexv1alpha1.KDexHost
+		pageHandler PageHandler
 		translation *kdexv1alpha1.KDexTranslation
-		page        kdexv1alpha1.KDexPageBinding
 		want        map[string][]string
 	}{
 		{
@@ -259,25 +315,44 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 					},
 				},
 			},
-			page: kdexv1alpha1.KDexPageBinding{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-render-page",
+			pageHandler: PageHandler{
+				Page: &kdexv1alpha1.KDexPageBinding{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "sample-render-page",
+					},
+					Spec: kdexv1alpha1.KDexPageBindingSpec{
+						Label: "TITLE",
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/",
+						},
+					},
 				},
-				Spec: kdexv1alpha1.KDexPageBindingSpec{
-					// PageComponents: kdexv1alpha1.PageComponents{
-					// 	Contents: map[string]string{
-					// 		"main": "MAIN",
-					// 	},
-					// 	Footer: "FOOTER",
-					// 	Header: `{{ l10n "key" }}`,
-					// 	Navigations: map[string]string{
-					// 		"main": "NAV",
-					// 	},
-					// 	PrimaryTemplate: primaryTemplate,
-					// 	Title:           "TITLE",
-					// },
-					Paths: kdexv1alpha1.Paths{
-						BasePath: "/",
+				Archetype: &kdexv1alpha1.KDexPageArchetype{
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: primaryTemplate,
+					},
+				},
+				Content: map[string]ResolvedContentEntry{
+					"main": {
+						Content: "MAIN",
+						Slot:    "main",
+					},
+				},
+				Footer: &kdexv1alpha1.KDexPageFooter{
+					Spec: kdexv1alpha1.KDexPageFooterSpec{
+						Content: "FOOTER",
+					},
+				},
+				Header: &kdexv1alpha1.KDexPageHeader{
+					Spec: kdexv1alpha1.KDexPageHeaderSpec{
+						Content: `{{ l10n "key" }}`,
+					},
+				},
+				Navigations: map[string]*kdexv1alpha1.KDexPageNavigation{
+					"main": {
+						Spec: kdexv1alpha1.KDexPageNavigationSpec{
+							Content: "NAV",
+						},
 					},
 				},
 			},
@@ -320,9 +395,8 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 			th := NewHostHandler(logr.Discard())
 			th.SetHost(&tt.host, nil, nil)
 			th.AddOrUpdateTranslation(tt.translation)
-			got := th.L10nRendersLocked(PageHandler{
-				Page: &tt.page,
-			}, map[language.Tag]*map[string]*render.PageEntry{})
+
+			got := th.L10nRendersLocked(tt.pageHandler, map[language.Tag]*map[string]*render.PageEntry{})
 
 			for key, values := range tt.want {
 				l10nRender := got[key]

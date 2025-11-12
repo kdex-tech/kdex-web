@@ -20,13 +20,14 @@ func resolveContents(
 	pageBinding *kdexv1alpha1.KDexPageBinding,
 	requeueDelay time.Duration,
 ) (map[string]store.ResolvedContentEntry, bool, ctrl.Result, error) {
-	contents := make(map[string]store.ResolvedContentEntry)
+	contents := map[string]store.ResolvedContentEntry{}
 
 	for _, contentEntry := range pageBinding.Spec.ContentEntries {
 		appRef := contentEntry.AppRef
 		if appRef == nil {
 			contents[contentEntry.Slot] = store.ResolvedContentEntry{
 				Content: contentEntry.RawHTML,
+				Slot:    contentEntry.Slot,
 			}
 
 			continue
@@ -64,7 +65,11 @@ func resolveContents(
 			return nil, true, r1, err
 		}
 
-		contents[contentEntry.Slot] = store.ResolvedContentEntry{App: &app}
+		contents[contentEntry.Slot] = store.ResolvedContentEntry{
+			App:               &app,
+			CustomElementName: contentEntry.CustomElementName,
+			Slot:              contentEntry.Slot,
+		}
 	}
 
 	return contents, false, ctrl.Result{}, nil

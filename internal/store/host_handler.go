@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"net/http"
 	"sync"
 	"time"
@@ -54,6 +55,9 @@ func NewHostHandler(
 }
 
 func (th *HostHandler) AddOrUpdateTranslation(translation *kdexv1alpha1.KDexTranslation) {
+	if translation == nil {
+		return
+	}
 	th.log.Info("add or update translation", "translation", translation.Name)
 	th.mu.Lock()
 	th.translationResources[translation.Name] = *translation
@@ -71,39 +75,102 @@ func (th *HostHandler) Domains() []string {
 	return th.host.Spec.Routing.Domains
 }
 
+func (th *HostHandler) FootScriptToHTML(handler PageHandler) string {
+	var buffer bytes.Buffer
+	separator := ""
+
+	if th.scriptLibrary != nil {
+		for _, script := range th.scriptLibrary.Spec.Scripts {
+			buffer.WriteString(separator)
+			buffer.WriteString(script.ToScriptTag(true))
+			separator = "\n"
+		}
+	}
+	for _, scriptLibrary := range handler.ScriptLibraries {
+		for _, script := range scriptLibrary.Spec.Scripts {
+			buffer.WriteString(separator)
+			buffer.WriteString(script.ToScriptTag(true))
+			separator = "\n"
+		}
+	}
+
+	return buffer.String()
+}
+
+func (th *HostHandler) HeadScriptToHTML(handler PageHandler) string {
+	packageReferences := []kdexv1alpha1.PackageReference{}
+	if th.scriptLibrary != nil && th.scriptLibrary.Spec.PackageReference != nil {
+		packageReferences = append(packageReferences, *th.scriptLibrary.Spec.PackageReference)
+	}
+	for _, scriptLibrary := range handler.ScriptLibraries {
+		if scriptLibrary.Spec.PackageReference != nil {
+			packageReferences = append(packageReferences, *scriptLibrary.Spec.PackageReference)
+		}
+	}
+	for _, content := range handler.Content {
+		if content.App != nil {
+			packageReferences = append(packageReferences, content.App.Spec.PackageReference)
+		}
+	}
+
+	var buffer bytes.Buffer
+	separator := ""
+
+	if len(packageReferences) > 0 {
+		buffer.WriteString(`<script type="module">\n`)
+		for _, pr := range packageReferences {
+			buffer.WriteString(separator)
+			buffer.WriteString(pr.ToImportStatement())
+			separator = "\n"
+		}
+		buffer.WriteString(`</script>`)
+	}
+
+	if th.scriptLibrary != nil {
+		for _, script := range th.scriptLibrary.Spec.Scripts {
+			buffer.WriteString(separator)
+			buffer.WriteString(script.ToScriptTag(false))
+			separator = "\n"
+		}
+	}
+	for _, scriptLibrary := range handler.ScriptLibraries {
+		for _, script := range scriptLibrary.Spec.Scripts {
+			buffer.WriteString(separator)
+			buffer.WriteString(script.ToScriptTag(false))
+			separator = "\n"
+		}
+	}
+
+	return buffer.String()
+}
+
 func (th *HostHandler) L10nRenderLocked(
 	handler PageHandler,
 	pageMap *map[string]*render.PageEntry,
 	l language.Tag,
 ) (string, error) {
-	page := handler.Page
-
-	assets := []kdexv1alpha1.Asset{}
-
-	if th.theme != nil {
-		assets = append(assets, th.theme.Spec.Assets...)
-	}
-
 	renderer := render.Renderer{
-		BasePath:        page.Spec.BasePath,
-		Contents:        map[string]string{}, // TODO fix
+		BasePath:        handler.Page.Spec.Paths.BasePath,
+		BrandName:       th.host.Spec.BrandName,
+		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: th.defaultLanguage,
-		Footer:          "", // TODO fix
-		FootScript:      "", // TODO fix
-		Header:          "", // TODO fix
-		HeadScript:      "",
+		Footer:          handler.FooterToHTML(),
+		FootScript:      th.FootScriptToHTML(handler),
+		Header:          handler.HeaderToHTML(),
+		HeadScript:      th.HeadScriptToHTML(handler),
 		Language:        l.String(),
 		Languages:       th.availableLanguagesLocked(),
 		LastModified:    time.Now(),
 		MessagePrinter:  th.messagePrinterLocked(l),
-		Meta:            th.host.Spec.BaseMeta,
-		Navigations:     map[string]string{}, // TODO fix
+		Meta:            th.MetaToString(handler),
+		Navigations:     handler.NavigationToHTMLMap(),
 		Organization:    th.host.Spec.Organization,
 		PageMap:         pageMap,
-		TemplateContent: "", // TODO fix
-		TemplateName:    page.Name,
-		Theme:           "", // TODO merge assets
-		Title:           page.Spec.Label,
+		PatternPath:     handler.Page.Spec.Paths.PatternPath,
+		TemplateContent: handler.Archetype.Spec.Content,
+		TemplateName:    handler.Page.Name,
+		Theme:           th.ThemeToString(),
+		Title:           handler.Page.Spec.Label,
 	}
 
 	return renderer.RenderPage()
@@ -123,6 +190,40 @@ func (th *HostHandler) L10nRendersLocked(
 		l10nRenders[l.String()] = rendered
 	}
 	return l10nRenders
+}
+
+func (th *HostHandler) MetaToString(handler PageHandler) string {
+	var buffer bytes.Buffer
+
+	if th.host.Spec.BaseMeta != "" {
+		buffer.WriteString(th.host.Spec.BaseMeta)
+		buffer.WriteRune('\n')
+	}
+	buffer.WriteString(`<meta name="kdex-ui"`)
+	buffer.WriteRune('\n')
+	buffer.WriteString(` data-page-basepath="`)
+	buffer.WriteString(handler.Page.Spec.Paths.BasePath)
+	buffer.WriteRune('"')
+	buffer.WriteRune('\n')
+	buffer.WriteString(` data-page-patternpath="`)
+	buffer.WriteString(handler.Page.Spec.Paths.PatternPath)
+	buffer.WriteRune('"')
+	buffer.WriteRune('\n')
+	buffer.WriteString(`/>`)
+
+	// data-check-batch-endpoint="/~/check/batch"
+	// data-check-single-endpoint="/~/check/single"
+	// data-login-path="/~/oauth/login"
+	// data-login-label="Login"
+	// data-login-css-query="nav.nav .nav-dropdown a.login"
+	// data-logout-path="/~/oauth/logout"
+	// data-logout-label="Logout"
+	// data-logout-css-query="nav.nav .nav-dropdown a.logout"
+	// data-navigation-endpoint="/~/navigation-in"
+	// data-path-separator="/_/"
+	// data-state-endpoint="/~/state/out"
+
+	return buffer.String()
 }
 
 func (th *HostHandler) RebuildMux() {
@@ -218,6 +319,22 @@ func (th *HostHandler) SetHost(
 	th.theme = theme
 	th.mu.Unlock()
 	th.RebuildMux()
+}
+
+func (th *HostHandler) ThemeToString() string {
+	if th.theme == nil {
+		return ""
+	}
+
+	var buffer bytes.Buffer
+	separator := ""
+	for _, asset := range th.theme.Spec.Assets {
+		buffer.WriteString(separator)
+		buffer.WriteString(asset.String())
+		separator = "\n"
+	}
+
+	return buffer.String()
 }
 
 func (th *HostHandler) availableLanguagesLocked() []string {
