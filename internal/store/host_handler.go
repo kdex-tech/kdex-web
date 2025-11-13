@@ -21,7 +21,7 @@ type HostHandler struct {
 	Pages                *PageStore
 	Translations         *catalog.Builder
 	defaultLanguage      string
-	host                 *kdexv1alpha1.KDexHost
+	host                 *kdexv1alpha1.KDexHostController
 	log                  logr.Logger
 	mu                   sync.RWMutex
 	scriptLibrary        *kdexv1alpha1.KDexScriptLibrary
@@ -72,7 +72,7 @@ func (th *HostHandler) Domains() []string {
 	if th.host == nil {
 		return []string{}
 	}
-	return th.host.Spec.Routing.Domains
+	return th.host.Spec.Host.Routing.Domains
 }
 
 func (th *HostHandler) FootScriptToHTML(handler PageHandler) string {
@@ -151,7 +151,7 @@ func (th *HostHandler) L10nRenderLocked(
 ) (string, error) {
 	renderer := render.Renderer{
 		BasePath:        handler.Page.Spec.BasePath,
-		BrandName:       th.host.Spec.BrandName,
+		BrandName:       th.host.Spec.Host.BrandName,
 		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: th.defaultLanguage,
 		Footer:          handler.FooterToHTML(),
@@ -164,7 +164,7 @@ func (th *HostHandler) L10nRenderLocked(
 		MessagePrinter:  th.messagePrinterLocked(l),
 		Meta:            th.MetaToString(handler),
 		Navigations:     handler.NavigationToHTMLMap(),
-		Organization:    th.host.Spec.Organization,
+		Organization:    th.host.Spec.Host.Organization,
 		PageMap:         pageMap,
 		PatternPath:     handler.Page.Spec.PatternPath,
 		TemplateContent: handler.Archetype.Spec.Content,
@@ -195,8 +195,8 @@ func (th *HostHandler) L10nRendersLocked(
 func (th *HostHandler) MetaToString(handler PageHandler) string {
 	var buffer bytes.Buffer
 
-	if th.host.Spec.BaseMeta != "" {
-		buffer.WriteString(th.host.Spec.BaseMeta)
+	if th.host.Spec.Host.BaseMeta != "" {
+		buffer.WriteString(th.host.Spec.Host.BaseMeta)
 		buffer.WriteRune('\n')
 	}
 	buffer.WriteString(`<meta name="kdex-ui"`)
@@ -308,12 +308,12 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (th *HostHandler) SetHost(
-	host *kdexv1alpha1.KDexHost,
+	host *kdexv1alpha1.KDexHostController,
 	scriptLibrary *kdexv1alpha1.KDexScriptLibrary,
 	theme *kdexv1alpha1.KDexTheme,
 ) {
 	th.mu.Lock()
-	th.defaultLanguage = host.Spec.DefaultLang
+	th.defaultLanguage = host.Spec.Host.DefaultLang
 	th.host = host
 	th.scriptLibrary = scriptLibrary
 	th.theme = theme

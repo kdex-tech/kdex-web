@@ -135,6 +135,17 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
+			hostSpec := kdexv1alpha1.KDexHostSpec{
+				BrandName:    "KDex Tech",
+				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+				Organization: "KDex Tech Inc.",
+				Routing: kdexv1alpha1.Routing{
+					Domains: []string{
+						"example.com",
+					},
+					Strategy: kdexv1alpha1.IngressRoutingStrategy,
+				},
+			}
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
@@ -142,17 +153,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
-							},
-							Strategy: kdexv1alpha1.IngressRoutingStrategy,
-						},
-					},
+					Spec: hostSpec,
 				},
 			)
 			addOrUpdateHostController(
@@ -162,9 +163,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
+						Host: hostSpec,
 					},
 				},
 			)
@@ -227,6 +226,17 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
+			hostSpec := kdexv1alpha1.KDexHostSpec{
+				BrandName:    "KDex Tech",
+				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+				Organization: "KDex Tech Inc.",
+				Routing: kdexv1alpha1.Routing{
+					Domains: []string{
+						"example.com",
+					},
+					Strategy: kdexv1alpha1.IngressRoutingStrategy,
+				},
+			}
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
@@ -234,17 +244,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
-							},
-							Strategy: kdexv1alpha1.IngressRoutingStrategy,
-						},
-					},
+					Spec: hostSpec,
 				},
 			)
 			addOrUpdateHostController(
@@ -254,9 +254,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
+						Host: hostSpec,
 					},
 				},
 			)
@@ -343,6 +341,17 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
+			hostSpec := kdexv1alpha1.KDexHostSpec{
+				BrandName:    "KDex Tech",
+				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+				Organization: "KDex Tech Inc.",
+				Routing: kdexv1alpha1.Routing{
+					Domains: []string{
+						"example.com",
+					},
+					Strategy: kdexv1alpha1.IngressRoutingStrategy,
+				},
+			}
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
@@ -350,17 +359,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
-							},
-							Strategy: kdexv1alpha1.IngressRoutingStrategy,
-						},
-					},
+					Spec: hostSpec,
 				},
 			)
 			addOrUpdateHostController(
@@ -370,9 +369,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
+						Host: hostSpec,
 					},
 				},
 			)
@@ -460,6 +457,17 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
+			hostSpec := kdexv1alpha1.KDexHostSpec{
+				BrandName:    "KDex Tech",
+				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+				Organization: "KDex Tech Inc.",
+				Routing: kdexv1alpha1.Routing{
+					Domains: []string{
+						"example.com",
+					},
+					Strategy: kdexv1alpha1.IngressRoutingStrategy,
+				},
+			}
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
@@ -467,17 +475,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
-							},
-							Strategy: kdexv1alpha1.IngressRoutingStrategy,
-						},
-					},
+					Spec: hostSpec,
 				},
 			)
 			addOrUpdateHostController(
@@ -487,9 +485,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
+						Host: hostSpec,
 					},
 				},
 			)
@@ -598,6 +594,17 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
+			hostSpec := kdexv1alpha1.KDexHostSpec{
+				BrandName:    "KDex Tech",
+				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+				Organization: "KDex Tech Inc.",
+				Routing: kdexv1alpha1.Routing{
+					Domains: []string{
+						"example.com",
+					},
+					Strategy: kdexv1alpha1.IngressRoutingStrategy,
+				},
+			}
 			addOrUpdateHost(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexHost{
@@ -605,17 +612,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
-							},
-							Strategy: kdexv1alpha1.IngressRoutingStrategy,
-						},
-					},
+					Spec: hostSpec,
 				},
 			)
 			addOrUpdateHostController(
@@ -625,9 +622,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
+						Host: hostSpec,
 					},
 				},
 			)

@@ -41,7 +41,7 @@ const (
 
 func TestHostHandler_L10nRenderLocked(t *testing.T) {
 	tests := []struct {
-		host        kdexv1alpha1.KDexHost
+		host        kdexv1alpha1.KDexHostController
 		lang        string
 		name        string
 		pageHandler PageHandler
@@ -50,17 +50,19 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 	}{
 		{
 			name: "english translation",
-			host: kdexv1alpha1.KDexHost{
+			host: kdexv1alpha1.KDexHostController{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.KDexHostSpec{
-					BrandName:    "KDex Tech",
-					DefaultLang:  "en",
-					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-					Organization: "KDex Tech Inc.",
-					Routing: kdexv1alpha1.Routing{
-						Domains: []string{"foo.bar"},
+				Spec: kdexv1alpha1.KDexHostControllerSpec{
+					Host: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						DefaultLang:  "en",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{"foo.bar"},
+						},
 					},
 				},
 			},
@@ -132,17 +134,19 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		},
 		{
 			name: "french translation",
-			host: kdexv1alpha1.KDexHost{
+			host: kdexv1alpha1.KDexHostController{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.KDexHostSpec{
-					BrandName:    "KDex Tech",
-					DefaultLang:  "en",
-					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-					Organization: "KDex Tech Inc.",
-					Routing: kdexv1alpha1.Routing{
-						Domains: []string{"foo.bar"},
+				Spec: kdexv1alpha1.KDexHostControllerSpec{
+					Host: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						DefaultLang:  "en",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{"foo.bar"},
+						},
 					},
 				},
 			},
@@ -214,17 +218,19 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		},
 		{
 			name: "no translation",
-			host: kdexv1alpha1.KDexHost{
+			host: kdexv1alpha1.KDexHostController{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.KDexHostSpec{
-					BrandName:    "KDex Tech",
-					DefaultLang:  "en",
-					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-					Organization: "KDex Tech Inc.",
-					Routing: kdexv1alpha1.Routing{
-						Domains: []string{"foo.bar"},
+				Spec: kdexv1alpha1.KDexHostControllerSpec{
+					Host: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						DefaultLang:  "en",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{"foo.bar"},
+						},
 					},
 				},
 			},
@@ -295,23 +301,25 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 func TestHostHandler_L10nRendersLocked(t *testing.T) {
 	tests := []struct {
 		name        string
-		host        kdexv1alpha1.KDexHost
+		host        kdexv1alpha1.KDexHostController
 		pageHandler PageHandler
 		translation *kdexv1alpha1.KDexTranslation
 		want        map[string][]string
 	}{
 		{
 			name: "translations",
-			host: kdexv1alpha1.KDexHost{
+			host: kdexv1alpha1.KDexHostController{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.KDexHostSpec{
-					DefaultLang:  "en",
-					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-					Organization: "KDex Tech Inc.",
-					Routing: kdexv1alpha1.Routing{
-						Domains: []string{"foo.bar"},
+				Spec: kdexv1alpha1.KDexHostControllerSpec{
+					Host: kdexv1alpha1.KDexHostSpec{
+						DefaultLang:  "en",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{"foo.bar"},
+						},
 					},
 				},
 			},
@@ -415,22 +423,24 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 	}
 	tests := []struct {
 		name        string
-		host        kdexv1alpha1.KDexHost
+		host        kdexv1alpha1.KDexHostController
 		translation *kdexv1alpha1.KDexTranslation
 		langTests   map[string]KeyAndExpected
 	}{
 		{
 			name: "add translation",
-			host: kdexv1alpha1.KDexHost{
+			host: kdexv1alpha1.KDexHostController{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "sample-host",
 				},
-				Spec: kdexv1alpha1.KDexHostSpec{
-					DefaultLang:  "en",
-					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-					Organization: "KDex Tech Inc.",
-					Routing: kdexv1alpha1.Routing{
-						Domains: []string{"foo.bar"},
+				Spec: kdexv1alpha1.KDexHostControllerSpec{
+					Host: kdexv1alpha1.KDexHostSpec{
+						DefaultLang:  "en",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{"foo.bar"},
+						},
 					},
 				},
 			},

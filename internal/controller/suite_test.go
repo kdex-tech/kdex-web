@@ -29,12 +29,13 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert/yaml"
 	"golang.org/x/mod/modfile"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/store"
-
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/crds/configuration"
+	"kdex.dev/web/internal/store"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -105,13 +106,15 @@ var _ = BeforeSuite(func() {
 		testEnv.BinaryAssetsDirectory = getFirstFoundEnvTestBinaryDir()
 	}
 
+	err = appsv1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 	err = corev1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-
 	err = kdexv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-
 	err = gatewayv1.Install(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = configuration.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// cfg is defined in this file globally.
@@ -134,6 +137,9 @@ var _ = BeforeSuite(func() {
 		},
 		Scheme: scheme.Scheme,
 	})
+	Expect(err).NotTo(HaveOccurred())
+
+	configuration := configuration.LoadConfiguration("/config.yaml", scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	mockHostReconciler := &MockHostReconciler{
@@ -176,7 +182,7 @@ var _ = BeforeSuite(func() {
 	hostControllerReconciler := &KDexHostControllerReconciler{
 		Client:              k8sManager.GetClient(),
 		ControllerNamespace: namespace,
-		Defaults:            Defaults("/config.yaml"),
+		Configuration:       configuration,
 		FocalHost:           focalHost,
 		HostStore:           hostStore,
 		Port:                8090,

@@ -32,7 +32,7 @@ func (s *HostStore) Get(name string) (*HostHandler, bool) {
 }
 
 func (s *HostStore) GetOrUpdate(
-	host *kdexv1alpha1.KDexHost,
+	host *kdexv1alpha1.KDexHostController,
 	scriptLibrary *kdexv1alpha1.KDexScriptLibrary,
 	theme *kdexv1alpha1.KDexTheme,
 	log logr.Logger,

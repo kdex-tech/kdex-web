@@ -88,21 +88,34 @@ var _ = Describe("KDexTranslation Controller", func() {
 					},
 				},
 			)
+			hostSpec := kdexv1alpha1.KDexHostSpec{
+				BrandName:    "KDex Tech",
+				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+				Organization: "KDex Tech Inc.",
+				Routing: kdexv1alpha1.Routing{
+					Domains: []string{
+						"example.com",
+					},
+					Strategy: kdexv1alpha1.IngressRoutingStrategy,
+				},
+			}
 			addOrUpdateHost(
 				ctx, k8sClient, kdexv1alpha1.KDexHost{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						DefaultLang:  "en",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains:  []string{"foo.bar"},
-							Strategy: kdexv1alpha1.IngressRoutingStrategy,
-						},
+					Spec: hostSpec,
+				},
+			)
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      focalHost,
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						Host: hostSpec,
 					},
 				},
 			)
@@ -127,19 +140,6 @@ var _ = Describe("KDexTranslation Controller", func() {
 						},
 						Paths: kdexv1alpha1.Paths{
 							BasePath: "/",
-						},
-					},
-				},
-			)
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
 						},
 					},
 				},

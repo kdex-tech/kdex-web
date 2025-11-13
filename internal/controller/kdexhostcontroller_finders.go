@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -10,27 +11,59 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *KDexHostControllerReconciler) findHostControllersForHost(
+func (r *KDexHostControllerReconciler) findHostControllersForScriptLibrary(
 	ctx context.Context,
-	host client.Object,
+	scriptLibrary client.Object,
 ) []reconcile.Request {
-	if r.FocalHost != host.GetName() {
-		return []reconcile.Request{}
-	}
-
 	log := logf.FromContext(ctx)
 
 	var hostControllerList kdexv1alpha1.KDexHostControllerList
 	if err := r.List(ctx, &hostControllerList, &client.ListOptions{
-		Namespace: host.GetNamespace(),
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.FocalHost),
+		Namespace:     scriptLibrary.GetNamespace(),
 	}); err != nil {
-		log.Error(err, "unable to list KDexHostControllers for host", "host", host.GetName())
+		log.Error(err, "unable to list KDexHostControllers for scriptLibrary", "scriptLibrary", scriptLibrary.GetName())
 		return []reconcile.Request{}
 	}
 
 	requests := make([]reconcile.Request, 0, len(hostControllerList.Items))
 	for _, hostController := range hostControllerList.Items {
-		if hostController.Spec.HostRef.Name == host.GetName() {
+		if hostController.Spec.Host.ScriptLibraryRef == nil {
+			continue
+		}
+		if hostController.Spec.Host.ScriptLibraryRef.Name == scriptLibrary.GetName() {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      hostController.Name,
+					Namespace: hostController.Namespace,
+				},
+			})
+		}
+	}
+	return requests
+}
+
+func (r *KDexHostControllerReconciler) findHostControllersForTheme(
+	ctx context.Context,
+	theme client.Object,
+) []reconcile.Request {
+	log := logf.FromContext(ctx)
+
+	var hostControllerList kdexv1alpha1.KDexHostControllerList
+	if err := r.List(ctx, &hostControllerList, &client.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.FocalHost),
+		Namespace:     theme.GetNamespace(),
+	}); err != nil {
+		log.Error(err, "unable to list KDexHostControllers for theme", "theme", theme.GetName())
+		return []reconcile.Request{}
+	}
+
+	requests := make([]reconcile.Request, 0, len(hostControllerList.Items))
+	for _, hostController := range hostControllerList.Items {
+		if hostController.Spec.Host.DefaultThemeRef == nil {
+			continue
+		}
+		if hostController.Spec.Host.DefaultThemeRef.Name == theme.GetName() {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      hostController.Name,

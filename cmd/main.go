@@ -31,10 +31,16 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/crds/configuration"
+	"kdex.dev/web/internal/controller"
+	"kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/web/server"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -42,12 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
-
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-
-	"kdex.dev/web/internal/controller"
-	"kdex.dev/web/internal/store"
-	"kdex.dev/web/internal/web/server"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -58,8 +59,11 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
 	utilruntime.Must(kdexv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(gatewayv1.Install(scheme))
+	utilruntime.Must(configuration.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -200,16 +204,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	configuration := configuration.LoadConfiguration(configFile, scheme)
 	hostStore := store.NewHostStore()
+	requeueDelay := time.Duration(requeueDelaySeconds) * time.Second
 
 	if err := (&controller.KDexHostControllerReconciler{
 		Client:              mgr.GetClient(),
 		ControllerNamespace: controllerNamespace,
-		Defaults:            controller.Defaults(configFile),
+		Configuration:       configuration,
 		FocalHost:           focalHost,
 		HostStore:           hostStore,
 		Port:                webserverPort(webserverAddr),
-		RequeueDelay:        time.Duration(requeueDelaySeconds) * time.Second,
+		RequeueDelay:        requeueDelay,
 		Scheme:              mgr.GetScheme(),
 		ServiceName:         serviceName,
 	}).SetupWithManager(mgr); err != nil {
@@ -219,7 +225,7 @@ func main() {
 	if err := (&controller.KDexPageBindingReconciler{
 		Client:       mgr.GetClient(),
 		HostStore:    hostStore,
-		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
+		RequeueDelay: requeueDelay,
 		Scheme:       mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexPageBinding")
@@ -228,7 +234,7 @@ func main() {
 	if err := (&controller.KDexTranslationReconciler{
 		Client:       mgr.GetClient(),
 		HostStore:    hostStore,
-		RequeueDelay: time.Duration(requeueDelaySeconds) * time.Second,
+		RequeueDelay: requeueDelay,
 		Scheme:       mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexTranslation")
