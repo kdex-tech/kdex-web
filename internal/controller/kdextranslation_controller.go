@@ -98,9 +98,6 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		kdexv1alpha1.ConditionReasonReconciling,
 		"Reconciling",
 	)
-	if err := r.Status().Update(ctx, &translation); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	// Defer status update
 	defer func() {
@@ -128,9 +125,7 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			kdexv1alpha1.ConditionReasonReconcileError,
 			"Host not found",
 		)
-		if err := r.Status().Update(ctx, &translation); err != nil {
-			return ctrl.Result{}, err
-		}
+
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
@@ -146,9 +141,6 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
-	if err := r.Status().Update(ctx, &translation); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	log.Info("reconciled KDexTranslation")
 

@@ -94,9 +94,6 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		kdexv1alpha1.ConditionReasonReconciling,
 		"Reconciling",
 	)
-	if err := r.Status().Update(ctx, &pageBinding); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	// Defer status update
 	defer func() {
@@ -269,9 +266,6 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 			kdexv1alpha1.ConditionReasonReconcileError,
 			err.Error(),
 		)
-		if err := r.Status().Update(ctx, pageBinding); err != nil {
-			return ctrl.Result{}, err
-		}
 
 		return ctrl.Result{}, err
 	}
@@ -289,9 +283,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 			kdexv1alpha1.ConditionReasonReconcileError,
 			"Host not found",
 		)
-		if err := r.Status().Update(ctx, pageBinding); err != nil {
-			return ctrl.Result{}, err
-		}
+
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
@@ -315,9 +307,6 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
-	if err := r.Status().Update(ctx, pageBinding); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	log.Info("reconciled KDexPageBinding")
 

@@ -103,9 +103,6 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		kdexv1alpha1.ConditionReasonReconciling,
 		"Reconciling",
 	)
-	if err := r.Status().Update(ctx, &hostController); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	// Defer status update
 	defer func() {
@@ -146,9 +143,6 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// 		kdexv1alpha1.ConditionReasonReconcileError,
 	// 		err.Error(),
 	// 	)
-	// 	if err := r.Status().Update(ctx, &hostController); err != nil {
-	// 		return ctrl.Result{}, err
-	// 	}
 	// 	return ctrl.Result{}, err
 	// }
 
@@ -225,9 +219,6 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
-	if err := r.Status().Update(ctx, hostController); err != nil {
-		return err
-	}
 
 	log.Info("reconciled KDexHostController")
 
@@ -332,10 +323,6 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 			err.Error(),
 		)
 
-		if err := r.Status().Update(ctx, hostController); err != nil {
-			return err
-		}
-
 		return err
 	}
 
@@ -407,10 +394,6 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 			err.Error(),
 		)
 
-		if err := r.Status().Update(ctx, hostController); err != nil {
-			return err
-		}
-
 		return err
 	}
 
@@ -469,10 +452,6 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 			kdexv1alpha1.ConditionReasonReconcileError,
 			err.Error(),
 		)
-
-		if err := r.Status().Update(ctx, hostController); err != nil {
-			return err
-		}
 
 		return err
 	}
