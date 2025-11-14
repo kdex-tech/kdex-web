@@ -43,7 +43,7 @@ type KDexTranslationReconciler struct {
 	Scheme       *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhost,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhosts,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdextranslations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdextranslations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdextranslations/finalizers,verbs=update
