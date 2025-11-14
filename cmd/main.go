@@ -84,13 +84,11 @@ func main() {
 	var tlsOpts []func(*tls.Config)
 
 	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file.")
-	flag.StringVar(
-		&focalHost, "focal-host", "",
-		"The name of a KDexHost resource to focus the controller instance's attention on.")
+	flag.StringVar(&focalHost, "focal-host", "", "The name of a KDexHost resource to focus the controller instance's "+
+		"attention on.")
 	flag.IntVar(&requeueDelaySeconds, "requeue-delay-seconds", 15, "Set the delay for requeuing reconciliation loops")
-	flag.StringVar(
-		&serviceName, "service-name", "",
-		"The name of the controller service so it can self configure an ingress/httproute with itself as backend.")
+	flag.StringVar(&serviceName, "service-name", "", "The name of the controller service so it can self configure an "+
+		"ingress/httproute with itself as backend.")
 	flag.StringVar(&webserverAddr, "webserver-bind-address", ":8090", "The address the webserver binds to.")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+

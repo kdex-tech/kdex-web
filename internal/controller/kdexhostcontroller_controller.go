@@ -63,8 +63,8 @@ type KDexHostControllerReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers/finalizers,verbs=update
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,verbs=get
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,verbs=get
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,verbs=get;list;watch
 
 func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)

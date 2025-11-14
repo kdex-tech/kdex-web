@@ -50,6 +50,7 @@ rules:
   - kdexpageheaders
   - kdexpagenavigations
   - kdexscriptlibraries
+  - kdexthemes
   verbs:
   - get
   - list
@@ -86,12 +87,6 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - kdex.dev
-  resources:
-  - kdexthemes
-  verbs:
-  - get
 - apiGroups:
   - networking.k8s.io
   resources:
