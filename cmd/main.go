@@ -202,14 +202,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	configuration := configuration.LoadConfiguration(configFile, scheme)
+	conf := configuration.LoadConfiguration(configFile, scheme)
 	hostStore := store.NewHostStore()
 	requeueDelay := time.Duration(requeueDelaySeconds) * time.Second
 
 	if err := (&controller.KDexHostControllerReconciler{
 		Client:              mgr.GetClient(),
 		ControllerNamespace: controllerNamespace,
-		Configuration:       configuration,
+		Configuration:       conf,
 		FocalHost:           focalHost,
 		HostStore:           hostStore,
 		Port:                webserverPort(webserverAddr),

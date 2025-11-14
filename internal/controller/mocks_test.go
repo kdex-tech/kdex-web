@@ -31,6 +31,7 @@ func (r *MockHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
+	host.Status.ObservedGeneration = host.Generation
 	if err := r.Status().Update(ctx, &host); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -66,6 +67,7 @@ func (r *MockPageArchetypeReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
+	pageArchetype.Status.ObservedGeneration = pageArchetype.Generation
 	if err := r.Status().Update(ctx, &pageArchetype); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -101,6 +103,7 @@ func (r *MockPageFooterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
+	pageFooter.Status.ObservedGeneration = pageFooter.Generation
 	if err := r.Status().Update(ctx, &pageFooter); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -136,6 +139,7 @@ func (r *MockPageHeaderReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
+	pageHeader.Status.ObservedGeneration = pageHeader.Generation
 	if err := r.Status().Update(ctx, &pageHeader); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -171,6 +175,7 @@ func (r *MockPageNavigationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
+	pageNavigation.Status.ObservedGeneration = pageNavigation.Generation
 	if err := r.Status().Update(ctx, &pageNavigation); err != nil {
 		return ctrl.Result{}, err
 	}

@@ -39,7 +39,10 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-const hostControllerFinalizerName = "kdex.dev/kdex-web-host-controller-finalizer"
+const (
+	hostControllerFinalizerName = "kdex.dev/kdex-web-host-controller-finalizer"
+	kdexWeb                     = "kdex-web"
+)
 
 // KDexHostControllerReconciler reconciles a KDexHostController object
 type KDexHostControllerReconciler struct {
@@ -66,7 +69,7 @@ type KDexHostControllerReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,verbs=get;list;watch
 
-func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 
 	var hostController kdexv1alpha1.KDexHostController
@@ -107,8 +110,11 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// Defer status update
 	defer func() {
 		hostController.Status.ObservedGeneration = hostController.Generation
-		if err := r.Status().Update(ctx, &hostController); err != nil {
-			log.Info("failed to update status", "err", err)
+		if updateErr := r.Status().Update(ctx, &hostController); updateErr != nil {
+			log.Info("failed to update status", "err", updateErr)
+			if err == nil {
+				err = updateErr
+			}
 		}
 	}()
 
@@ -293,10 +299,24 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 			if ingress.Labels == nil {
 				ingress.Labels = make(map[string]string)
 			}
-			ingress.Labels["app.kubernetes.io/name"] = "kdex-web"
+			ingress.Labels["app.kubernetes.io/name"] = kdexWeb
 			ingress.Labels["kdex.dev/focus-host"] = hostController.Name
 			ingress.Spec = r.Configuration.ThemeServer.Ingress
+
+			if ingress.Spec.DefaultBackend == nil {
+				ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{}
+			}
+
+			if ingress.Spec.DefaultBackend.Service == nil {
+				ingress.Spec.DefaultBackend.Service = &networkingv1.IngressServiceBackend{}
+			}
+
 			ingress.Spec.DefaultBackend.Service.Name = r.ServiceName
+
+			// if ingress.Spec.DefaultBackend.Service.Port == nil {
+			// 	ingress.Spec.DefaultBackend.Service.Port = &corev1.ServicePort{}
+			// }
+
 			ingress.Spec.DefaultBackend.Service.Port.Name = hostController.Name
 			ingress.Spec.IngressClassName = hostController.Spec.Host.Routing.IngressClassName
 
@@ -363,14 +383,14 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 			if deployment.Labels == nil {
 				deployment.Labels = make(map[string]string)
 			}
-			deployment.Labels["app.kubernetes.io/name"] = "kdex-web"
+			deployment.Labels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Labels["kdex.dev/theme"] = theme.Name
 			deployment.Spec = r.Configuration.ThemeServer.Deployment
 			deployment.Spec.Selector.MatchLabels = make(map[string]string)
-			deployment.Spec.Selector.MatchLabels["app.kubernetes.io/name"] = "kdex-web"
+			deployment.Spec.Selector.MatchLabels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Spec.Selector.MatchLabels["kdex.dev/theme"] = theme.Name
 			deployment.Spec.Template.Labels = make(map[string]string)
-			deployment.Spec.Template.Labels["app.kubernetes.io/name"] = "kdex-web"
+			deployment.Spec.Template.Labels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Spec.Template.Labels["kdex.dev/theme"] = theme.Name
 
 			deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
@@ -426,10 +446,10 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 			if service.Labels == nil {
 				service.Labels = make(map[string]string)
 			}
-			service.Labels["app.kubernetes.io/name"] = "kdex-web"
+			service.Labels["app.kubernetes.io/name"] = kdexWeb
 			service.Labels["kdex.dev/theme"] = theme.Name
 			service.Spec = r.Configuration.ThemeServer.Service
-			service.Spec.Selector["app.kubernetes.io/name"] = "kdex-web"
+			service.Spec.Selector["app.kubernetes.io/name"] = kdexWeb
 			service.Spec.Selector["kdex.dev/theme"] = theme.Name
 
 			for idx, value := range service.Spec.Ports {

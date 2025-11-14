@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
@@ -506,15 +505,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, true)
 
-			var checkPageBinding kdexv1alpha1.KDexPageBinding
-			pageBindingName := types.NamespacedName{
-				Name:      resourceName,
-				Namespace: namespace,
-			}
-			err := k8sClient.Get(ctx, pageBindingName, &checkPageBinding)
-			Expect(err).NotTo(HaveOccurred())
+			hostHandler, ok := hostStore.Get(focalHost)
+			Expect(ok).To(BeTrue())
 
-			resourceVersion := checkPageBinding.ResourceVersion
+			pageHandler, ok := hostHandler.Pages.Get(resource.Name)
+			Expect(ok).To(BeTrue())
+
+			Expect(pageHandler.Header.Spec.Content).To(Equal("BEFORE"))
 
 			addOrUpdatePageHeader(
 				ctx, k8sClient,
@@ -530,21 +527,16 @@ var _ = Describe("KDexPageBinding Controller", func() {
 			)
 
 			check := func(g Gomega) {
-				var checkPageBinding kdexv1alpha1.KDexPageBinding
-				pageBindingName := types.NamespacedName{
-					Name:      resourceName,
-					Namespace: namespace,
-				}
-				err := k8sClient.Get(ctx, pageBindingName, &checkPageBinding)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(checkPageBinding.ResourceVersion).NotTo(Equal(resourceVersion))
+				hostHandler, ok = hostStore.Get(focalHost)
+				g.Expect(ok).To(BeTrue())
+
+				pageHandler, ok = hostHandler.Pages.Get(resource.Name)
+				g.Expect(ok).To(BeTrue())
+
+				g.Expect(pageHandler.Header.Spec.Content).To(Equal("AFTER"))
 			}
 
 			Eventually(check).Should(Succeed())
-
-			assertResourceReady(
-				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexPageBinding{}, true)
 		})
 
 		It("updates when an indirect dependency is updated", func() {
@@ -644,15 +636,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, true)
 
-			var checkPageBinding kdexv1alpha1.KDexPageBinding
-			pageBindingName := types.NamespacedName{
-				Name:      resourceName,
-				Namespace: namespace,
-			}
-			err := k8sClient.Get(ctx, pageBindingName, &checkPageBinding)
-			Expect(err).NotTo(HaveOccurred())
+			hostHandler, ok := hostStore.Get(focalHost)
+			Expect(ok).To(BeTrue())
 
-			resourceVersion := checkPageBinding.ResourceVersion
+			pageHandler, ok := hostHandler.Pages.Get(resource.Name)
+			Expect(ok).To(BeTrue())
+
+			Expect(pageHandler.Header.Spec.Content).To(Equal("BEFORE"))
 
 			addOrUpdatePageHeader(
 				ctx, k8sClient,
@@ -668,21 +658,16 @@ var _ = Describe("KDexPageBinding Controller", func() {
 			)
 
 			check := func(g Gomega) {
-				var checkPageBinding kdexv1alpha1.KDexPageBinding
-				pageBindingName := types.NamespacedName{
-					Name:      resourceName,
-					Namespace: namespace,
-				}
-				err := k8sClient.Get(ctx, pageBindingName, &checkPageBinding)
-				g.Expect(err).NotTo(HaveOccurred())
-				g.Expect(checkPageBinding.ResourceVersion).NotTo(Equal(resourceVersion))
+				hostHandler, ok = hostStore.Get(focalHost)
+				g.Expect(ok).To(BeTrue())
+
+				pageHandler, ok = hostHandler.Pages.Get(resource.Name)
+				g.Expect(ok).To(BeTrue())
+
+				g.Expect(pageHandler.Header.Spec.Content).To(Equal("AFTER"))
 			}
 
 			Eventually(check).Should(Succeed())
-
-			assertResourceReady(
-				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexPageBinding{}, true)
 		})
 	})
 })
