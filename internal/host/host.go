@@ -206,7 +206,7 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	buffer.WriteString(handler.Page.Spec.BasePath)
 	buffer.WriteRune('"')
 	buffer.WriteRune('\n')
-	buffer.WriteString(` data-navigation-endpoint="/~/navigation/{name}/{l10n}{basePath...}"`)
+	buffer.WriteString(` data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"`)
 	buffer.WriteRune('\n')
 	buffer.WriteString(` data-page-patternpath="`)
 	buffer.WriteString(handler.Page.Spec.PatternPath)
@@ -378,9 +378,11 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		th.mu.RLock()
 		defer th.mu.RUnlock()
 
-		basePath := r.PathValue("basePath")
+		basePath := "/" + r.PathValue("basePath")
 		l10n := r.PathValue("l10n")
-		name := r.PathValue("name")
+		navKey := r.PathValue("navKey")
+
+		th.log.Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
 
 		var pageHandler *page.PageHandler
 
@@ -398,8 +400,8 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 
 		var nav *kdexv1alpha1.KDexPageNavigation
 
-		for _, n := range pageHandler.Navigations {
-			if n.Name == name {
+		for key, n := range pageHandler.Navigations {
+			if key == navKey {
 				nav = n
 				break
 			}
@@ -452,7 +454,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		}
 	}
 
-	mux.HandleFunc("GET /~/navigation/{name}/{l10n}/{basePath...}", handler)
+	mux.HandleFunc("GET /~/navigation/{navKey}/{l10n}/{basePath...}", handler)
 
 	return mux
 }

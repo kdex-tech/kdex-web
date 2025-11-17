@@ -49,8 +49,8 @@ func (p PageHandler) HeaderToHTML() string {
 func (p PageHandler) NavigationToHTMLMap() map[string]string {
 	items := map[string]string{}
 
-	for name := range p.Navigations {
-		items[name] = fmt.Sprintf(`
+	for navKey := range p.Navigations {
+		items[navKey] = fmt.Sprintf(`
 <div id="navigation-%s"></div>
 <script type="text/javascript">
 fetch('/~/navigation/%s/{{ .Language }}%s')
@@ -59,7 +59,7 @@ fetch('/~/navigation/%s/{{ .Language }}%s')
     document.getElementById('navigation-%s').innerHTML += data;
   });
 </script>
-`, name, name, p.Page.Spec.BasePath, name)
+`, navKey, navKey, p.Page.Spec.BasePath, navKey)
 	}
 
 	return items
