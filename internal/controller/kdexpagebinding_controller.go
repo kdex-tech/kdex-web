@@ -291,14 +291,27 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
+	packageReferences := []kdexv1alpha1.PackageReference{}
+	for _, content := range contents {
+		if content.App != nil {
+			packageReferences = append(packageReferences, content.App.Spec.PackageReference)
+		}
+	}
+	for _, scriptLibrary := range scriptLibraries {
+		if scriptLibrary.Spec.PackageReference != nil {
+			packageReferences = append(packageReferences, *scriptLibrary.Spec.PackageReference)
+		}
+	}
+
 	hostHandler.Pages.Set(page.PageHandler{
-		Archetype:       archetype,
-		Content:         contents,
-		Footer:          footer,
-		Header:          header,
-		Navigations:     navigations,
-		Page:            pageBinding,
-		ScriptLibraries: scriptLibraries,
+		Archetype:         archetype,
+		Content:           contents,
+		Footer:            footer,
+		Header:            header,
+		Navigations:       navigations,
+		PackageReferences: packageReferences,
+		Page:              pageBinding,
+		ScriptLibraries:   scriptLibraries,
 	})
 
 	kdexv1alpha1.SetConditions(

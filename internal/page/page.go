@@ -29,6 +29,7 @@ type PageHandler struct {
 	Footer          *kdexv1alpha1.KDexPageFooter
 	Header          *kdexv1alpha1.KDexPageHeader
 	Navigations     map[string]*kdexv1alpha1.KDexPageNavigation
+	PackageReferences []kdexv1alpha1.PackageReference
 	ScriptLibraries []kdexv1alpha1.KDexScriptLibrary
 }
 

@@ -11,6 +11,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+func (r *KDexHostControllerReconciler) findHostControllersForPageBinding(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	pageBinding, ok := obj.(*kdexv1alpha1.KDexPageBinding)
+	if !ok {
+		return nil
+	}
+
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Name:      pageBinding.Spec.HostRef.Name,
+				Namespace: pageBinding.Namespace,
+			},
+		},
+	}
+}
+
 func (r *KDexHostControllerReconciler) findHostControllersForScriptLibrary(
 	ctx context.Context,
 	scriptLibrary client.Object,

@@ -31,12 +31,12 @@ const (
 type HostHandler struct {
 	Mux                  *http.ServeMux
 	Pages                *page.PageStore
+	ScriptLibrary        *kdexv1alpha1.KDexScriptLibrary
 	Translations         *catalog.Builder
 	defaultLanguage      string
 	host                 *kdexv1alpha1.KDexHostController
 	log                  logr.Logger
 	mu                   sync.RWMutex
-	scriptLibrary        *kdexv1alpha1.KDexScriptLibrary
 	theme                *kdexv1alpha1.KDexTheme
 	translationResources map[string]kdexv1alpha1.KDexTranslation
 }
@@ -91,8 +91,8 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 	separator := ""
 
-	if th.scriptLibrary != nil {
-		for _, script := range th.scriptLibrary.Spec.Scripts {
+	if th.ScriptLibrary != nil {
+		for _, script := range th.ScriptLibrary.Spec.Scripts {
 			buffer.WriteString(separator)
 			buffer.WriteString(script.ToScriptTag(true))
 			separator = "\n"
@@ -111,19 +111,10 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 
 func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	packageReferences := []kdexv1alpha1.PackageReference{}
-	if th.scriptLibrary != nil && th.scriptLibrary.Spec.PackageReference != nil {
-		packageReferences = append(packageReferences, *th.scriptLibrary.Spec.PackageReference)
+	if th.ScriptLibrary != nil && th.ScriptLibrary.Spec.PackageReference != nil {
+		packageReferences = append(packageReferences, *th.ScriptLibrary.Spec.PackageReference)
 	}
-	for _, scriptLibrary := range handler.ScriptLibraries {
-		if scriptLibrary.Spec.PackageReference != nil {
-			packageReferences = append(packageReferences, *scriptLibrary.Spec.PackageReference)
-		}
-	}
-	for _, content := range handler.Content {
-		if content.App != nil {
-			packageReferences = append(packageReferences, content.App.Spec.PackageReference)
-		}
-	}
+	packageReferences = append(packageReferences, handler.PackageReferences...)
 
 	var buffer bytes.Buffer
 	separator := ""
@@ -138,8 +129,8 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 		buffer.WriteString("</script>")
 	}
 
-	if th.scriptLibrary != nil {
-		for _, script := range th.scriptLibrary.Spec.Scripts {
+	if th.ScriptLibrary != nil {
+		for _, script := range th.ScriptLibrary.Spec.Scripts {
 			buffer.WriteString(separator)
 			buffer.WriteString(script.ToScriptTag(false))
 			separator = "\n"
@@ -244,7 +235,7 @@ func (th *HostHandler) RebuildMux() {
 
 	mux := th.muxWithDefaultsLocked()
 
-	l10nPageMaps := th.generatePageMapsLocked()
+	// l10nPageMaps := th.generatePageMapsLocked()
 
 	pageList := th.Pages.List()
 
@@ -261,7 +252,7 @@ func (th *HostHandler) RebuildMux() {
 	for _, handler := range pageList {
 		p := handler.Page
 
-		l10nRenders := th.L10nRendersLocked(handler, l10nPageMaps)
+		l10nRenders := th.L10nRendersLocked(handler, nil)
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
@@ -322,7 +313,7 @@ func (th *HostHandler) SetHost(
 	th.mu.Lock()
 	th.defaultLanguage = host.Spec.Host.DefaultLang
 	th.host = host
-	th.scriptLibrary = scriptLibrary
+	th.ScriptLibrary = scriptLibrary
 	th.theme = theme
 	th.mu.Unlock()
 	th.RebuildMux()

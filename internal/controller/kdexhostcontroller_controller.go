@@ -71,7 +71,8 @@ type KDexHostControllerReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers/finalizers,verbs=update
-
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostpackagereferences,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,verbs=get;list;watch
 
@@ -186,6 +187,10 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&gatewayv1.HTTPRoute{}).
 		Owns(&networkingv1.Ingress{}).
 		Watches(
+			&kdexv1alpha1.KDexPageBinding{},
+			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForPageBinding),
+		).
+		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
 			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForScriptLibrary),
 		).
@@ -237,6 +242,10 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 ) error {
 	log := logf.FromContext(ctx)
 
+	if err := r.createOrUpdatePackageReferences(ctx, hostController, theme); err != nil {
+		return err
+	}
+
 	if err := r.createOrUpdateThemeDeployment(ctx, hostController, theme); err != nil {
 		return err
 	}
@@ -267,6 +276,64 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 	)
 
 	log.Info("reconciled KDexHostController")
+
+	return nil
+}
+
+func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
+	ctx context.Context,
+	hostController *kdexv1alpha1.KDexHostController,
+	theme *kdexv1alpha1.KDexTheme,
+) error {
+	hostHandler, ok := r.HostStore.Get(hostController.Name)
+	if !ok {
+		return nil
+	}
+
+	allPackageReferences := []kdexv1alpha1.PackageReference{}
+	if hostHandler.ScriptLibrary != nil && hostHandler.ScriptLibrary.Spec.PackageReference != nil {
+		allPackageReferences = append(allPackageReferences, *hostHandler.ScriptLibrary.Spec.PackageReference)
+	}
+
+	if theme != nil && theme.Spec.ScriptLibraryRef != nil {
+		themeScriptLibrary, _, _, err := resolveScriptLibrary(ctx, r.Client, hostController, &hostController.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
+		if err != nil {
+			return err
+		}
+		if themeScriptLibrary != nil {
+			if themeScriptLibrary.Spec.PackageReference != nil {
+				allPackageReferences = append(allPackageReferences, *themeScriptLibrary.Spec.PackageReference)
+			}
+		}
+	}
+
+	for _, p := range hostHandler.Pages.List() {
+		allPackageReferences = append(allPackageReferences, p.PackageReferences...)
+	}
+
+	uniquePackageReferences := make(map[string]kdexv1alpha1.PackageReference)
+	for _, pkgRef := range allPackageReferences {
+		uniquePackageReferences[pkgRef.Name] = pkgRef
+	}
+
+	finalPackageReferences := []kdexv1alpha1.PackageReference{}
+	for _, pkgRef := range uniquePackageReferences {
+		finalPackageReferences = append(finalPackageReferences, pkgRef)
+	}
+
+	hostPackageReferences := &kdexv1alpha1.KDexHostPackageReferences{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      hostController.Name,
+			Namespace: hostController.Namespace,
+		},
+	}
+
+	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, hostPackageReferences, func() error {
+		hostPackageReferences.Spec.PackageReferences = finalPackageReferences
+		return ctrl.SetControllerReference(hostController, hostPackageReferences, r.Scheme)
+	}); err != nil {
+		return err
+	}
 
 	return nil
 }
