@@ -353,10 +353,6 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 
 			ingress.Spec.DefaultBackend.Service.Name = r.ServiceName
 
-			// if ingress.Spec.DefaultBackend.Service.Port == nil {
-			// 	ingress.Spec.DefaultBackend.Service.Port = &corev1.ServicePort{}
-			// }
-
 			ingress.Spec.DefaultBackend.Service.Port.Name = hostController.Name
 			ingress.Spec.IngressClassName = hostController.Spec.Host.Routing.IngressClassName
 
@@ -542,7 +538,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 
 			portFound := false
 			for idx, value := range service.Spec.Ports {
-				if value.Name == "webserver" {
+				if value.Name == "webserver" || value.Name == theme.Name {
 					service.Spec.Ports[idx].Name = theme.Name
 					service.Spec.Ports[idx].Port = 80
 					service.Spec.Ports[idx].Protocol = corev1.ProtocolTCP
