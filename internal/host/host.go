@@ -2,6 +2,7 @@ package host
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -202,15 +203,11 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	}
 	buffer.WriteString(`<meta name="kdex-ui"`)
 	buffer.WriteRune('\n')
-	buffer.WriteString(` data-page-basepath="`)
-	buffer.WriteString(handler.Page.Spec.BasePath)
-	buffer.WriteRune('"')
+	fmt.Fprintf(&buffer, ` data-page-basepath="%s"`, handler.Page.Spec.BasePath)
 	buffer.WriteRune('\n')
 	buffer.WriteString(` data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"`)
 	buffer.WriteRune('\n')
-	buffer.WriteString(` data-page-patternpath="`)
-	buffer.WriteString(handler.Page.Spec.PatternPath)
-	buffer.WriteRune('"')
+	fmt.Fprintf(&buffer, ` data-page-patternpath="%s"`, handler.Page.Spec.PatternPath)
 	buffer.WriteRune('\n')
 	buffer.WriteString(`/>`)
 
@@ -378,7 +375,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		th.mu.RLock()
 		defer th.mu.RUnlock()
 
-		basePath := "/" + r.PathValue("basePath")
+		basePath := "/" + r.PathValue("basePathMinusLeadingSlash")
 		l10n := r.PathValue("l10n")
 		navKey := r.PathValue("navKey")
 
@@ -454,7 +451,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		}
 	}
 
-	mux.HandleFunc("GET /~/navigation/{navKey}/{l10n}/{basePath...}", handler)
+	mux.HandleFunc("GET /~/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}", handler)
 
 	return mux
 }
