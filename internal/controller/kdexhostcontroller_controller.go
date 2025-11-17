@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -25,6 +26,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	"kdex.dev/web/internal/host"
@@ -55,6 +57,10 @@ type KDexHostControllerReconciler struct {
 	RequeueDelay        time.Duration
 	Scheme              *runtime.Scheme
 	ServiceName         string
+
+	mu                 sync.RWMutex
+	memoizedDeployment *appsv1.DeploymentSpec
+	memoizedService    *corev1.ServiceSpec
 }
 
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
@@ -188,6 +194,40 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForTheme)).
 		Named("kdexhostcontroller").
 		Complete(r)
+}
+
+func (r *KDexHostControllerReconciler) getMemoizedDeployment() *appsv1.DeploymentSpec {
+	r.mu.RLock()
+
+	if r.memoizedDeployment != nil {
+		r.mu.RUnlock()
+		return r.memoizedDeployment
+	}
+
+	r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.memoizedDeployment = r.Configuration.ThemeServer.Deployment.DeepCopy()
+
+	return r.memoizedDeployment
+}
+
+func (r *KDexHostControllerReconciler) getMemoizedService() *corev1.ServiceSpec {
+	r.mu.RLock()
+
+	if r.memoizedService != nil {
+		r.mu.RUnlock()
+		return r.memoizedService
+	}
+
+	r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.memoizedService = r.Configuration.ThemeServer.Service.DeepCopy()
+
+	return r.memoizedService
 }
 
 func (r *KDexHostControllerReconciler) innerReconcile(
@@ -378,27 +418,62 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 		r.Client,
 		deployment,
 		func() error {
-			deployment.Annotations = theme.Annotations
-			deployment.Labels = theme.Labels
+			if deployment.Annotations == nil {
+				deployment.Annotations = make(map[string]string)
+			}
+			for key, value := range theme.Annotations {
+				deployment.Annotations[key] = value
+			}
 			if deployment.Labels == nil {
 				deployment.Labels = make(map[string]string)
 			}
+			for key, value := range theme.Labels {
+				deployment.Labels[key] = value
+			}
 			deployment.Labels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Labels["kdex.dev/theme"] = theme.Name
-			deployment.Spec = r.Configuration.ThemeServer.Deployment
-			deployment.Spec.Selector.MatchLabels = make(map[string]string)
+			deployment.Spec = *r.getMemoizedDeployment()
+			if deployment.Spec.Selector == nil {
+				deployment.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{},
+				}
+			}
 			deployment.Spec.Selector.MatchLabels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Spec.Selector.MatchLabels["kdex.dev/theme"] = theme.Name
-			deployment.Spec.Template.Labels = make(map[string]string)
+
+			if deployment.Spec.Template.Labels == nil {
+				deployment.Spec.Template.Labels = make(map[string]string)
+			}
 			deployment.Spec.Template.Labels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Spec.Template.Labels["kdex.dev/theme"] = theme.Name
 
-			deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-				Name:  "CORS_DOMAINS",
-				Value: utils.DomainsToMatcher(hostController.Spec.Host.Routing.Domains),
-			})
-			deployment.Spec.Template.Spec.Containers[0].Name = hostController.Name
-			deployment.Spec.Template.Spec.Containers[0].Ports[0].Name = hostController.Name
+			foundCorsDomainsEnv := false
+			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
+				if value.Name == "CORS_DOMAINS" {
+					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(hostController.Spec.Host.Routing.Domains)
+					foundCorsDomainsEnv = true
+				}
+			}
+
+			if !foundCorsDomainsEnv {
+				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+					Name:  "CORS_DOMAINS",
+					Value: utils.DomainsToMatcher(hostController.Spec.Host.Routing.Domains),
+				})
+			}
+
+			deployment.Spec.Template.Spec.Containers[0].Name = theme.Name
+			deployment.Spec.Template.Spec.Containers[0].Ports[0].Name = theme.Name
+
+			for idx, value := range deployment.Spec.Template.Spec.Volumes {
+				if value.Name == "theme-oci-image" {
+					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = theme.Spec.Image
+
+					if theme.Spec.PullPolicy != "" {
+						deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = theme.Spec.PullPolicy
+					}
+				}
+			}
 
 			return ctrl.SetControllerReference(hostController, deployment, r.Scheme)
 		},
@@ -441,22 +516,48 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 		r.Client,
 		service,
 		func() error {
-			service.Annotations = theme.Annotations
-			service.Labels = theme.Labels
+			if service.Annotations == nil {
+				service.Annotations = make(map[string]string)
+			}
+			for key, value := range theme.Annotations {
+				service.Annotations[key] = value
+			}
 			if service.Labels == nil {
 				service.Labels = make(map[string]string)
 			}
+			for key, value := range theme.Labels {
+				service.Labels[key] = value
+			}
 			service.Labels["app.kubernetes.io/name"] = kdexWeb
 			service.Labels["kdex.dev/theme"] = theme.Name
-			service.Spec = r.Configuration.ThemeServer.Service
+
+			service.Spec = *r.getMemoizedService()
+
+			if service.Spec.Selector == nil {
+				service.Spec.Selector = make(map[string]string)
+			}
+
 			service.Spec.Selector["app.kubernetes.io/name"] = kdexWeb
 			service.Spec.Selector["kdex.dev/theme"] = theme.Name
 
+			portFound := false
 			for idx, value := range service.Spec.Ports {
 				if value.Name == "webserver" {
-					service.Spec.Ports[idx].Name = hostController.Name
-					service.Spec.Ports[idx].TargetPort.StrVal = hostController.Name
+					service.Spec.Ports[idx].Name = theme.Name
+					service.Spec.Ports[idx].Port = 80
+					service.Spec.Ports[idx].Protocol = corev1.ProtocolTCP
+					service.Spec.Ports[idx].TargetPort.StrVal = theme.Name
+					portFound = true
 				}
+			}
+
+			if !portFound {
+				service.Spec.Ports = append(service.Spec.Ports, corev1.ServicePort{
+					Name:       theme.Name,
+					Port:       80,
+					Protocol:   corev1.ProtocolTCP,
+					TargetPort: intstr.FromString(theme.Name),
+				})
 			}
 
 			return ctrl.SetControllerReference(hostController, service, r.Scheme)
