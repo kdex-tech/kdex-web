@@ -39,7 +39,7 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	"kdex.dev/web/internal/controller"
-	"kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/host"
 	"kdex.dev/web/internal/web/server"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -203,7 +203,7 @@ func main() {
 	}
 
 	conf := configuration.LoadConfiguration(configFile, scheme)
-	hostStore := store.NewHostStore()
+	hostStore := host.NewHostStore()
 	requeueDelay := time.Duration(requeueDelaySeconds) * time.Second
 
 	if err := (&controller.KDexHostControllerReconciler{

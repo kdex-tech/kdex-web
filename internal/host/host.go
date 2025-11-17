@@ -1,4 +1,4 @@
-package store
+package host
 
 import (
 	"bytes"
@@ -13,12 +13,13 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
 	kdexhttp "kdex.dev/web/internal/http"
+	"kdex.dev/web/internal/page"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type HostHandler struct {
 	Mux                  *http.ServeMux
-	Pages                *PageStore
+	Pages                *page.PageStore
 	Translations         *catalog.Builder
 	defaultLanguage      string
 	host                 *kdexv1alpha1.KDexHostController
@@ -44,10 +45,10 @@ func NewHostHandler(
 	}
 	th.Translations = catalogBuilder
 
-	rps := &PageStore{
-		handlers: map[string]PageHandler{},
-		log:      log.WithName("render-page-store"),
-		onUpdate: th.RebuildMux,
+	rps := &page.PageStore{
+		Handlers: map[string]page.PageHandler{},
+		Log:      log.WithName("render-page-store"),
+		OnUpdate: th.RebuildMux,
 	}
 	th.Pages = rps
 	th.RebuildMux()
@@ -75,7 +76,7 @@ func (th *HostHandler) Domains() []string {
 	return th.host.Spec.Host.Routing.Domains
 }
 
-func (th *HostHandler) FootScriptToHTML(handler PageHandler) string {
+func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 	separator := ""
 
@@ -97,7 +98,7 @@ func (th *HostHandler) FootScriptToHTML(handler PageHandler) string {
 	return buffer.String()
 }
 
-func (th *HostHandler) HeadScriptToHTML(handler PageHandler) string {
+func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	packageReferences := []kdexv1alpha1.PackageReference{}
 	if th.scriptLibrary != nil && th.scriptLibrary.Spec.PackageReference != nil {
 		packageReferences = append(packageReferences, *th.scriptLibrary.Spec.PackageReference)
@@ -145,7 +146,7 @@ func (th *HostHandler) HeadScriptToHTML(handler PageHandler) string {
 }
 
 func (th *HostHandler) L10nRenderLocked(
-	handler PageHandler,
+	handler page.PageHandler,
 	pageMap *map[string]*render.PageEntry,
 	l language.Tag,
 ) (string, error) {
@@ -177,7 +178,7 @@ func (th *HostHandler) L10nRenderLocked(
 }
 
 func (th *HostHandler) L10nRendersLocked(
-	handler PageHandler,
+	handler page.PageHandler,
 	pageMaps map[language.Tag]*map[string]*render.PageEntry,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
@@ -192,7 +193,7 @@ func (th *HostHandler) L10nRendersLocked(
 	return l10nRenders
 }
 
-func (th *HostHandler) MetaToString(handler PageHandler) string {
+func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 
 	if th.host.Spec.Host.BaseMeta != "" {
@@ -204,6 +205,8 @@ func (th *HostHandler) MetaToString(handler PageHandler) string {
 	buffer.WriteString(` data-page-basepath="`)
 	buffer.WriteString(handler.Page.Spec.BasePath)
 	buffer.WriteRune('"')
+	buffer.WriteRune('\n')
+	buffer.WriteString(` data-navigation-endpoint="/~/navigation/{name}/{l10n}{basePath...}"`)
 	buffer.WriteRune('\n')
 	buffer.WriteString(` data-page-patternpath="`)
 	buffer.WriteString(handler.Page.Spec.PatternPath)
@@ -235,7 +238,7 @@ func (th *HostHandler) RebuildMux() {
 		return
 	}
 
-	mux := http.NewServeMux()
+	mux := th.muxWithDefaultsLocked()
 
 	l10nPageMaps := th.generatePageMapsLocked()
 
@@ -366,6 +369,92 @@ func (th *HostHandler) messagePrinterLocked(tag language.Tag) *message.Printer {
 		tag,
 		message.Catalog(th.Translations),
 	)
+}
+
+func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
+	mux := http.NewServeMux()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		th.mu.RLock()
+		defer th.mu.RUnlock()
+
+		basePath := r.PathValue("basePath")
+		l10n := r.PathValue("l10n")
+		name := r.PathValue("name")
+
+		var pageHandler *page.PageHandler
+
+		for _, ph := range th.Pages.List() {
+			if ph.Page.Spec.BasePath == basePath {
+				pageHandler = &ph
+				break
+			}
+		}
+
+		if pageHandler == nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		var nav *kdexv1alpha1.KDexPageNavigation
+
+		for _, n := range pageHandler.Navigations {
+			if n.Name == name {
+				nav = n
+				break
+			}
+		}
+
+		if nav == nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		langTag := language.Make(l10n)
+		if langTag.IsRoot() {
+			langTag = language.Make(th.defaultLanguage)
+		}
+
+		rootEntry := &render.PageEntry{}
+		th.Pages.BuildMenuEntries(rootEntry, &langTag, langTag.String() == th.defaultLanguage, nil)
+		pageMap := rootEntry.Children
+
+		renderer := render.Renderer{
+			BasePath:        pageHandler.Page.Spec.BasePath,
+			BrandName:       th.host.Spec.Host.BrandName,
+			DefaultLanguage: th.defaultLanguage,
+			Language:        langTag.String(),
+			Languages:       th.availableLanguagesLocked(),
+			LastModified:    time.Now(),
+			MessagePrinter:  th.messagePrinterLocked(langTag),
+			Organization:    th.host.Spec.Host.Organization,
+			PageMap:         pageMap,
+			PatternPath:     pageHandler.Page.Spec.PatternPath,
+			Title:           pageHandler.Page.Spec.Label,
+		}
+
+		templateData, err := renderer.TemplateData()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		rendered, err := renderer.RenderOne(nav.Name, nav.Spec.Content, templateData)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html")
+		_, err = w.Write([]byte(rendered))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+
+	mux.HandleFunc("GET /~/navigation/{name}/{l10n}/{basePath...}", handler)
+
+	return mux
 }
 
 func (th *HostHandler) rebuildTranslationsLocked() {

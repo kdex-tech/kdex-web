@@ -1,4 +1,4 @@
-package store
+package host
 
 import (
 	"sync"
@@ -32,22 +32,22 @@ func (s *HostStore) Get(name string) (*HostHandler, bool) {
 }
 
 func (s *HostStore) GetOrUpdate(
-	host *kdexv1alpha1.KDexHostController,
+	h *kdexv1alpha1.KDexHostController,
 	scriptLibrary *kdexv1alpha1.KDexScriptLibrary,
 	theme *kdexv1alpha1.KDexTheme,
 	log logr.Logger,
 ) *HostHandler {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	handler, ok := s.handlers[host.Name]
+	handler, ok := s.handlers[h.Name]
 	if !ok {
 		handler = NewHostHandler(log)
-		s.handlers[host.Name] = handler
-		log.Info("adding new host", "host", host.Name)
+		s.handlers[h.Name] = handler
+		log.Info("adding new host", "host", h.Name)
 	} else {
-		log.Info("updating existing host", "host", host.Name)
+		log.Info("updating existing host", "host", h.Name)
 	}
-	handler.SetHost(host, scriptLibrary, theme)
+	handler.SetHost(h, scriptLibrary, theme)
 	return handler
 }
 

@@ -24,7 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/host"
+	"kdex.dev/web/internal/page"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -37,7 +38,7 @@ const pageBindingFinalizerName = "kdex.dev/kdex-nexus-page-binding-finalizer"
 // KDexPageBindingReconciler reconciles a KDexPageBinding object
 type KDexPageBindingReconciler struct {
 	client.Client
-	HostStore    *store.HostStore
+	HostStore    *host.HostStore
 	RequeueDelay time.Duration
 	Scheme       *runtime.Scheme
 }
@@ -290,7 +291,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	hostHandler.Pages.Set(store.PageHandler{
+	hostHandler.Pages.Set(page.PageHandler{
 		Archetype:       archetype,
 		Content:         contents,
 		Footer:          footer,

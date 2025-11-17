@@ -1,4 +1,4 @@
-package store
+package page
 
 import (
 	"sync"
@@ -11,31 +11,31 @@ import (
 )
 
 type PageStore struct {
-	log      logr.Logger
+	Log      logr.Logger
 	mu       sync.RWMutex
-	onUpdate func()
-	handlers map[string]PageHandler
+	OnUpdate func()
+	Handlers map[string]PageHandler
 }
 
 func (s *PageStore) Count() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.handlers)
+	return len(s.Handlers)
 }
 
 func (s *PageStore) Delete(name string) {
 	s.mu.Lock()
-	delete(s.handlers, name)
+	delete(s.Handlers, name)
 	s.mu.Unlock()
-	if s.onUpdate != nil {
-		s.onUpdate()
+	if s.OnUpdate != nil {
+		s.OnUpdate()
 	}
 }
 
 func (s *PageStore) Get(name string) (PageHandler, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	page, ok := s.handlers[name]
+	page, ok := s.Handlers[name]
 	return page, ok
 }
 
@@ -43,19 +43,19 @@ func (s *PageStore) List() []PageHandler {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	pages := []PageHandler{}
-	for _, page := range s.handlers {
+	for _, page := range s.Handlers {
 		pages = append(pages, page)
 	}
 	return pages
 }
 
 func (s *PageStore) Set(handler PageHandler) {
-	s.log.Info("set render page", "name", handler.Page.Name)
+	s.Log.Info("set render page", "name", handler.Page.Name)
 	s.mu.Lock()
-	s.handlers[handler.Page.Name] = handler
+	s.Handlers[handler.Page.Name] = handler
 	s.mu.Unlock()
-	if s.onUpdate != nil {
-		s.onUpdate()
+	if s.OnUpdate != nil {
+		s.OnUpdate()
 	}
 }
 

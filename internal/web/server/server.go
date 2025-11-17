@@ -3,14 +3,14 @@ package server
 import (
 	"net/http"
 
-	store_ "kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/host"
 	"kdex.dev/web/internal/web/middleware"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func New(address string, store *store_.HostStore) *http.Server {
+func New(address string, store *host.HostStore) *http.Server {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hostHandler, ok := r.Context().Value(middleware.HostKey).(*store_.HostHandler)
+		hostHandler, ok := r.Context().Value(middleware.HostKey).(*host.HostHandler)
 		if ok {
 			hostHandler.ServeHTTP(w, r)
 			return

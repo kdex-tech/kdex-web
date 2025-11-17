@@ -1,4 +1,4 @@
-package store
+package host
 
 import (
 	"testing"
@@ -10,6 +10,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
+	"kdex.dev/web/internal/page"
 )
 
 const (
@@ -44,7 +45,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		host        kdexv1alpha1.KDexHostController
 		lang        string
 		name        string
-		pageHandler PageHandler
+		pageHandler page.PageHandler
 		translation *kdexv1alpha1.KDexTranslation
 		want        []string
 	}{
@@ -66,7 +67,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			pageHandler: PageHandler{
+			pageHandler: page.PageHandler{
 				Page: &kdexv1alpha1.KDexPageBinding{
 					ObjectMeta: v1.ObjectMeta{
 						Name: "sample-page-binding",
@@ -83,7 +84,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						Content: primaryTemplate,
 					},
 				},
-				Content: map[string]ResolvedContentEntry{
+				Content: map[string]page.ResolvedContentEntry{
 					"main": {
 						Content: "MAIN",
 						Slot:    "main",
@@ -130,7 +131,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			want: []string{"FOOTER", "ENGLISH_TRANSLATION", "NAV", "MAIN", "TITLE"},
+			want: []string{"FOOTER", "ENGLISH_TRANSLATION", "/~/navigation/main/en/", "MAIN", "TITLE"},
 		},
 		{
 			name: "french translation",
@@ -150,7 +151,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			pageHandler: PageHandler{
+			pageHandler: page.PageHandler{
 				Page: &kdexv1alpha1.KDexPageBinding{
 					ObjectMeta: v1.ObjectMeta{
 						Name: "sample-render-page",
@@ -167,7 +168,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						Content: primaryTemplate,
 					},
 				},
-				Content: map[string]ResolvedContentEntry{
+				Content: map[string]page.ResolvedContentEntry{
 					"main": {
 						Content: "MAIN",
 						Slot:    "main",
@@ -214,7 +215,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			want: []string{"FOOTER", "FRENCH_TRANSLATION", "NAV", "MAIN", "TITLE"},
+			want: []string{"FOOTER", "FRENCH_TRANSLATION", "/~/navigation/main/fr/", "MAIN", "TITLE"},
 		},
 		{
 			name: "no translation",
@@ -234,7 +235,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			pageHandler: PageHandler{
+			pageHandler: page.PageHandler{
 				Page: &kdexv1alpha1.KDexPageBinding{
 					ObjectMeta: v1.ObjectMeta{
 						Name: "sample-render-page",
@@ -251,7 +252,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						Content: primaryTemplate,
 					},
 				},
-				Content: map[string]ResolvedContentEntry{
+				Content: map[string]page.ResolvedContentEntry{
 					"main": {
 						Content: "MAIN",
 						Slot:    "main",
@@ -276,7 +277,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 				},
 			},
 			lang: "en",
-			want: []string{"FOOTER", "key", "NAV", "MAIN", "TITLE"},
+			want: []string{"FOOTER", "key", "/~/navigation/main/en/", "MAIN", "TITLE"},
 		},
 	}
 	for _, tt := range tests {
@@ -302,7 +303,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 	tests := []struct {
 		name        string
 		host        kdexv1alpha1.KDexHostController
-		pageHandler PageHandler
+		pageHandler page.PageHandler
 		translation *kdexv1alpha1.KDexTranslation
 		want        map[string][]string
 	}{
@@ -323,7 +324,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 					},
 				},
 			},
-			pageHandler: PageHandler{
+			pageHandler: page.PageHandler{
 				Page: &kdexv1alpha1.KDexPageBinding{
 					ObjectMeta: v1.ObjectMeta{
 						Name: "sample-render-page",
@@ -340,7 +341,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 						Content: primaryTemplate,
 					},
 				},
-				Content: map[string]ResolvedContentEntry{
+				Content: map[string]page.ResolvedContentEntry{
 					"main": {
 						Content: "MAIN",
 						Slot:    "main",
@@ -388,10 +389,10 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 			},
 			want: map[string][]string{
 				"en": {
-					"FOOTER", "ENGLISH_TRANSLATION", "NAV", "MAIN", "TITLE",
+					"FOOTER", "ENGLISH_TRANSLATION", "/~/navigation/main/en/", "MAIN", "TITLE",
 				},
 				"fr": {
-					"FOOTER", "FRENCH_TRANSLATION", "NAV", "MAIN", "TITLE",
+					"FOOTER", "FRENCH_TRANSLATION", "/~/navigation/main/fr/", "MAIN", "TITLE",
 				},
 			},
 		},

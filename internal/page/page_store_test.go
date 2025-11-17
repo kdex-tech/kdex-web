@@ -1,4 +1,4 @@
-package store
+package page
 
 import (
 	"testing"
@@ -156,7 +156,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rps := PageStore{
-				handlers: *tt.items,
+				Handlers: *tt.items,
 			}
 			tag := language.English
 			catalogBuilder := catalog.NewBuilder()

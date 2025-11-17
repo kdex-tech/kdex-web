@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/rest"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
-	"kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/host"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -54,7 +54,7 @@ var (
 	cancel    context.CancelFunc
 	testEnv   *envtest.Environment
 	cfg       *rest.Config
-	hostStore *store.HostStore
+	hostStore *host.HostStore
 	k8sClient client.Client
 	focalHost string
 	namespace string
@@ -177,7 +177,7 @@ var _ = BeforeSuite(func() {
 	err = mockPageNavigationReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
-	hostStore = store.NewHostStore()
+	hostStore = host.NewHostStore()
 
 	hostControllerReconciler := &KDexHostControllerReconciler{
 		Client:              k8sManager.GetClient(),

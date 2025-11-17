@@ -1,4 +1,4 @@
-package store
+package page
 
 import (
 	"bytes"
@@ -49,8 +49,17 @@ func (p PageHandler) HeaderToHTML() string {
 func (p PageHandler) NavigationToHTMLMap() map[string]string {
 	items := map[string]string{}
 
-	for name, navigation := range p.Navigations {
-		items[name] = navigation.Spec.Content
+	for name := range p.Navigations {
+		items[name] = fmt.Sprintf(`
+<div id="navigation-%s"></div>
+<script type="text/javascript">
+fetch('/~/navigation/%s/{{ .Language }}%s')
+  .then(response => response.text())
+  .then(data => {
+    document.getElementById('navigation-%s').innerHTML += data;
+  });
+</script>
+`, name, name, p.Page.Spec.BasePath, name)
 	}
 
 	return items

@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
-	"kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/host"
 	"kdex.dev/web/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,7 +50,7 @@ type KDexHostControllerReconciler struct {
 	Configuration       configuration.NexusConfiguration
 	ControllerNamespace string
 	FocalHost           string
-	HostStore           *store.HostStore
+	HostStore           *host.HostStore
 	Port                int32
 	RequeueDelay        time.Duration
 	Scheme              *runtime.Scheme

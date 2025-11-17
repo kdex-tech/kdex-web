@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/page"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -19,13 +19,13 @@ func resolveContents(
 	c client.Client,
 	pageBinding *kdexv1alpha1.KDexPageBinding,
 	requeueDelay time.Duration,
-) (map[string]store.ResolvedContentEntry, bool, ctrl.Result, error) {
-	contents := map[string]store.ResolvedContentEntry{}
+) (map[string]page.ResolvedContentEntry, bool, ctrl.Result, error) {
+	contents := map[string]page.ResolvedContentEntry{}
 
 	for _, contentEntry := range pageBinding.Spec.ContentEntries {
 		appRef := contentEntry.AppRef
 		if appRef == nil {
-			contents[contentEntry.Slot] = store.ResolvedContentEntry{
+			contents[contentEntry.Slot] = page.ResolvedContentEntry{
 				Content: contentEntry.RawHTML,
 				Slot:    contentEntry.Slot,
 			}
@@ -65,7 +65,7 @@ func resolveContents(
 			return nil, true, r1, err
 		}
 
-		contents[contentEntry.Slot] = store.ResolvedContentEntry{
+		contents[contentEntry.Slot] = page.ResolvedContentEntry{
 			App:               &app,
 			CustomElementName: contentEntry.CustomElementName,
 			Slot:              contentEntry.Slot,

@@ -6,14 +6,14 @@ import (
 	"net/http"
 	"strings"
 
-	store_ "kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/host"
 )
 
 type contextKey string
 
 const HostKey contextKey = "host"
 
-func WithHost(store *store_.HostStore) func(http.Handler) http.Handler {
+func WithHost(store *host.HostStore) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			hostHeader := r.Host
@@ -24,7 +24,7 @@ func WithHost(store *store_.HostStore) func(http.Handler) http.Handler {
 
 			handlers := store.List()
 
-			var bestMatchHost *store_.HostHandler
+			var bestMatchHost *host.HostHandler
 			var bestMatchLength = -1
 
 			for _, handler := range handlers {
@@ -62,7 +62,7 @@ func WithHost(store *store_.HostStore) func(http.Handler) http.Handler {
 	}
 }
 
-var fallbackHostHandler = store_.HostHandler{
+var fallbackHostHandler = host.HostHandler{
 	Mux: func() *http.ServeMux {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

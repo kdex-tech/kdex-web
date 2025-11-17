@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/store"
+	"kdex.dev/web/internal/host"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -38,7 +38,7 @@ const translationFinalizerName = "kdex.dev/kdex-web-translation-finalizer"
 // KDexTranslationReconciler reconciles a KDexTranslation object
 type KDexTranslationReconciler struct {
 	client.Client
-	HostStore    *store.HostStore
+	HostStore    *host.HostStore
 	RequeueDelay time.Duration
 	Scheme       *runtime.Scheme
 }
