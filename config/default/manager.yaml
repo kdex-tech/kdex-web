@@ -31,12 +31,13 @@ spec:
         control-plane: controller-manager
     spec:
       containers:
-      - command:
-        - /manager
+      - args:
         - --focal-host=simple-host
         - --health-probe-bind-address=:8081
         - --service-name=simple-host
         - --webserver-bind-address=:8090
+        command:
+        - /manager
         image: controller:latest
         livenessProbe:
           httpGet:

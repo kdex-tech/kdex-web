@@ -167,6 +167,16 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
+CRDS_DIR = $(shell go list -m -f '{{.Dir}}' kdex.dev/crds)
+
+.PHONY: install
+install: kustomize ## Install CRDs from the kdex-crds module.
+	$(KUSTOMIZE) build $(CRDS_DIR)/config/crd | $(KUBECTL) apply -f -
+
+.PHONY: uninstall
+uninstall: kustomize ## Uninstall CRDs from the kdex-crds module.
+	$(KUSTOMIZE) build $(CRDS_DIR)/config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/default && $(KUSTOMIZE) edit set image controller=${IMG}
