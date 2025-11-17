@@ -18,6 +18,16 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	kdexUIMetaTemplate = `<meta
+  name="kdex-ui"
+  data-page-basepath="%s"
+  data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
+  data-page-patternpath="%s"
+/>
+`
+)
+
 type HostHandler struct {
 	Mux                  *http.ServeMux
 	Pages                *page.PageStore
@@ -119,13 +129,13 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	separator := ""
 
 	if len(packageReferences) > 0 {
-		buffer.WriteString(`<script type="module">\n`)
+		buffer.WriteString("<script type=\"module\">\n")
 		for _, pr := range packageReferences {
 			buffer.WriteString(separator)
 			buffer.WriteString(pr.ToImportStatement())
 			separator = "\n"
 		}
-		buffer.WriteString(`</script>`)
+		buffer.WriteString("</script>")
 	}
 
 	if th.scriptLibrary != nil {
@@ -201,15 +211,13 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 		buffer.WriteString(th.host.Spec.Host.BaseMeta)
 		buffer.WriteRune('\n')
 	}
-	buffer.WriteString(`<meta name="kdex-ui"`)
-	buffer.WriteRune('\n')
-	fmt.Fprintf(&buffer, ` data-page-basepath="%s"`, handler.Page.Spec.BasePath)
-	buffer.WriteRune('\n')
-	buffer.WriteString(` data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"`)
-	buffer.WriteRune('\n')
-	fmt.Fprintf(&buffer, ` data-page-patternpath="%s"`, handler.Page.Spec.PatternPath)
-	buffer.WriteRune('\n')
-	buffer.WriteString(`/>`)
+
+	fmt.Fprintf(
+		&buffer,
+		kdexUIMetaTemplate,
+		handler.Page.Spec.BasePath,
+		handler.Page.Spec.PatternPath,
+	)
 
 	// data-check-batch-endpoint="/~/check/batch"
 	// data-check-single-endpoint="/~/check/single"
@@ -219,7 +227,6 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	// data-logout-path="/~/oauth/logout"
 	// data-logout-label="Logout"
 	// data-logout-css-query="nav.nav .nav-dropdown a.logout"
-	// data-navigation-endpoint="/~/navigation-in"
 	// data-path-separator="/_/"
 	// data-state-endpoint="/~/state/out"
 
@@ -252,7 +259,7 @@ func (th *HostHandler) RebuildMux() {
 	}
 
 	for _, handler := range pageList {
-		page := handler.Page
+		p := handler.Page
 
 		l10nRenders := th.L10nRendersLocked(handler, l10nPageMaps)
 
@@ -275,12 +282,12 @@ func (th *HostHandler) RebuildMux() {
 			}
 		}
 
-		mux.HandleFunc("GET "+page.Spec.BasePath, handler)
-		mux.HandleFunc("GET /{l10n}"+page.Spec.BasePath, handler)
+		mux.HandleFunc("GET "+p.Spec.BasePath, handler)
+		mux.HandleFunc("GET /{l10n}"+p.Spec.BasePath, handler)
 
-		if page.Spec.PatternPath != "" {
-			mux.HandleFunc("GET "+page.Spec.PatternPath, handler)
-			mux.HandleFunc("GET /{l10n}"+page.Spec.PatternPath, handler)
+		if p.Spec.PatternPath != "" {
+			mux.HandleFunc("GET "+p.Spec.PatternPath, handler)
+			mux.HandleFunc("GET /{l10n}"+p.Spec.PatternPath, handler)
 		}
 	}
 

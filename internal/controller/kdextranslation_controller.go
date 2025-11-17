@@ -163,21 +163,21 @@ func (r *KDexTranslationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *KDexTranslationReconciler) findTranslationsForHost(
 	ctx context.Context,
-	host client.Object,
+	h client.Object,
 ) []reconcile.Request {
 	log := logf.FromContext(ctx)
 
 	var translationList kdexv1alpha1.KDexTranslationList
 	if err := r.List(ctx, &translationList, &client.ListOptions{
-		Namespace: host.GetNamespace(),
+		Namespace: h.GetNamespace(),
 	}); err != nil {
-		log.Error(err, "unable to list KDexTranslation for host", "name", host.GetName())
+		log.Error(err, "unable to list KDexTranslation for host", "name", h.GetName())
 		return []reconcile.Request{}
 	}
 
 	requests := make([]reconcile.Request, 0, len(translationList.Items))
 	for _, translation := range translationList.Items {
-		if translation.Spec.HostRef.Name == host.GetName() {
+		if translation.Spec.HostRef.Name == h.GetName() {
 			requests = append(requests, reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      translation.Name,

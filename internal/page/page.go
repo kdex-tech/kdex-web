@@ -1,10 +1,22 @@
 package page
 
 import (
-	"bytes"
 	"fmt"
 
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+)
+
+const (
+	customElementTemplate = `<%s id="content-%s" data-app-name="%s" data-app-resource-version="%s"></%s>`
+	navigationTemplate    = `<div id="navigation-%s"></div>
+<script type="text/javascript">
+fetch('/~/navigation/%s/{{ .Language }}%s')
+  .then(response => response.text())
+  .then(data => {
+    document.getElementById('navigation-%s').innerHTML += data;
+  });
+</script>`
+	rawHTMLTemplate = `<div id="content-%s">%s</div>`
 )
 
 type PageHandler struct {
@@ -50,16 +62,7 @@ func (p PageHandler) NavigationToHTMLMap() map[string]string {
 	items := map[string]string{}
 
 	for navKey := range p.Navigations {
-		items[navKey] = fmt.Sprintf(`
-<div id="navigation-%s"></div>
-<script type="text/javascript">
-fetch('/~/navigation/%s/{{ .Language }}%s')
-  .then(response => response.text())
-  .then(data => {
-    document.getElementById('navigation-%s').innerHTML += data;
-  });
-</script>
-`, navKey, navKey, p.Page.Spec.BasePath, navKey)
+		items[navKey] = fmt.Sprintf(navigationTemplate, navKey, navKey, p.Page.Spec.BasePath, navKey)
 	}
 
 	return items
@@ -74,22 +77,8 @@ type ResolvedContentEntry struct {
 
 func (r *ResolvedContentEntry) ToHTML() string {
 	if r.Content != "" {
-		return fmt.Sprintf(`<div id="%s">%s</div>`, r.Slot, r.Content)
+		return fmt.Sprintf(rawHTMLTemplate, r.Slot, r.Content)
 	}
 
-	var buffer bytes.Buffer
-
-	buffer.WriteRune('<')
-	buffer.WriteString(r.CustomElementName)
-	buffer.WriteString(` id="`)
-	buffer.WriteString(r.Slot)
-	buffer.WriteString(`" data-app-name="`)
-	buffer.WriteString(r.App.Name)
-	buffer.WriteString(`" data-app-resource-version="`)
-	buffer.WriteString(r.App.ResourceVersion)
-	buffer.WriteString(`"></`)
-	buffer.WriteString(r.CustomElementName)
-	buffer.WriteRune('>')
-
-	return buffer.String()
+	return fmt.Sprintf(customElementTemplate, r.CustomElementName, r.Slot, r.App.Name, r.App.ResourceVersion, r.CustomElementName)
 }

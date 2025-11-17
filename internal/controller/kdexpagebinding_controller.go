@@ -150,12 +150,12 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 
 	scriptLibraries := []kdexv1alpha1.KDexScriptLibrary{}
 
-	host, shouldReturn, r1, err := resolveHost(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, &pageBinding.Spec.HostRef, r.RequeueDelay)
+	h, shouldReturn, r1, err := resolveHost(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, &pageBinding.Spec.HostRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
 
-	hostScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, host.Spec.ScriptLibraryRef, r.RequeueDelay)
+	hostScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, h.Spec.ScriptLibraryRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
