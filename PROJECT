@@ -21,4 +21,8 @@ resources:
   domain: kdex.dev
   kind: KDexTranslation
   version: v1alpha1
+- controller: true
+  domain: kdex.dev
+  kind: KDexHostPackageReferences
+  version: v1alpha1
 version: "3"

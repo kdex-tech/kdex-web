@@ -38,9 +38,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
-	"kdex.dev/web/internal/controller"
-	"kdex.dev/web/internal/host"
-	"kdex.dev/web/internal/web/server"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
@@ -49,6 +46,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+
+	"kdex.dev/web/internal/controller"
+	"kdex.dev/web/internal/host"
+	"kdex.dev/web/internal/web/server"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -236,6 +237,13 @@ func main() {
 		Scheme:       mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexTranslation")
+		os.Exit(1)
+	}
+	if err := (&controller.KDexHostPackageReferencesReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KDexHostPackageReferences")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
