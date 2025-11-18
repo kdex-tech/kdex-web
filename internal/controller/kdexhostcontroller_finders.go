@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,8 +41,7 @@ func (r *KDexHostControllerReconciler) findHostControllersForScriptLibrary(
 
 	var hostControllerList kdexv1alpha1.KDexHostControllerList
 	if err := r.List(ctx, &hostControllerList, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.FocalHost),
-		Namespace:     scriptLibrary.GetNamespace(),
+		Namespace: scriptLibrary.GetNamespace(),
 	}); err != nil {
 		log.Error(err, "unable to list KDexHostControllers for scriptLibrary", "scriptLibrary", scriptLibrary.GetName())
 		return []reconcile.Request{}
@@ -51,6 +49,9 @@ func (r *KDexHostControllerReconciler) findHostControllersForScriptLibrary(
 
 	requests := make([]reconcile.Request, 0, len(hostControllerList.Items))
 	for _, hostController := range hostControllerList.Items {
+		if hostController.Name != r.FocalHost {
+			continue
+		}
 		if hostController.Spec.Host.ScriptLibraryRef == nil {
 			continue
 		}
@@ -74,8 +75,7 @@ func (r *KDexHostControllerReconciler) findHostControllersForTheme(
 
 	var hostControllerList kdexv1alpha1.KDexHostControllerList
 	if err := r.List(ctx, &hostControllerList, &client.ListOptions{
-		FieldSelector: fields.OneTermEqualSelector("metadata.name", r.FocalHost),
-		Namespace:     theme.GetNamespace(),
+		Namespace: theme.GetNamespace(),
 	}); err != nil {
 		log.Error(err, "unable to list KDexHostControllers for theme", "theme", theme.GetName())
 		return []reconcile.Request{}
@@ -83,6 +83,9 @@ func (r *KDexHostControllerReconciler) findHostControllersForTheme(
 
 	requests := make([]reconcile.Request, 0, len(hostControllerList.Items))
 	for _, hostController := range hostControllerList.Items {
+		if hostController.Name != r.FocalHost {
+			continue
+		}
 		if hostController.Spec.Host.DefaultThemeRef == nil {
 			continue
 		}

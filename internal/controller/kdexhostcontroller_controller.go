@@ -163,18 +163,33 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	hasFocalHost := func(o client.Object) bool {
+		switch t := o.(type) {
+		case *kdexv1alpha1.KDexHostController:
+			return t.Name == r.FocalHost
+		case *kdexv1alpha1.KDexPageBinding:
+			return t.Spec.HostRef.Name == r.FocalHost
+		case *kdexv1alpha1.KDexScriptLibrary:
+			return true // we can't know so we need to accept it
+		case *kdexv1alpha1.KDexTheme:
+			return true // we can't know so we need to accept it
+		default:
+			return false
+		}
+	}
+
 	var enabledFilter = predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return e.Object.GetName() == r.FocalHost
+			return hasFocalHost(e.Object)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return e.ObjectNew.GetName() == r.FocalHost
+			return hasFocalHost(e.ObjectNew)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return e.Object.GetName() == r.FocalHost
+			return hasFocalHost(e.Object)
 		},
 		GenericFunc: func(e event.GenericEvent) bool {
-			return e.Object.GetName() == r.FocalHost
+			return hasFocalHost(e.Object)
 		},
 	}
 
