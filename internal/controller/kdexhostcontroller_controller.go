@@ -140,13 +140,15 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		scriptLibraries = append(scriptLibraries, *scriptLibrary)
 	}
 
-	themeScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, &hostController, &hostController.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
-	if shouldReturn {
-		return r1, err
-	}
+	if theme != nil {
+		themeScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, &hostController, &hostController.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
+		if shouldReturn {
+			return r1, err
+		}
 
-	if themeScriptLibrary != nil {
-		scriptLibraries = append(scriptLibraries, *themeScriptLibrary)
+		if themeScriptLibrary != nil {
+			scriptLibraries = append(scriptLibraries, *themeScriptLibrary)
+		}
 	}
 
 	r.HostStore.GetOrUpdate(&hostController, scriptLibraries, theme, log)
