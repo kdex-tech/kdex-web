@@ -184,14 +184,12 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		switch t := o.(type) {
 		case *kdexv1alpha1.KDexHostController:
 			return t.Name == r.FocalHost
+		case *kdexv1alpha1.KDexHostPackageReferences:
+			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
-		case *kdexv1alpha1.KDexScriptLibrary:
-			return true // we can't know so we need to accept it
-		case *kdexv1alpha1.KDexTheme:
-			return true // we can't know so we need to accept it
 		default:
-			return false
+			return true
 		}
 	}
 
@@ -216,7 +214,12 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&gatewayv1.HTTPRoute{}).
+		Owns(&kdexv1alpha1.KDexHostPackageReferences{}).
 		Owns(&networkingv1.Ingress{}).
+		Watches(
+			&kdexv1alpha1.KDexHostPackageReferences{},
+			cr_handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &kdexv1alpha1.KDexHostController{}, cr_handler.OnlyControllerOwner()),
+		).
 		Watches(
 			&kdexv1alpha1.KDexPageBinding{},
 			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForPageBinding),
