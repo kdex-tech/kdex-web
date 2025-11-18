@@ -312,7 +312,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 
 	uniquePackageReferences := make(map[string]kdexv1alpha1.PackageReference)
 	for _, pkgRef := range allPackageReferences {
-		uniquePackageReferences[pkgRef.Name] = pkgRef
+		uniquePackageReferences[pkgRef.Name+"@"+pkgRef.Version] = pkgRef
 	}
 
 	finalPackageReferences := []kdexv1alpha1.PackageReference{}
@@ -325,6 +325,16 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 			Name:      hostController.Name,
 			Namespace: hostController.Namespace,
 		},
+	}
+
+	if len(finalPackageReferences) == 0 {
+		if err := r.Delete(ctx, hostPackageReferences); err != nil {
+			if client.IgnoreNotFound(err) != nil {
+				return err
+			}
+		}
+
+		return nil
 	}
 
 	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, hostPackageReferences, func() error {
