@@ -24,13 +24,13 @@ type PageHandler struct {
 	Page *kdexv1alpha1.KDexPageBinding
 
 	// dereferenced resources
-	Archetype       *kdexv1alpha1.KDexPageArchetype
-	Content         map[string]ResolvedContentEntry
-	Footer          *kdexv1alpha1.KDexPageFooter
-	Header          *kdexv1alpha1.KDexPageHeader
-	Navigations     map[string]*kdexv1alpha1.KDexPageNavigation
+	Archetype         *kdexv1alpha1.KDexPageArchetype
+	Content           map[string]ResolvedContentEntry
+	Footer            *kdexv1alpha1.KDexPageFooter
+	Header            *kdexv1alpha1.KDexPageHeader
+	Navigations       map[string]*kdexv1alpha1.KDexPageNavigation
 	PackageReferences []kdexv1alpha1.PackageReference
-	ScriptLibraries []kdexv1alpha1.KDexScriptLibrary
+	ScriptLibraries   []kdexv1alpha1.KDexScriptLibrary
 }
 
 func (p *PageHandler) ContentToHTMLMap() map[string]string {
