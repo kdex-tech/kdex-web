@@ -51,10 +51,6 @@ func resolveContents(
 					err.Error(),
 				)
 
-				if err := c.Status().Update(ctx, pageBinding); err != nil {
-					return nil, true, ctrl.Result{}, err
-				}
-
 				return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 			}
 
@@ -105,10 +101,6 @@ func resolveHost(
 				err.Error(),
 			)
 
-			if err := c.Status().Update(ctx, object); err != nil {
-				return nil, true, ctrl.Result{}, err
-			}
-
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}
 
@@ -151,10 +143,6 @@ func resolvePageArchetype(
 				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
-
-			if err := c.Status().Update(ctx, object); err != nil {
-				return nil, true, ctrl.Result{}, err
-			}
 
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}
@@ -200,10 +188,6 @@ func resolvePageFooter(
 				err.Error(),
 			)
 
-			if err := c.Status().Update(ctx, object); err != nil {
-				return nil, true, ctrl.Result{}, err
-			}
-
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}
 
@@ -247,9 +231,6 @@ func resolvePageHeader(
 				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
-			if err := c.Status().Update(ctx, object); err != nil {
-				return nil, true, ctrl.Result{}, err
-			}
 
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}
@@ -293,10 +274,6 @@ func resolvePageNavigation(
 				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
-
-			if err := c.Status().Update(ctx, object); err != nil {
-				return nil, true, ctrl.Result{}, err
-			}
 
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}
@@ -383,10 +360,6 @@ func resolvePageBinding(
 				err.Error(),
 			)
 
-			if err := c.Status().Update(ctx, object); err != nil {
-				return nil, true, ctrl.Result{}, err
-			}
-
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}
 
@@ -429,10 +402,6 @@ func resolveScriptLibrary(
 				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
-
-			if err := c.Status().Update(ctx, object); err != nil {
-				return nil, true, ctrl.Result{}, err
-			}
 
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}
@@ -477,10 +446,6 @@ func ResolveSecret(
 				err.Error(),
 			)
 
-			if err := c.Status().Update(ctx, object); err != nil {
-				return nil, true, ctrl.Result{}, err
-			}
-
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}
 	}
@@ -517,10 +482,6 @@ func resolveTheme(
 				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
-
-			if err := c.Status().Update(ctx, object); err != nil {
-				return nil, true, ctrl.Result{}, err
-			}
 
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}

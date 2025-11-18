@@ -39,9 +39,6 @@ func isReady(
 				fmt.Sprintf("referenced %s %s is not ready", t.Name(), referred.GetName()),
 			),
 		)
-		if err := c.Status().Update(ctx, object); err != nil {
-			return false, ctrl.Result{}, err
-		}
 
 		return false, ctrl.Result{RequeueAfter: requeueDelay}, nil
 	}
