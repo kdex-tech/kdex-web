@@ -271,7 +271,7 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 ) error {
 	log := logf.FromContext(ctx)
 
-	if err := r.createOrUpdatePackageReferences(ctx, hostController, theme); err != nil {
+	if err := r.createOrUpdatePackageReferences(ctx, hostController); err != nil {
 		return err
 	}
 
@@ -312,7 +312,6 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
-	theme *kdexv1alpha1.KDexTheme,
 ) error {
 	hostHandler, ok := r.HostStore.Get(hostController.Name)
 	if !ok {
