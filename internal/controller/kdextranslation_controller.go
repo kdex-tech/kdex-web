@@ -65,6 +65,16 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// Defer status update
+	defer func() {
+		translation.Status.ObservedGeneration = translation.Generation
+		if updateErr := r.Status().Update(ctx, &translation); updateErr != nil {
+			if err == nil {
+				err = updateErr
+			}
+		}
+	}()
+
 	if translation.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
 			controllerutil.AddFinalizer(&translation, translationFinalizerName)
@@ -98,16 +108,6 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		kdexv1alpha1.ConditionReasonReconciling,
 		"Reconciling",
 	)
-
-	// Defer status update
-	defer func() {
-		translation.Status.ObservedGeneration = translation.Generation
-		if updateErr := r.Status().Update(ctx, &translation); updateErr != nil {
-			if err == nil {
-				err = updateErr
-			}
-		}
-	}()
 
 	_, shouldReturn, r1, err := resolveHost(ctx, r.Client, &translation, &translation.Status.Conditions, &translation.Spec.HostRef, r.RequeueDelay)
 	if shouldReturn {

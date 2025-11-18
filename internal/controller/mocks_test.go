@@ -15,11 +15,21 @@ type MockHostReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-func (r *MockHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MockHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	var host kdexv1alpha1.KDexHost
 	if err := r.Get(ctx, req.NamespacedName, &host); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	// Defer status update
+	defer func() {
+		host.Status.ObservedGeneration = host.Generation
+		if updateErr := r.Status().Update(ctx, &host); updateErr != nil {
+			if err == nil {
+				err = updateErr
+			}
+		}
+	}()
 
 	kdexv1alpha1.SetConditions(
 		&host.Status.Conditions,
@@ -31,10 +41,6 @@ func (r *MockHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
-	host.Status.ObservedGeneration = host.Generation
-	if err := r.Status().Update(ctx, &host); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	return ctrl.Result{}, nil
 }
@@ -51,11 +57,21 @@ type MockPageArchetypeReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-func (r *MockPageArchetypeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MockPageArchetypeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	var pageArchetype kdexv1alpha1.KDexPageArchetype
 	if err := r.Get(ctx, req.NamespacedName, &pageArchetype); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	// Defer status update
+	defer func() {
+		pageArchetype.Status.ObservedGeneration = pageArchetype.Generation
+		if updateErr := r.Status().Update(ctx, &pageArchetype); updateErr != nil {
+			if err == nil {
+				err = updateErr
+			}
+		}
+	}()
 
 	kdexv1alpha1.SetConditions(
 		&pageArchetype.Status.Conditions,
@@ -67,10 +83,6 @@ func (r *MockPageArchetypeReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
-	pageArchetype.Status.ObservedGeneration = pageArchetype.Generation
-	if err := r.Status().Update(ctx, &pageArchetype); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	return ctrl.Result{}, nil
 }
@@ -87,11 +99,21 @@ type MockPageFooterReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-func (r *MockPageFooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MockPageFooterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	var pageFooter kdexv1alpha1.KDexPageFooter
 	if err := r.Get(ctx, req.NamespacedName, &pageFooter); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	// Defer status update
+	defer func() {
+		pageFooter.Status.ObservedGeneration = pageFooter.Generation
+		if updateErr := r.Status().Update(ctx, &pageFooter); updateErr != nil {
+			if err == nil {
+				err = updateErr
+			}
+		}
+	}()
 
 	kdexv1alpha1.SetConditions(
 		&pageFooter.Status.Conditions,
@@ -103,10 +125,6 @@ func (r *MockPageFooterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
-	pageFooter.Status.ObservedGeneration = pageFooter.Generation
-	if err := r.Status().Update(ctx, &pageFooter); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	return ctrl.Result{}, nil
 }
@@ -123,11 +141,21 @@ type MockPageHeaderReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-func (r *MockPageHeaderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MockPageHeaderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	var pageHeader kdexv1alpha1.KDexPageHeader
 	if err := r.Get(ctx, req.NamespacedName, &pageHeader); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	// Defer status update
+	defer func() {
+		pageHeader.Status.ObservedGeneration = pageHeader.Generation
+		if updateErr := r.Status().Update(ctx, &pageHeader); updateErr != nil {
+			if err == nil {
+				err = updateErr
+			}
+		}
+	}()
 
 	kdexv1alpha1.SetConditions(
 		&pageHeader.Status.Conditions,
@@ -139,10 +167,6 @@ func (r *MockPageHeaderReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
-	pageHeader.Status.ObservedGeneration = pageHeader.Generation
-	if err := r.Status().Update(ctx, &pageHeader); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	return ctrl.Result{}, nil
 }
@@ -159,11 +183,21 @@ type MockPageNavigationReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-func (r *MockPageNavigationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *MockPageNavigationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	var pageNavigation kdexv1alpha1.KDexPageNavigation
 	if err := r.Get(ctx, req.NamespacedName, &pageNavigation); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+
+	// Defer status update
+	defer func() {
+		pageNavigation.Status.ObservedGeneration = pageNavigation.Generation
+		if updateErr := r.Status().Update(ctx, &pageNavigation); updateErr != nil {
+			if err == nil {
+				err = updateErr
+			}
+		}
+	}()
 
 	kdexv1alpha1.SetConditions(
 		&pageNavigation.Status.Conditions,
@@ -175,10 +209,6 @@ func (r *MockPageNavigationReconciler) Reconcile(ctx context.Context, req ctrl.R
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful",
 	)
-	pageNavigation.Status.ObservedGeneration = pageNavigation.Generation
-	if err := r.Status().Update(ctx, &pageNavigation); err != nil {
-		return ctrl.Result{}, err
-	}
 
 	return ctrl.Result{}, nil
 }

@@ -84,6 +84,16 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// Defer status update
+	defer func() {
+		hostController.Status.ObservedGeneration = hostController.Generation
+		if updateErr := r.Status().Update(ctx, &hostController); updateErr != nil {
+			if err == nil {
+				err = updateErr
+			}
+		}
+	}()
+
 	if hostController.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(&hostController, hostControllerFinalizerName) {
 			controllerutil.AddFinalizer(&hostController, hostControllerFinalizerName)
@@ -113,16 +123,6 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		kdexv1alpha1.ConditionReasonReconciling,
 		"Reconciling",
 	)
-
-	// Defer status update
-	defer func() {
-		hostController.Status.ObservedGeneration = hostController.Generation
-		if updateErr := r.Status().Update(ctx, &hostController); updateErr != nil {
-			if err == nil {
-				err = updateErr
-			}
-		}
-	}()
 
 	theme, shouldReturn, r1, err := resolveTheme(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.Host.DefaultThemeRef, r.RequeueDelay)
 	if shouldReturn {

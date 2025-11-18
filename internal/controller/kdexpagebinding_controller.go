@@ -60,6 +60,16 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// Defer status update
+	defer func() {
+		pageBinding.Status.ObservedGeneration = pageBinding.Generation
+		if updateErr := r.Status().Update(ctx, &pageBinding); updateErr != nil {
+			if err == nil {
+				err = updateErr
+			}
+		}
+	}()
+
 	if pageBinding.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(&pageBinding, pageBindingFinalizerName) {
 			controllerutil.AddFinalizer(&pageBinding, pageBindingFinalizerName)
@@ -93,16 +103,6 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		kdexv1alpha1.ConditionReasonReconciling,
 		"Reconciling",
 	)
-
-	// Defer status update
-	defer func() {
-		pageBinding.Status.ObservedGeneration = pageBinding.Generation
-		if updateErr := r.Status().Update(ctx, &pageBinding); updateErr != nil {
-			if err == nil {
-				err = updateErr
-			}
-		}
-	}()
 
 	return r.innerReconcile(ctx, &pageBinding)
 }
