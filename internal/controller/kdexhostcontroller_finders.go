@@ -20,6 +20,10 @@ func (r *KDexHostControllerReconciler) findHostControllersForPageBinding(
 		return nil
 	}
 
+	if pageBinding.Spec.HostRef.Name != r.FocalHost {
+		return nil
+	}
+
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
