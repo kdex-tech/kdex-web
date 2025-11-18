@@ -33,7 +33,7 @@ func (s *HostStore) Get(name string) (*HostHandler, bool) {
 
 func (s *HostStore) GetOrUpdate(
 	h *kdexv1alpha1.KDexHostController,
-	scriptLibrary *kdexv1alpha1.KDexScriptLibrary,
+	scriptLibraries []kdexv1alpha1.KDexScriptLibrary,
 	theme *kdexv1alpha1.KDexTheme,
 	log logr.Logger,
 ) *HostHandler {
@@ -47,7 +47,7 @@ func (s *HostStore) GetOrUpdate(
 	} else {
 		log.Info("updating existing host", "host", h.Name)
 	}
-	handler.SetHost(h, scriptLibrary, theme)
+	handler.SetHost(h, scriptLibraries, theme)
 	return handler
 }
 

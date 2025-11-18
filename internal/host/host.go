@@ -31,7 +31,7 @@ const (
 type HostHandler struct {
 	Mux                  *http.ServeMux
 	Pages                *page.PageStore
-	ScriptLibrary        *kdexv1alpha1.KDexScriptLibrary
+	ScriptLibraries      []kdexv1alpha1.KDexScriptLibrary
 	Translations         *catalog.Builder
 	defaultLanguage      string
 	host                 *kdexv1alpha1.KDexHostController
@@ -91,8 +91,8 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 	separator := ""
 
-	if th.ScriptLibrary != nil {
-		for _, script := range th.ScriptLibrary.Spec.Scripts {
+	for _, scriptLibrary := range th.ScriptLibraries {
+		for _, script := range scriptLibrary.Spec.Scripts {
 			buffer.WriteString(separator)
 			buffer.WriteString(script.ToScriptTag(true))
 			separator = "\n"
@@ -111,8 +111,10 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 
 func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	packageReferences := []kdexv1alpha1.PackageReference{}
-	if th.ScriptLibrary != nil && th.ScriptLibrary.Spec.PackageReference != nil {
-		packageReferences = append(packageReferences, *th.ScriptLibrary.Spec.PackageReference)
+	for _, scriptLibrary := range th.ScriptLibraries {
+		if scriptLibrary.Spec.PackageReference != nil {
+			packageReferences = append(packageReferences, *scriptLibrary.Spec.PackageReference)
+		}
 	}
 	packageReferences = append(packageReferences, handler.PackageReferences...)
 
@@ -129,8 +131,8 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 		buffer.WriteString("</script>")
 	}
 
-	if th.ScriptLibrary != nil {
-		for _, script := range th.ScriptLibrary.Spec.Scripts {
+	for _, scriptLibrary := range th.ScriptLibraries {
+		for _, script := range scriptLibrary.Spec.Scripts {
 			buffer.WriteString(separator)
 			buffer.WriteString(script.ToScriptTag(false))
 			separator = "\n"
@@ -307,13 +309,13 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (th *HostHandler) SetHost(
 	host *kdexv1alpha1.KDexHostController,
-	scriptLibrary *kdexv1alpha1.KDexScriptLibrary,
+	scriptLibraries []kdexv1alpha1.KDexScriptLibrary,
 	theme *kdexv1alpha1.KDexTheme,
 ) {
 	th.mu.Lock()
 	th.defaultLanguage = host.Spec.Host.DefaultLang
 	th.host = host
-	th.ScriptLibrary = scriptLibrary
+	th.ScriptLibraries = scriptLibraries
 	th.theme = theme
 	th.mu.Unlock()
 	th.RebuildMux()

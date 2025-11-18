@@ -129,12 +129,27 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return r1, err
 	}
 
+	var scriptLibraries []kdexv1alpha1.KDexScriptLibrary
+
 	scriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.Host.ScriptLibraryRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
 
-	r.HostStore.GetOrUpdate(&hostController, scriptLibrary, theme, log)
+	if scriptLibrary != nil {
+		scriptLibraries = append(scriptLibraries, *scriptLibrary)
+	}
+
+	themeScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, &hostController, &hostController.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
+	if shouldReturn {
+		return r1, err
+	}
+
+	if themeScriptLibrary != nil {
+		scriptLibraries = append(scriptLibraries, *themeScriptLibrary)
+	}
+
+	r.HostStore.GetOrUpdate(&hostController, scriptLibraries, theme, log)
 
 	// hasRootPage := hasRootPage(hostHandler.Pages)
 
@@ -305,19 +320,9 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 	}
 
 	allPackageReferences := []kdexv1alpha1.PackageReference{}
-	if hostHandler.ScriptLibrary != nil && hostHandler.ScriptLibrary.Spec.PackageReference != nil {
-		allPackageReferences = append(allPackageReferences, *hostHandler.ScriptLibrary.Spec.PackageReference)
-	}
-
-	if theme != nil && theme.Spec.ScriptLibraryRef != nil {
-		themeScriptLibrary, _, _, err := resolveScriptLibrary(ctx, r.Client, hostController, &hostController.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
-		if err != nil {
-			return err
-		}
-		if themeScriptLibrary != nil {
-			if themeScriptLibrary.Spec.PackageReference != nil {
-				allPackageReferences = append(allPackageReferences, *themeScriptLibrary.Spec.PackageReference)
-			}
+	for _, scriptLibrary := range hostHandler.ScriptLibraries {
+		if scriptLibrary.Spec.PackageReference != nil {
+			allPackageReferences = append(allPackageReferences, *scriptLibrary.Spec.PackageReference)
 		}
 	}
 
