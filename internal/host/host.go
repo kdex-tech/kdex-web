@@ -349,17 +349,17 @@ func (th *HostHandler) availableLanguagesLocked() []string {
 	return availableLangs
 }
 
-func (th *HostHandler) generatePageMapsLocked() map[language.Tag]*map[string]*render.PageEntry {
-	l10nPageMaps := map[language.Tag]*map[string]*render.PageEntry{}
+// func (th *HostHandler) generatePageMapsLocked() map[language.Tag]*map[string]*render.PageEntry {
+// 	l10nPageMaps := map[language.Tag]*map[string]*render.PageEntry{}
 
-	for _, l := range th.Translations.Languages() {
-		rootEntry := &render.PageEntry{}
-		th.Pages.BuildMenuEntries(rootEntry, &l, l.String() == th.defaultLanguage, nil)
-		l10nPageMaps[l] = rootEntry.Children
-	}
+// 	for _, l := range th.Translations.Languages() {
+// 		rootEntry := &render.PageEntry{}
+// 		th.Pages.BuildMenuEntries(rootEntry, &l, l.String() == th.defaultLanguage, nil)
+// 		l10nPageMaps[l] = rootEntry.Children
+// 	}
 
-	return l10nPageMaps
-}
+// 	return l10nPageMaps
+// }
 
 func (th *HostHandler) messagePrinterLocked(tag language.Tag) *message.Printer {
 	return message.NewPrinter(
