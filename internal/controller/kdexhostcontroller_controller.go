@@ -151,7 +151,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	r.HostStore.GetOrUpdate(&hostController, scriptLibraries, theme, log)
+	hostHandler := r.HostStore.GetOrUpdate(&hostController, scriptLibraries, theme, log)
 
 	// hasRootPage := hasRootPage(hostHandler.Pages)
 
@@ -175,7 +175,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	// 	return ctrl.Result{}, err
 	// }
 
-	return ctrl.Result{}, r.innerReconcile(ctx, &hostController, theme)
+	return r.innerReconcile(ctx, &hostController, theme, hostHandler)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -273,28 +273,34 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
 	theme *kdexv1alpha1.KDexTheme,
-) error {
+	hostHandler *host.HostHandler,
+) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	if err := r.createOrUpdatePackageReferences(ctx, hostController); err != nil {
-		return err
+	hostPackageReferences, shouldReturn, r1, err := r.createOrUpdatePackageReferences(ctx, hostController, hostHandler)
+	if shouldReturn {
+		return r1, err
+	}
+
+	if hostPackageReferences != nil {
+		// TODO create the Package Server Deployment and service
 	}
 
 	if err := r.createOrUpdateThemeDeployment(ctx, hostController, theme); err != nil {
-		return err
+		return ctrl.Result{}, err
 	}
 
 	if err := r.createOrUpdateThemeService(ctx, hostController, theme); err != nil {
-		return err
+		return ctrl.Result{}, err
 	}
 
 	if hostController.Spec.Host.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
 		if err := r.createOrUpdateHTTPRoute(ctx, hostController, theme); err != nil {
-			return err
+			return ctrl.Result{}, err
 		}
 	} else {
 		if err := r.createOrUpdateIngress(ctx, hostController, theme); err != nil {
-			return err
+			return ctrl.Result{}, err
 		}
 	}
 
@@ -311,18 +317,14 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 
 	log.Info("reconciled KDexHostController")
 
-	return nil
+	return ctrl.Result{}, nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
-) error {
-	hostHandler, ok := r.HostStore.Get(hostController.Name)
-	if !ok {
-		return nil
-	}
-
+	hostHandler *host.HostHandler,
+) (*kdexv1alpha1.KDexHostPackageReferences, bool, ctrl.Result, error) {
 	allPackageReferences := []kdexv1alpha1.PackageReference{}
 	for _, scriptLibrary := range hostHandler.ScriptLibraries {
 		if scriptLibrary.Spec.PackageReference != nil {
@@ -354,21 +356,63 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 	if len(finalPackageReferences) == 0 {
 		if err := r.Delete(ctx, hostPackageReferences); err != nil {
 			if client.IgnoreNotFound(err) != nil {
-				return err
+				kdexv1alpha1.SetConditions(
+					&hostController.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileSuccess,
+					err.Error(),
+				)
+
+				return nil, true, ctrl.Result{}, err
 			}
 		}
 
-		return nil
+		return nil, false, ctrl.Result{}, nil
 	}
 
-	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, hostPackageReferences, func() error {
-		hostPackageReferences.Spec.PackageReferences = finalPackageReferences
-		return ctrl.SetControllerReference(hostController, hostPackageReferences, r.Scheme)
-	}); err != nil {
-		return err
+	if _, err := ctrl.CreateOrUpdate(
+		ctx,
+		r.Client,
+		hostPackageReferences,
+		func() error {
+			hostPackageReferences.Spec.PackageReferences = finalPackageReferences
+			return ctrl.SetControllerReference(hostController, hostPackageReferences, r.Scheme)
+		},
+	); err != nil {
+		kdexv1alpha1.SetConditions(
+			&hostController.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			err.Error(),
+		)
+
+		return nil, true, ctrl.Result{}, err
 	}
 
-	return nil
+	if hostPackageReferences.Status.Image == "" {
+		kdexv1alpha1.SetConditions(
+			&hostController.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionFalse,
+				Progressing: metav1.ConditionTrue,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			"image not available yet, requeueing",
+		)
+
+		return nil, true, ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+	}
+
+	return hostPackageReferences, false, ctrl.Result{}, nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdateIngress(
