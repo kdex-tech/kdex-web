@@ -55,8 +55,6 @@ type KDexPageBindingReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,verbs=get;list;watch
 
 func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
-
 	var pageBinding kdexv1alpha1.KDexPageBinding
 	if err := r.Get(ctx, req.NamespacedName, &pageBinding); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -100,7 +98,6 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	defer func() {
 		pageBinding.Status.ObservedGeneration = pageBinding.Generation
 		if updateErr := r.Status().Update(ctx, &pageBinding); updateErr != nil {
-			log.Info("failed to update status", "err", updateErr)
 			if err == nil {
 				err = updateErr
 			}
