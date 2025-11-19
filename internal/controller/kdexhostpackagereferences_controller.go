@@ -87,8 +87,17 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&hostPackageReferences, hostPackageReferencesFinalizerName) {
-			// TODO: Clean up external resources managed by this controller
 			log.Info("deleting external resources")
+
+			if err := r.cleanupJob(ctx, &hostPackageReferences); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err := r.cleanupConfigMap(ctx, &hostPackageReferences); err != nil {
+				return ctrl.Result{}, err
+			}
+			if err := r.cleanupSecret(ctx, &hostPackageReferences); err != nil {
+				return ctrl.Result{}, err
+			}
 
 			controllerutil.RemoveFinalizer(&hostPackageReferences, hostPackageReferencesFinalizerName)
 			if err := r.Update(ctx, &hostPackageReferences); err != nil {
@@ -120,6 +129,54 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 	}
 
 	return r.createOrUpdateJob(ctx, &hostPackageReferences, cm, npmrcSecret)
+}
+
+func (r *KDexHostPackageReferencesReconciler) cleanupConfigMap(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
+	cm := &corev1.ConfigMap{}
+	cmName := types.NamespacedName{
+		Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+		Namespace: hostPackageReferences.Namespace,
+	}
+	if err := r.Get(ctx, cmName, cm); err == nil {
+		if err := r.Delete(ctx, cm); err != nil {
+			return err
+		}
+	} else if !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (r *KDexHostPackageReferencesReconciler) cleanupJob(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
+	job := &batchv1.Job{}
+	jobName := types.NamespacedName{
+		Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+		Namespace: hostPackageReferences.Namespace,
+	}
+	if err := r.Get(ctx, jobName, job); err == nil {
+		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
+			return err
+		}
+	} else if !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
+}
+
+func (r *KDexHostPackageReferencesReconciler) cleanupSecret(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
+	secret := &corev1.Secret{}
+	secretName := types.NamespacedName{
+		Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+		Namespace: hostPackageReferences.Namespace,
+	}
+	if err := r.Get(ctx, secretName, secret); err == nil {
+		if err := r.Delete(ctx, secret); err != nil {
+			return err
+		}
+	} else if !errors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
