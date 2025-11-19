@@ -24,7 +24,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
@@ -105,28 +104,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&hostController, hostControllerFinalizerName) {
-			hostPackageReferences := &kdexv1alpha1.KDexHostPackageReferences{}
-			err := r.Get(ctx, req.NamespacedName, hostPackageReferences)
-			if err == nil {
-				if hostPackageReferences.DeletionTimestamp.IsZero() {
-					if err := r.Delete(ctx, hostPackageReferences); err != nil {
-						return ctrl.Result{}, err
-					}
-				}
-				// KDexHostPackageReferences still exists. We wait.
-				return ctrl.Result{Requeue: true}, nil
-			}
-			if !errors.IsNotFound(err) {
-				return ctrl.Result{}, err
-			}
-
-			if controllerutil.RemoveFinalizer(hostPackageReferences, hostControllerFinalizerName) {
-				if err := r.Update(ctx, hostPackageReferences); client.IgnoreNotFound(err) != nil {
-					return ctrl.Result{}, err
-				}
-			}
-
-			r.HostStore.Delete(hostPackageReferences.Name)
+			r.HostStore.Delete(hostController.Name)
 
 			controllerutil.RemoveFinalizer(&hostController, hostControllerFinalizerName)
 			if err := r.Update(ctx, &hostController); err != nil {
@@ -440,7 +418,6 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 
 			hostPackageReferences.Spec.PackageReferences = finalPackageReferences
 
-			controllerutil.AddFinalizer(hostPackageReferences, hostControllerFinalizerName)
 			return ctrl.SetControllerReference(hostController, hostPackageReferences, r.Scheme)
 		},
 	); err != nil {
