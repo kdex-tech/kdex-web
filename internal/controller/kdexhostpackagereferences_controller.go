@@ -626,7 +626,6 @@ COPY node_modules /modules
 				configMap.Labels[key] = value
 			}
 
-			configMap.Labels["app.kubernetes.io/name"] = kdexWeb
 			configMap.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
 			configMap.Data = map[string]string{
@@ -711,7 +710,6 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateNpmrcSecret(
 				secret.Labels[key] = value
 			}
 
-			secret.Labels["app.kubernetes.io/name"] = kdexWeb
 			secret.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
 			secret.StringData = map[string]string{
