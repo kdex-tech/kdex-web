@@ -26,7 +26,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	"kdex.dev/web/internal/host"
@@ -471,7 +470,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 										Service: &networkingv1.IngressServiceBackend{
 											Name: r.ServiceName,
 											Port: networkingv1.ServiceBackendPort{
-												Name: hostController.Name,
+												Name: "server",
 											},
 										},
 									},
@@ -492,7 +491,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 								Service: &networkingv1.IngressServiceBackend{
 									Name: hostPackageReferences.Name,
 									Port: networkingv1.ServiceBackendPort{
-										Name: hostPackageReferences.Name,
+										Name: "server",
 									},
 								},
 							},
@@ -511,7 +510,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 								Service: &networkingv1.IngressServiceBackend{
 									Name: theme.Name,
 									Port: networkingv1.ServiceBackendPort{
-										Name: theme.Name,
+										Name: "server",
 									},
 								},
 							},
@@ -660,7 +659,6 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 			}
 
 			deployment.Spec.Template.Spec.Containers[0].Name = hostPackageReferences.Name
-			deployment.Spec.Template.Spec.Containers[0].Ports[0].Name = hostPackageReferences.Name
 
 			for idx, value := range deployment.Spec.Template.Spec.Volumes {
 				if value.Name == "oci-image" {
@@ -734,26 +732,6 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 
 			service.Spec.Selector["app.kubernetes.io/name"] = kdexWeb
 			service.Spec.Selector["kdex.dev/packages"] = hostPackageReferences.Name
-
-			portFound := false
-			for idx, value := range service.Spec.Ports {
-				if value.Name == "server" || value.Name == hostPackageReferences.Name {
-					service.Spec.Ports[idx].Name = hostPackageReferences.Name
-					service.Spec.Ports[idx].Port = 80
-					service.Spec.Ports[idx].Protocol = corev1.ProtocolTCP
-					service.Spec.Ports[idx].TargetPort.StrVal = hostPackageReferences.Name
-					portFound = true
-				}
-			}
-
-			if !portFound {
-				service.Spec.Ports = append(service.Spec.Ports, corev1.ServicePort{
-					Name:       hostPackageReferences.Name,
-					Port:       80,
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromString(hostPackageReferences.Name),
-				})
-			}
 
 			return ctrl.SetControllerReference(hostController, service, r.Scheme)
 		},
@@ -846,7 +824,6 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 			}
 
 			deployment.Spec.Template.Spec.Containers[0].Name = theme.Name
-			deployment.Spec.Template.Spec.Containers[0].Ports[0].Name = theme.Name
 
 			for idx, value := range deployment.Spec.Template.Spec.Volumes {
 				if value.Name == "oci-image" {
@@ -923,26 +900,6 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 
 			service.Spec.Selector["app.kubernetes.io/name"] = kdexWeb
 			service.Spec.Selector["kdex.dev/theme"] = theme.Name
-
-			portFound := false
-			for idx, value := range service.Spec.Ports {
-				if value.Name == "server" || value.Name == theme.Name {
-					service.Spec.Ports[idx].Name = theme.Name
-					service.Spec.Ports[idx].Port = 80
-					service.Spec.Ports[idx].Protocol = corev1.ProtocolTCP
-					service.Spec.Ports[idx].TargetPort.StrVal = theme.Name
-					portFound = true
-				}
-			}
-
-			if !portFound {
-				service.Spec.Ports = append(service.Spec.Ports, corev1.ServicePort{
-					Name:       theme.Name,
-					Port:       80,
-					Protocol:   corev1.ProtocolTCP,
-					TargetPort: intstr.FromString(theme.Name),
-				})
-			}
 
 			return ctrl.SetControllerReference(hostController, service, r.Scheme)
 		},

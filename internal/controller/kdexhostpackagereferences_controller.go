@@ -26,6 +26,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const hostPackageReferencesFinalizerName = "kdex.dev/hostpackagereferences-finalizer"
@@ -59,8 +59,6 @@ type KDexHostPackageReferencesReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
-
 	var hostPackageReferences kdexv1alpha1.KDexHostPackageReferences
 	if err := r.Get(ctx, req.NamespacedName, &hostPackageReferences); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -87,16 +85,58 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&hostPackageReferences, hostPackageReferencesFinalizerName) {
-			log.Info("deleting external resources")
+			kdexv1alpha1.SetConditions(
+				&hostPackageReferences.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionFalse,
+					Progressing: metav1.ConditionTrue,
+					Ready:       metav1.ConditionUnknown,
+				},
+				kdexv1alpha1.ConditionReasonReconciling,
+				"Terminating",
+			)
 
 			if err := r.cleanupJob(ctx, &hostPackageReferences); err != nil {
-				return ctrl.Result{}, err
+				kdexv1alpha1.SetConditions(
+					&hostPackageReferences.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionTrue,
+						Ready:       metav1.ConditionUnknown,
+					},
+					kdexv1alpha1.ConditionReasonReconciling,
+					err.Error(),
+				)
+
+				return ctrl.Result{Requeue: true}, nil
 			}
 			if err := r.cleanupConfigMap(ctx, &hostPackageReferences); err != nil {
-				return ctrl.Result{}, err
+				kdexv1alpha1.SetConditions(
+					&hostPackageReferences.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionTrue,
+						Ready:       metav1.ConditionUnknown,
+					},
+					kdexv1alpha1.ConditionReasonReconciling,
+					err.Error(),
+				)
+
+				return ctrl.Result{Requeue: true}, nil
 			}
 			if err := r.cleanupSecret(ctx, &hostPackageReferences); err != nil {
-				return ctrl.Result{}, err
+				kdexv1alpha1.SetConditions(
+					&hostPackageReferences.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionTrue,
+						Ready:       metav1.ConditionUnknown,
+					},
+					kdexv1alpha1.ConditionReasonReconciling,
+					err.Error(),
+				)
+
+				return ctrl.Result{Requeue: true}, nil
 			}
 
 			controllerutil.RemoveFinalizer(&hostPackageReferences, hostPackageReferencesFinalizerName)
@@ -104,6 +144,11 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 				return ctrl.Result{}, err
 			}
 		}
+		return ctrl.Result{}, nil
+	}
+
+	if meta.IsStatusConditionTrue(hostPackageReferences.Status.Conditions, string(kdexv1alpha1.ConditionTypeReady)) &&
+		hostPackageReferences.Generation == hostPackageReferences.Status.ObservedGeneration {
 		return ctrl.Result{}, nil
 	}
 
@@ -131,10 +176,25 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 	return r.createOrUpdateJob(ctx, &hostPackageReferences, cm, npmrcSecret)
 }
 
+// SetupWithManager sets up the controller with the Manager.
+func (r *KDexHostPackageReferencesReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&kdexv1alpha1.KDexHostPackageReferences{}).
+		Owns(&batchv1.Job{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.Secret{}).
+		Watches(
+			&batchv1.Job{},
+			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &kdexv1alpha1.KDexHostPackageReferences{}, handler.OnlyControllerOwner()),
+		).
+		Named("kdexhostpackagereferences").
+		Complete(r)
+}
+
 func (r *KDexHostPackageReferencesReconciler) cleanupConfigMap(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
 	cm := &corev1.ConfigMap{}
 	cmName := types.NamespacedName{
-		Name:      fmt.Sprintf("%s-packages-configmap", hostPackageReferences.Name),
+		Name:      fmt.Sprintf("%s-configmap", hostPackageReferences.Name),
 		Namespace: hostPackageReferences.Namespace,
 	}
 	if err := r.Get(ctx, cmName, cm); err == nil {
@@ -150,7 +210,7 @@ func (r *KDexHostPackageReferencesReconciler) cleanupConfigMap(ctx context.Conte
 func (r *KDexHostPackageReferencesReconciler) cleanupJob(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
 	job := &batchv1.Job{}
 	jobName := types.NamespacedName{
-		Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+		Name:      hostPackageReferences.Name,
 		Namespace: hostPackageReferences.Namespace,
 	}
 	if err := r.Get(ctx, jobName, job); err == nil {
@@ -166,7 +226,7 @@ func (r *KDexHostPackageReferencesReconciler) cleanupJob(ctx context.Context, ho
 func (r *KDexHostPackageReferencesReconciler) cleanupSecret(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
 	secret := &corev1.Secret{}
 	secretName := types.NamespacedName{
-		Name:      fmt.Sprintf("%s-packages-secret", hostPackageReferences.Name),
+		Name:      fmt.Sprintf("%s-secret", hostPackageReferences.Name),
 		Namespace: hostPackageReferences.Namespace,
 	}
 	if err := r.Get(ctx, secretName, secret); err == nil {
@@ -187,7 +247,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 ) (ctrl.Result, error) {
 	job := &batchv1.Job{}
 	jobName := types.NamespacedName{
-		Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+		Name:      hostPackageReferences.Name,
 		Namespace: hostPackageReferences.Namespace,
 	}
 
@@ -312,7 +372,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		}
 
 		imageRepo := r.Configuration.DefaultImageRegistry.Host
-		imageURL := fmt.Sprintf("%s/%s-packages@%s", imageRepo, hostPackageReferences.Name, imageDigest)
+		imageURL := fmt.Sprintf("%s/%s@%s", imageRepo, hostPackageReferences.Name, imageDigest)
 		hostPackageReferences.Status.Image = imageURL
 
 		kdexv1alpha1.SetConditions(
@@ -395,7 +455,7 @@ func (r *KDexHostPackageReferencesReconciler) buildJob(
 ) (*batchv1.Job, error) {
 	imageRepo := r.Configuration.DefaultImageRegistry.Host
 	imageTag := fmt.Sprintf("%d", hostPackageReferences.Generation)
-	imageURL := fmt.Sprintf("%s/%s-packages:%s", imageRepo, hostPackageReferences.Name, imageTag)
+	imageURL := fmt.Sprintf("%s/%s:%s", imageRepo, hostPackageReferences.Name, imageTag)
 
 	volumes := []corev1.Volume{
 		{
@@ -459,7 +519,7 @@ func (r *KDexHostPackageReferencesReconciler) buildJob(
 	backoffLimit := int32(4)
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+			Name:      hostPackageReferences.Name,
 			Namespace: hostPackageReferences.Namespace,
 			Labels: map[string]string{
 				"app.kubernetes.io/name": kdexWeb,
@@ -529,7 +589,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
 ) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-packages-configmap", hostPackageReferences.Name),
+			Name:      fmt.Sprintf("%s-configmap", hostPackageReferences.Name),
 			Namespace: hostPackageReferences.Namespace,
 		},
 	}
@@ -604,7 +664,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateNpmrcSecret(
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-packages-secret", hostPackageReferences.Name),
+			Name:      fmt.Sprintf("%s-secret", hostPackageReferences.Name),
 			Namespace: hostPackageReferences.Namespace,
 		},
 	}
@@ -676,19 +736,4 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateNpmrcSecret(
 	}
 
 	return secret, nil
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *KDexHostPackageReferencesReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&kdexv1alpha1.KDexHostPackageReferences{}).
-		Owns(&batchv1.Job{}).
-		Owns(&corev1.ConfigMap{}).
-		Owns(&corev1.Secret{}).
-		Watches(
-			&batchv1.Job{},
-			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &kdexv1alpha1.KDexHostPackageReferences{}, handler.OnlyControllerOwner()),
-		).
-		Named("kdexhostpackagereferences").
-		Complete(r)
 }
