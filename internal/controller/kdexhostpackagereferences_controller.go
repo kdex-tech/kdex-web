@@ -68,7 +68,7 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 	defer func() {
 		hostPackageReferences.Status.ObservedGeneration = hostPackageReferences.Generation
 		if updateErr := r.Status().Update(ctx, &hostPackageReferences); updateErr != nil {
-			if err == nil {
+			if res == (ctrl.Result{}) {
 				err = updateErr
 			}
 		}
@@ -85,57 +85,13 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&hostPackageReferences, hostPackageReferencesFinalizerName) {
-			kdexv1alpha1.SetConditions(
-				&hostPackageReferences.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionFalse,
-					Progressing: metav1.ConditionTrue,
-					Ready:       metav1.ConditionUnknown,
-				},
-				kdexv1alpha1.ConditionReasonReconciling,
-				"Terminating",
-			)
-
-			if err := r.cleanupJob(ctx, &hostPackageReferences); err != nil {
-				kdexv1alpha1.SetConditions(
-					&hostPackageReferences.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionTrue,
-						Ready:       metav1.ConditionUnknown,
-					},
-					kdexv1alpha1.ConditionReasonReconciling,
-					err.Error(),
-				)
-
+			if err1 := r.cleanupJob(ctx, &hostPackageReferences); err1 != nil {
 				return ctrl.Result{Requeue: true}, nil
 			}
-			if err := r.cleanupConfigMap(ctx, &hostPackageReferences); err != nil {
-				kdexv1alpha1.SetConditions(
-					&hostPackageReferences.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionTrue,
-						Ready:       metav1.ConditionUnknown,
-					},
-					kdexv1alpha1.ConditionReasonReconciling,
-					err.Error(),
-				)
-
+			if err1 := r.cleanupConfigMap(ctx, &hostPackageReferences); err1 != nil {
 				return ctrl.Result{Requeue: true}, nil
 			}
-			if err := r.cleanupSecret(ctx, &hostPackageReferences); err != nil {
-				kdexv1alpha1.SetConditions(
-					&hostPackageReferences.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionTrue,
-						Ready:       metav1.ConditionUnknown,
-					},
-					kdexv1alpha1.ConditionReasonReconciling,
-					err.Error(),
-				)
-
+			if err1 := r.cleanupSecret(ctx, &hostPackageReferences); err1 != nil {
 				return ctrl.Result{Requeue: true}, nil
 			}
 
@@ -192,48 +148,39 @@ func (r *KDexHostPackageReferencesReconciler) SetupWithManager(mgr ctrl.Manager)
 }
 
 func (r *KDexHostPackageReferencesReconciler) cleanupConfigMap(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
-	cm := &corev1.ConfigMap{}
-	cmName := types.NamespacedName{
-		Name:      fmt.Sprintf("%s-configmap", hostPackageReferences.Name),
-		Namespace: hostPackageReferences.Namespace,
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-configmap", hostPackageReferences.Name),
+			Namespace: hostPackageReferences.Namespace,
+		},
 	}
-	if err := r.Get(ctx, cmName, cm); err == nil {
-		if err := r.Delete(ctx, cm); err != nil {
-			return err
-		}
-	} else if !errors.IsNotFound(err) {
+	if err := r.Delete(ctx, cm, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
 		return err
 	}
 	return nil
 }
 
 func (r *KDexHostPackageReferencesReconciler) cleanupJob(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
-	job := &batchv1.Job{}
-	jobName := types.NamespacedName{
-		Name:      hostPackageReferences.Name,
-		Namespace: hostPackageReferences.Namespace,
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      hostPackageReferences.Name,
+			Namespace: hostPackageReferences.Namespace,
+		},
 	}
-	if err := r.Get(ctx, jobName, job); err == nil {
-		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
-			return err
-		}
-	} else if !errors.IsNotFound(err) {
+	if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
 		return err
 	}
 	return nil
 }
 
 func (r *KDexHostPackageReferencesReconciler) cleanupSecret(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
-	secret := &corev1.Secret{}
-	secretName := types.NamespacedName{
-		Name:      fmt.Sprintf("%s-secret", hostPackageReferences.Name),
-		Namespace: hostPackageReferences.Namespace,
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-secret", hostPackageReferences.Name),
+			Namespace: hostPackageReferences.Namespace,
+		},
 	}
-	if err := r.Get(ctx, secretName, secret); err == nil {
-		if err := r.Delete(ctx, secret); err != nil {
-			return err
-		}
-	} else if !errors.IsNotFound(err) {
+	if err := r.Delete(ctx, secret, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
 		return err
 	}
 	return nil

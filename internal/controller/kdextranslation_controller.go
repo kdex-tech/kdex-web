@@ -69,7 +69,7 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	defer func() {
 		translation.Status.ObservedGeneration = translation.Generation
 		if updateErr := r.Status().Update(ctx, &translation); updateErr != nil {
-			if err == nil {
+			if res == (ctrl.Result{}) {
 				err = updateErr
 			}
 		}

@@ -25,7 +25,7 @@ func (r *MockHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (r
 	defer func() {
 		host.Status.ObservedGeneration = host.Generation
 		if updateErr := r.Status().Update(ctx, &host); updateErr != nil {
-			if err == nil {
+			if res == (ctrl.Result{}) {
 				err = updateErr
 			}
 		}
@@ -67,7 +67,7 @@ func (r *MockPageArchetypeReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	defer func() {
 		pageArchetype.Status.ObservedGeneration = pageArchetype.Generation
 		if updateErr := r.Status().Update(ctx, &pageArchetype); updateErr != nil {
-			if err == nil {
+			if res == (ctrl.Result{}) {
 				err = updateErr
 			}
 		}
@@ -109,7 +109,7 @@ func (r *MockPageFooterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	defer func() {
 		pageFooter.Status.ObservedGeneration = pageFooter.Generation
 		if updateErr := r.Status().Update(ctx, &pageFooter); updateErr != nil {
-			if err == nil {
+			if res == (ctrl.Result{}) {
 				err = updateErr
 			}
 		}
@@ -151,7 +151,7 @@ func (r *MockPageHeaderReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	defer func() {
 		pageHeader.Status.ObservedGeneration = pageHeader.Generation
 		if updateErr := r.Status().Update(ctx, &pageHeader); updateErr != nil {
-			if err == nil {
+			if res == (ctrl.Result{}) {
 				err = updateErr
 			}
 		}
@@ -193,7 +193,7 @@ func (r *MockPageNavigationReconciler) Reconcile(ctx context.Context, req ctrl.R
 	defer func() {
 		pageNavigation.Status.ObservedGeneration = pageNavigation.Generation
 		if updateErr := r.Status().Update(ctx, &pageNavigation); updateErr != nil {
-			if err == nil {
+			if res == (ctrl.Result{}) {
 				err = updateErr
 			}
 		}
