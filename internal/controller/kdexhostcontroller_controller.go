@@ -520,13 +520,21 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 				}
 			}
 
-			ingress.Annotations = hostController.Annotations
-			ingress.Labels = hostController.Labels
+			if ingress.Annotations == nil {
+				ingress.Annotations = make(map[string]string)
+			}
+			for key, value := range hostController.Annotations {
+				ingress.Annotations[key] = value
+			}
 			if ingress.Labels == nil {
 				ingress.Labels = make(map[string]string)
 			}
+			for key, value := range hostController.Labels {
+				ingress.Labels[key] = value
+			}
+
 			ingress.Labels["app.kubernetes.io/name"] = kdexWeb
-			ingress.Labels["kdex.dev/focus-host"] = hostController.Name
+			ingress.Labels["kdex.dev/instance"] = hostController.Name
 
 			ingress.Spec = *r.getMemoizedIngress()
 
@@ -614,8 +622,9 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 			for key, value := range hostPackageReferences.Labels {
 				deployment.Labels[key] = value
 			}
+
 			deployment.Labels["app.kubernetes.io/name"] = kdexWeb
-			deployment.Labels["kdex.dev/package-references"] = hostPackageReferences.Name
+			deployment.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
 			deployment.Spec = *r.getMemoizedDeployment()
 
@@ -626,14 +635,14 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 			}
 
 			deployment.Spec.Selector.MatchLabels["app.kubernetes.io/name"] = kdexWeb
-			deployment.Spec.Selector.MatchLabels["kdex.dev/package-references"] = hostPackageReferences.Name
+			deployment.Spec.Selector.MatchLabels["kdex.dev/packages"] = hostPackageReferences.Name
 
 			if deployment.Spec.Template.Labels == nil {
 				deployment.Spec.Template.Labels = make(map[string]string)
 			}
 
 			deployment.Spec.Template.Labels["app.kubernetes.io/name"] = kdexWeb
-			deployment.Spec.Template.Labels["kdex.dev/package-references"] = hostPackageReferences.Name
+			deployment.Spec.Template.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
 			foundCorsDomainsEnv := false
 			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
@@ -713,8 +722,9 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 			for key, value := range hostPackageReferences.Labels {
 				service.Labels[key] = value
 			}
+
 			service.Labels["app.kubernetes.io/name"] = kdexWeb
-			service.Labels["kdex.dev/theme"] = hostPackageReferences.Name
+			service.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
 			service.Spec = *r.getMemoizedService()
 
@@ -723,7 +733,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 			}
 
 			service.Spec.Selector["app.kubernetes.io/name"] = kdexWeb
-			service.Spec.Selector["kdex.dev/theme"] = hostPackageReferences.Name
+			service.Spec.Selector["kdex.dev/packages"] = hostPackageReferences.Name
 
 			portFound := false
 			for idx, value := range service.Spec.Ports {
@@ -798,6 +808,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 			for key, value := range theme.Labels {
 				deployment.Labels[key] = value
 			}
+
 			deployment.Labels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Labels["kdex.dev/theme"] = theme.Name
 
@@ -900,6 +911,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 			for key, value := range theme.Labels {
 				service.Labels[key] = value
 			}
+
 			service.Labels["app.kubernetes.io/name"] = kdexWeb
 			service.Labels["kdex.dev/theme"] = theme.Name
 

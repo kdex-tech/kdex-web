@@ -134,7 +134,7 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 func (r *KDexHostPackageReferencesReconciler) cleanupConfigMap(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
 	cm := &corev1.ConfigMap{}
 	cmName := types.NamespacedName{
-		Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+		Name:      fmt.Sprintf("%s-packages-configmap", hostPackageReferences.Name),
 		Namespace: hostPackageReferences.Namespace,
 	}
 	if err := r.Get(ctx, cmName, cm); err == nil {
@@ -166,7 +166,7 @@ func (r *KDexHostPackageReferencesReconciler) cleanupJob(ctx context.Context, ho
 func (r *KDexHostPackageReferencesReconciler) cleanupSecret(ctx context.Context, hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences) error {
 	secret := &corev1.Secret{}
 	secretName := types.NamespacedName{
-		Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+		Name:      fmt.Sprintf("%s-packages-secret", hostPackageReferences.Name),
 		Namespace: hostPackageReferences.Namespace,
 	}
 	if err := r.Get(ctx, secretName, secret); err == nil {
@@ -252,6 +252,25 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		return ctrl.Result{}, err
 	}
 
+	if job.Labels["kdex.dev/generation"] != fmt.Sprintf("%d", hostPackageReferences.Generation) {
+		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+			kdexv1alpha1.SetConditions(
+				&hostPackageReferences.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				"Deleting job failed",
+			)
+
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+	}
+
 	if job.Status.Succeeded > 0 {
 		pod, err := r.getPodForJob(ctx, job)
 		if err != nil {
@@ -306,6 +325,21 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 			kdexv1alpha1.ConditionReasonReconcileSuccess,
 			"Reconciliation successful, package image ready",
 		)
+
+		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+			kdexv1alpha1.SetConditions(
+				&hostPackageReferences.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				"Deleting job failed",
+			)
+
+			return ctrl.Result{}, err
+		}
 	} else if job.Status.Failed > 0 {
 		kdexv1alpha1.SetConditions(
 			&hostPackageReferences.Status.Conditions,
@@ -315,8 +349,10 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 				Ready:       metav1.ConditionFalse,
 			},
 			kdexv1alpha1.ConditionReasonReconcileError,
-			"Package build job failed",
+			"Package build job failed, requeueing",
 		)
+
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	} else {
 		kdexv1alpha1.SetConditions(
 			&hostPackageReferences.Status.Conditions,
@@ -326,7 +362,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 				Ready:       metav1.ConditionFalse,
 			},
 			kdexv1alpha1.ConditionReasonReconcileError,
-			"job is still running",
+			"Job is still running, requeueing",
 		)
 
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
@@ -426,9 +462,9 @@ func (r *KDexHostPackageReferencesReconciler) buildJob(
 			Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
 			Namespace: hostPackageReferences.Namespace,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":       "kdexhostpackagereferences-builder",
-				"app.kubernetes.io/instance":   hostPackageReferences.Name,
-				"app.kubernetes.io/managed-by": "kdex-web-controller",
+				"app.kubernetes.io/name": kdexWeb,
+				"kdex.dev/generation":    fmt.Sprintf("%d", hostPackageReferences.Generation),
+				"kdex.dev/packages":      hostPackageReferences.Name,
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -470,6 +506,17 @@ func (r *KDexHostPackageReferencesReconciler) buildJob(
 	}
 
 	if err := ctrl.SetControllerReference(hostPackageReferences, job, r.Scheme); err != nil {
+		kdexv1alpha1.SetConditions(
+			&hostPackageReferences.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			err.Error(),
+		)
+
 		return nil, err
 	}
 
@@ -482,7 +529,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
 ) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+			Name:      fmt.Sprintf("%s-packages-configmap", hostPackageReferences.Name),
 			Namespace: hostPackageReferences.Namespace,
 		},
 	}
@@ -518,8 +565,9 @@ COPY node_modules /modules
 			for key, value := range hostPackageReferences.Labels {
 				configMap.Labels[key] = value
 			}
+
 			configMap.Labels["app.kubernetes.io/name"] = kdexWeb
-			configMap.Labels["kdex.dev/theme"] = hostPackageReferences.Name
+			configMap.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
 			configMap.Data = map[string]string{
 				"package.json": packageJSON,
@@ -556,7 +604,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateNpmrcSecret(
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
+			Name:      fmt.Sprintf("%s-packages-secret", hostPackageReferences.Name),
 			Namespace: hostPackageReferences.Namespace,
 		},
 	}
@@ -589,6 +637,22 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateNpmrcSecret(
 				authStr := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", r.Configuration.DefaultNpmRegistry.AuthData.Username, r.Configuration.DefaultNpmRegistry.AuthData.Password)))
 				npmrcContent += fmt.Sprintf("//%s/:_auth=%s\n", registryUrl.Host, authStr)
 			}
+
+			if secret.Annotations == nil {
+				secret.Annotations = make(map[string]string)
+			}
+			for key, value := range hostPackageReferences.Annotations {
+				secret.Annotations[key] = value
+			}
+			if secret.Labels == nil {
+				secret.Labels = make(map[string]string)
+			}
+			for key, value := range hostPackageReferences.Labels {
+				secret.Labels[key] = value
+			}
+
+			secret.Labels["app.kubernetes.io/name"] = kdexWeb
+			secret.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
 			secret.StringData = map[string]string{
 				".npmrc": npmrcContent,
