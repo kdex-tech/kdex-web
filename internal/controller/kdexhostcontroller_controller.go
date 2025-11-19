@@ -60,6 +60,7 @@ type KDexHostControllerReconciler struct {
 
 	mu                 sync.RWMutex
 	memoizedDeployment *appsv1.DeploymentSpec
+	memoizedIngress    *networkingv1.IngressSpec
 	memoizedService    *corev1.ServiceSpec
 }
 
@@ -247,9 +248,26 @@ func (r *KDexHostControllerReconciler) getMemoizedDeployment() *appsv1.Deploymen
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.memoizedDeployment = r.Configuration.ThemeServer.Deployment.DeepCopy()
+	r.memoizedDeployment = r.Configuration.StaticServing.Deployment.DeepCopy()
 
 	return r.memoizedDeployment
+}
+
+func (r *KDexHostControllerReconciler) getMemoizedIngress() *networkingv1.IngressSpec {
+	r.mu.RLock()
+
+	if r.memoizedIngress != nil {
+		r.mu.RUnlock()
+		return r.memoizedIngress
+	}
+
+	r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.memoizedIngress = r.Configuration.StaticServing.Ingress.DeepCopy()
+
+	return r.memoizedIngress
 }
 
 func (r *KDexHostControllerReconciler) getMemoizedService() *corev1.ServiceSpec {
@@ -264,7 +282,7 @@ func (r *KDexHostControllerReconciler) getMemoizedService() *corev1.ServiceSpec 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.memoizedService = r.Configuration.ThemeServer.Service.DeepCopy()
+	r.memoizedService = r.Configuration.StaticServing.Service.DeepCopy()
 
 	return r.memoizedService
 }
@@ -509,7 +527,8 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 			}
 			ingress.Labels["app.kubernetes.io/name"] = kdexWeb
 			ingress.Labels["kdex.dev/focus-host"] = hostController.Name
-			ingress.Spec = r.Configuration.ThemeServer.Ingress
+
+			ingress.Spec = *r.getMemoizedIngress()
 
 			if ingress.Spec.DefaultBackend == nil {
 				ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{}
@@ -637,6 +656,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 			for idx, value := range deployment.Spec.Template.Spec.Volumes {
 				if value.Name == "oci-image" {
 					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = hostPackageReferences.Status.Image
+					deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = corev1.PullIfNotPresent
 				}
 			}
 
@@ -707,7 +727,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 
 			portFound := false
 			for idx, value := range service.Spec.Ports {
-				if value.Name == "webserver" || value.Name == hostPackageReferences.Name {
+				if value.Name == "server" || value.Name == hostPackageReferences.Name {
 					service.Spec.Ports[idx].Name = hostPackageReferences.Name
 					service.Spec.Ports[idx].Port = 80
 					service.Spec.Ports[idx].Protocol = corev1.ProtocolTCP
@@ -894,7 +914,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 
 			portFound := false
 			for idx, value := range service.Spec.Ports {
-				if value.Name == "webserver" || value.Name == theme.Name {
+				if value.Name == "server" || value.Name == theme.Name {
 					service.Spec.Ports[idx].Name = theme.Name
 					service.Spec.Ports[idx].Port = 80
 					service.Spec.Ports[idx].Protocol = corev1.ProtocolTCP

@@ -109,6 +109,18 @@ metadata:
   namespace: system
 data:
     config.yaml: |
-      deployment:
-        image: k3d-registry:5000/kdex-tech/kdex-themeserver:latest
-        pullPolicy: Always
+      defaultImageRegistry:
+        host: k3d-registry:5000
+        insecure: true
+
+      defaultNpmRegistry:
+        host: npm-registry-verdaccio.npm-registry:4873
+        insecure: true
+
+      staticServing:
+        deployment:
+          template:
+            spec:
+              containers:
+              - image: k3d-registry:5000/kdex-tech/kdex-themeserver:latest
+                imagePullPolicy: Always
