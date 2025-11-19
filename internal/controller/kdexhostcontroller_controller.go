@@ -282,8 +282,12 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 		return r1, err
 	}
 
-	if hostPackageReferences != nil {
-		// TODO create the Package Server Deployment and service
+	if err := r.createOrUpdatePackagesDeployment(ctx, hostController, hostPackageReferences); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	if err := r.createOrUpdatePackagesService(ctx, hostController, hostPackageReferences); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if err := r.createOrUpdateThemeDeployment(ctx, hostController, theme); err != nil {
@@ -295,11 +299,11 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 	}
 
 	if hostController.Spec.Host.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
-		if err := r.createOrUpdateHTTPRoute(ctx, hostController, theme); err != nil {
+		if err := r.createOrUpdateHTTPRoute(ctx, hostController, theme, hostPackageReferences); err != nil {
 			return ctrl.Result{}, err
 		}
 	} else {
-		if err := r.createOrUpdateIngress(ctx, hostController, theme); err != nil {
+		if err := r.createOrUpdateIngress(ctx, hostController, theme, hostPackageReferences); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -348,7 +352,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 
 	hostPackageReferences := &kdexv1alpha1.KDexHostPackageReferences{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      hostController.Name,
+			Name:      hostController.Name + "-packages",
 			Namespace: hostController.Namespace,
 		},
 	}
@@ -419,6 +423,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
 	theme *kdexv1alpha1.KDexTheme,
+	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) error {
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -457,6 +462,25 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 						},
 					},
 				})
+			}
+
+			if hostPackageReferences != nil {
+				for _, rule := range rules {
+					rule.HTTP.Paths = append(rule.HTTP.Paths,
+						networkingv1.HTTPIngressPath{
+							Path:     "/modules",
+							PathType: &pathType,
+							Backend: networkingv1.IngressBackend{
+								Service: &networkingv1.IngressServiceBackend{
+									Name: hostPackageReferences.Name,
+									Port: networkingv1.ServiceBackendPort{
+										Name: hostPackageReferences.Name,
+									},
+								},
+							},
+						},
+					)
+				}
 			}
 
 			if theme != nil {
@@ -533,7 +557,191 @@ func (r *KDexHostControllerReconciler) createOrUpdateHTTPRoute(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
 	theme *kdexv1alpha1.KDexTheme,
+	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) error {
+	return nil
+}
+
+func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
+	ctx context.Context,
+	hostController *kdexv1alpha1.KDexHostController,
+	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
+) error {
+	if hostPackageReferences == nil {
+		return nil
+	}
+
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      hostPackageReferences.Name,
+			Namespace: hostController.Namespace,
+		},
+	}
+
+	if _, err := ctrl.CreateOrUpdate(
+		ctx,
+		r.Client,
+		deployment,
+		func() error {
+			if deployment.Annotations == nil {
+				deployment.Annotations = make(map[string]string)
+			}
+			for key, value := range hostPackageReferences.Annotations {
+				deployment.Annotations[key] = value
+			}
+			if deployment.Labels == nil {
+				deployment.Labels = make(map[string]string)
+			}
+			for key, value := range hostPackageReferences.Labels {
+				deployment.Labels[key] = value
+			}
+			deployment.Labels["app.kubernetes.io/name"] = kdexWeb
+			deployment.Labels["kdex.dev/package-references"] = hostPackageReferences.Name
+
+			deployment.Spec = *r.getMemoizedDeployment()
+
+			if deployment.Spec.Selector == nil {
+				deployment.Spec.Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{},
+				}
+			}
+
+			deployment.Spec.Selector.MatchLabels["app.kubernetes.io/name"] = kdexWeb
+			deployment.Spec.Selector.MatchLabels["kdex.dev/package-references"] = hostPackageReferences.Name
+
+			if deployment.Spec.Template.Labels == nil {
+				deployment.Spec.Template.Labels = make(map[string]string)
+			}
+
+			deployment.Spec.Template.Labels["app.kubernetes.io/name"] = kdexWeb
+			deployment.Spec.Template.Labels["kdex.dev/package-references"] = hostPackageReferences.Name
+
+			foundCorsDomainsEnv := false
+			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
+				if value.Name == "CORS_DOMAINS" {
+					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(hostController.Spec.Host.Routing.Domains)
+					foundCorsDomainsEnv = true
+				}
+			}
+
+			if !foundCorsDomainsEnv {
+				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
+					Name:  "CORS_DOMAINS",
+					Value: utils.DomainsToMatcher(hostController.Spec.Host.Routing.Domains),
+				})
+			}
+
+			deployment.Spec.Template.Spec.Containers[0].Name = hostPackageReferences.Name
+			deployment.Spec.Template.Spec.Containers[0].Ports[0].Name = hostPackageReferences.Name
+
+			for idx, value := range deployment.Spec.Template.Spec.Volumes {
+				if value.Name == "oci-image" {
+					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = hostPackageReferences.Status.Image
+				}
+			}
+
+			return ctrl.SetControllerReference(hostController, deployment, r.Scheme)
+		},
+	); err != nil {
+		kdexv1alpha1.SetConditions(
+			&hostController.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			err.Error(),
+		)
+
+		return err
+	}
+
+	return nil
+}
+
+func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
+	ctx context.Context,
+	hostController *kdexv1alpha1.KDexHostController,
+	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
+) error {
+	if hostPackageReferences == nil {
+		return nil
+	}
+
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      hostPackageReferences.Name,
+			Namespace: hostController.Namespace,
+		},
+	}
+
+	if _, err := ctrl.CreateOrUpdate(
+		ctx,
+		r.Client,
+		service,
+		func() error {
+			if service.Annotations == nil {
+				service.Annotations = make(map[string]string)
+			}
+			for key, value := range hostPackageReferences.Annotations {
+				service.Annotations[key] = value
+			}
+			if service.Labels == nil {
+				service.Labels = make(map[string]string)
+			}
+			for key, value := range hostPackageReferences.Labels {
+				service.Labels[key] = value
+			}
+			service.Labels["app.kubernetes.io/name"] = kdexWeb
+			service.Labels["kdex.dev/theme"] = hostPackageReferences.Name
+
+			service.Spec = *r.getMemoizedService()
+
+			if service.Spec.Selector == nil {
+				service.Spec.Selector = make(map[string]string)
+			}
+
+			service.Spec.Selector["app.kubernetes.io/name"] = kdexWeb
+			service.Spec.Selector["kdex.dev/theme"] = hostPackageReferences.Name
+
+			portFound := false
+			for idx, value := range service.Spec.Ports {
+				if value.Name == "webserver" || value.Name == hostPackageReferences.Name {
+					service.Spec.Ports[idx].Name = hostPackageReferences.Name
+					service.Spec.Ports[idx].Port = 80
+					service.Spec.Ports[idx].Protocol = corev1.ProtocolTCP
+					service.Spec.Ports[idx].TargetPort.StrVal = hostPackageReferences.Name
+					portFound = true
+				}
+			}
+
+			if !portFound {
+				service.Spec.Ports = append(service.Spec.Ports, corev1.ServicePort{
+					Name:       hostPackageReferences.Name,
+					Port:       80,
+					Protocol:   corev1.ProtocolTCP,
+					TargetPort: intstr.FromString(hostPackageReferences.Name),
+				})
+			}
+
+			return ctrl.SetControllerReference(hostController, service, r.Scheme)
+		},
+	); err != nil {
+		kdexv1alpha1.SetConditions(
+			&hostController.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			err.Error(),
+		)
+
+		return err
+	}
+
 	return nil
 }
 
@@ -572,18 +780,22 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 			}
 			deployment.Labels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Labels["kdex.dev/theme"] = theme.Name
+
 			deployment.Spec = *r.getMemoizedDeployment()
+
 			if deployment.Spec.Selector == nil {
 				deployment.Spec.Selector = &metav1.LabelSelector{
 					MatchLabels: map[string]string{},
 				}
 			}
+
 			deployment.Spec.Selector.MatchLabels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Spec.Selector.MatchLabels["kdex.dev/theme"] = theme.Name
 
 			if deployment.Spec.Template.Labels == nil {
 				deployment.Spec.Template.Labels = make(map[string]string)
 			}
+
 			deployment.Spec.Template.Labels["app.kubernetes.io/name"] = kdexWeb
 			deployment.Spec.Template.Labels["kdex.dev/theme"] = theme.Name
 
@@ -606,7 +818,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 			deployment.Spec.Template.Spec.Containers[0].Ports[0].Name = theme.Name
 
 			for idx, value := range deployment.Spec.Template.Spec.Volumes {
-				if value.Name == "theme-oci-image" {
+				if value.Name == "oci-image" {
 					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = theme.Spec.Image
 
 					if theme.Spec.PullPolicy != "" {

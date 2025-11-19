@@ -358,6 +358,7 @@ func (r *KDexHostPackageReferencesReconciler) buildJob(
 		"--destination=" + imageURL,
 		"--digest-file=/dev/termination-log",
 	}
+
 	if r.Configuration.DefaultImageRegistry.InSecure {
 		kanikoArgs = append(kanikoArgs, "--insecure")
 	}
@@ -424,7 +425,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
 ) (*corev1.ConfigMap, error) {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-packages-config", hostPackageReferences.Name),
+			Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
 			Namespace: hostPackageReferences.Namespace,
 		},
 	}
@@ -445,7 +446,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
 
 			dockerfile := `
 FROM scratch
-COPY node_modules /node_modules
+COPY node_modules /modules
 `
 
 			if configMap.Annotations == nil {
@@ -498,7 +499,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateNpmrcSecret(
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-packages-npmrc", hostPackageReferences.Name),
+			Name:      fmt.Sprintf("%s-packages", hostPackageReferences.Name),
 			Namespace: hostPackageReferences.Namespace,
 		},
 	}
