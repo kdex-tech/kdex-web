@@ -304,17 +304,6 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		}
 
 		if imageDigest == "" {
-			kdexv1alpha1.SetConditions(
-				&hostPackageReferences.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionFalse,
-					Progressing: metav1.ConditionTrue,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				"image digest not found in termination message, requeueing",
-			)
-
 			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 		}
 
@@ -348,30 +337,8 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 			return ctrl.Result{}, err
 		}
 	} else if job.Status.Failed > 0 {
-		kdexv1alpha1.SetConditions(
-			&hostPackageReferences.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionTrue,
-				Progressing: metav1.ConditionFalse,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconcileError,
-			"Package build job failed, requeueing",
-		)
-
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	} else {
-		kdexv1alpha1.SetConditions(
-			&hostPackageReferences.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionFalse,
-				Progressing: metav1.ConditionTrue,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconcileError,
-			"Job is still running, requeueing",
-		)
-
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
