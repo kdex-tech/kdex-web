@@ -4,17 +4,19 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 type HostStore struct {
 	mu       sync.RWMutex
 	handlers map[string]*HostHandler
+	log      logr.Logger
 }
 
 func NewHostStore() *HostStore {
 	return &HostStore{
 		handlers: make(map[string]*HostHandler),
+		log:      ctrl.Log.WithName("hostStore"),
 	}
 }
 
@@ -31,23 +33,17 @@ func (s *HostStore) Get(name string) (*HostHandler, bool) {
 	return handler, ok
 }
 
-func (s *HostStore) GetOrUpdate(
-	h *kdexv1alpha1.KDexHostController,
-	scriptLibraries []kdexv1alpha1.KDexScriptLibrary,
-	theme *kdexv1alpha1.KDexTheme,
-	log logr.Logger,
-) *HostHandler {
+func (s *HostStore) GetOrUpdate(name string) *HostHandler {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	handler, ok := s.handlers[h.Name]
+	handler, ok := s.handlers[name]
 	if !ok {
-		handler = NewHostHandler(log)
-		s.handlers[h.Name] = handler
-		log.Info("adding new host", "host", h.Name)
+		handler = NewHostHandler(name, s.log)
+		s.handlers[name] = handler
+		s.log.Info("adding new host", "host", name)
 	} else {
-		log.Info("updating existing host", "host", h.Name)
+		s.log.Info("updating existing host", "host", name)
 	}
-	handler.SetHost(h, scriptLibraries, theme)
 	return handler
 }
 

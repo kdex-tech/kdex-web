@@ -41,29 +41,30 @@ const (
 )
 
 func TestHostHandler_L10nRenderLocked(t *testing.T) {
+	type THost struct {
+		name string
+		host kdexv1alpha1.KDexHostSpec
+	}
+
 	tests := []struct {
-		host        kdexv1alpha1.KDexHostController
-		lang        string
 		name        string
+		host        THost
+		lang        string
 		pageHandler page.PageHandler
 		translation *kdexv1alpha1.KDexTranslation
 		want        []string
 	}{
 		{
 			name: "english translation",
-			host: kdexv1alpha1.KDexHostController{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-host",
-				},
-				Spec: kdexv1alpha1.KDexHostControllerSpec{
-					Host: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						DefaultLang:  "en",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{"foo.bar"},
-						},
+			host: THost{
+				name: "sample-host",
+				host: kdexv1alpha1.KDexHostSpec{
+					BrandName:    "KDex Tech",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
 					},
 				},
 			},
@@ -135,19 +136,15 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		},
 		{
 			name: "french translation",
-			host: kdexv1alpha1.KDexHostController{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-host",
-				},
-				Spec: kdexv1alpha1.KDexHostControllerSpec{
-					Host: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						DefaultLang:  "en",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{"foo.bar"},
-						},
+			host: THost{
+				name: "sample-host",
+				host: kdexv1alpha1.KDexHostSpec{
+					BrandName:    "KDex Tech",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
 					},
 				},
 			},
@@ -219,19 +216,15 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		},
 		{
 			name: "no translation",
-			host: kdexv1alpha1.KDexHostController{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-host",
-				},
-				Spec: kdexv1alpha1.KDexHostControllerSpec{
-					Host: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						DefaultLang:  "en",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{"foo.bar"},
-						},
+			host: THost{
+				name: "sample-host",
+				host: kdexv1alpha1.KDexHostSpec{
+					BrandName:    "KDex Tech",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
 					},
 				},
 			},
@@ -284,8 +277,8 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(logr.Discard())
-			th.SetHost(&tt.host, nil, nil)
+			th := NewHostHandler(tt.host.name, logr.Discard())
+			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translation)
 
 			got, gotErr := th.L10nRenderLocked(tt.pageHandler, &map[string]*render.PageEntry{}, language.Make(tt.lang))
@@ -300,27 +293,28 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 }
 
 func TestHostHandler_L10nRendersLocked(t *testing.T) {
+	type THost struct {
+		name string
+		host kdexv1alpha1.KDexHostSpec
+	}
+
 	tests := []struct {
 		name        string
-		host        kdexv1alpha1.KDexHostController
+		host        THost
 		pageHandler page.PageHandler
 		translation *kdexv1alpha1.KDexTranslation
 		want        map[string][]string
 	}{
 		{
 			name: "translations",
-			host: kdexv1alpha1.KDexHostController{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-host",
-				},
-				Spec: kdexv1alpha1.KDexHostControllerSpec{
-					Host: kdexv1alpha1.KDexHostSpec{
-						DefaultLang:  "en",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{"foo.bar"},
-						},
+			host: THost{
+				name: "sample-host",
+				host: kdexv1alpha1.KDexHostSpec{
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
 					},
 				},
 			},
@@ -401,8 +395,8 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(logr.Discard())
-			th.SetHost(&tt.host, nil, nil)
+			th := NewHostHandler(tt.host.name, logr.Discard())
+			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translation)
 
 			got := th.L10nRendersLocked(tt.pageHandler, map[language.Tag]*map[string]*render.PageEntry{})
@@ -422,26 +416,27 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 		key      string
 		expected string
 	}
+	type THost struct {
+		name string
+		host kdexv1alpha1.KDexHostSpec
+	}
+
 	tests := []struct {
 		name        string
-		host        kdexv1alpha1.KDexHostController
+		host        THost
 		translation *kdexv1alpha1.KDexTranslation
 		langTests   map[string]KeyAndExpected
 	}{
 		{
 			name: "add translation",
-			host: kdexv1alpha1.KDexHostController{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-host",
-				},
-				Spec: kdexv1alpha1.KDexHostControllerSpec{
-					Host: kdexv1alpha1.KDexHostSpec{
-						DefaultLang:  "en",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{"foo.bar"},
-						},
+			host: THost{
+				name: "sample-host",
+				host: kdexv1alpha1.KDexHostSpec{
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
 					},
 				},
 			},
@@ -488,8 +483,8 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(logr.Discard())
-			th.SetHost(&tt.host, nil, nil)
+			th := NewHostHandler(tt.host.name, logr.Discard())
+			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translation)
 
 			for lang, expected := range tt.langTests {

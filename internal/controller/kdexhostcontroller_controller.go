@@ -42,7 +42,6 @@ import (
 
 const (
 	hostControllerFinalizerName = "kdex.dev/kdex-web-host-controller-finalizer"
-	kdexWeb                     = "kdex-web"
 )
 
 // KDexHostControllerReconciler reconciles a KDexHostController object
@@ -77,8 +76,6 @@ type KDexHostControllerReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,verbs=get;list;watch
 
 func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
-	log := logf.FromContext(ctx)
-
 	var hostController kdexv1alpha1.KDexHostController
 	if err := r.Get(ctx, req.NamespacedName, &hostController); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -152,31 +149,61 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	hostHandler := r.HostStore.GetOrUpdate(&hostController, scriptLibraries, theme, log)
+	hostHandler := r.HostStore.GetOrUpdate(hostController.Name)
 
-	// hasRootPage := hasRootPage(hostHandler.Pages)
+	allPackageReferences := []kdexv1alpha1.PackageReference{}
+	for _, scriptLibrary := range scriptLibraries {
+		if scriptLibrary.Spec.PackageReference != nil {
+			allPackageReferences = append(allPackageReferences, *scriptLibrary.Spec.PackageReference)
+		}
+	}
 
-	// if hostHandler.Pages.Count() == 0 || !hasRootPage {
-	// 	err := fmt.Errorf("no pages to render for host %s", host.Name)
+	for _, p := range hostHandler.Pages.List() {
+		allPackageReferences = append(allPackageReferences, p.PackageReferences...)
+	}
 
-	// 	if !hasRootPage {
-	// 		err = fmt.Errorf("no root page for host %s", host.Name)
-	// 	}
+	uniquePackageReferences := make(map[string]kdexv1alpha1.PackageReference)
+	for _, pkgRef := range allPackageReferences {
+		uniquePackageReferences[pkgRef.Name+"@"+pkgRef.Version] = pkgRef
+	}
 
-	// 	kdexv1alpha1.SetConditions(
-	// 		&hostController.Status.Conditions,
-	// 		kdexv1alpha1.ConditionStatuses{
-	// 			Degraded:    metav1.ConditionTrue,
-	// 			Progressing: metav1.ConditionFalse,
-	// 			Ready:       metav1.ConditionFalse,
-	// 		},
-	// 		kdexv1alpha1.ConditionReasonReconcileError,
-	// 		err.Error(),
-	// 	)
-	// 	return ctrl.Result{}, err
-	// }
+	finalPackageReferences := []kdexv1alpha1.PackageReference{}
+	for _, pkgRef := range uniquePackageReferences {
+		finalPackageReferences = append(finalPackageReferences, pkgRef)
+	}
 
-	return r.innerReconcile(ctx, &hostController, theme, hostHandler)
+	hostPackageReferences, shouldReturn, r1, err := r.createOrUpdatePackageReferences(ctx, &hostController, finalPackageReferences)
+	if shouldReturn {
+		return r1, err
+	}
+
+	if len(finalPackageReferences) == 0 && hostPackageReferences != nil {
+		if err := r.Delete(ctx, hostPackageReferences); err != nil {
+			if client.IgnoreNotFound(err) != nil {
+				kdexv1alpha1.SetConditions(
+					&hostController.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileSuccess,
+					err.Error(),
+				)
+
+				return ctrl.Result{}, err
+			}
+		}
+
+		hostPackageReferences = nil
+	}
+
+	hostHandler.SetHost(
+		&hostController.Spec.Host, theme.Spec.Assets, scriptLibraries,
+		hostPackageReferences.Status.ImportMap,
+	)
+
+	return r.innerReconcile(ctx, &hostController, theme, hostPackageReferences)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -291,14 +318,9 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
 	theme *kdexv1alpha1.KDexTheme,
-	hostHandler *host.HostHandler,
+	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
-
-	hostPackageReferences, shouldReturn, r1, err := r.createOrUpdatePackageReferences(ctx, hostController, hostHandler)
-	if shouldReturn {
-		return r1, err
-	}
 
 	if err := r.createOrUpdatePackagesDeployment(ctx, hostController, hostPackageReferences); err != nil {
 		return ctrl.Result{}, err
@@ -345,55 +367,13 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
-	hostHandler *host.HostHandler,
+	packageReferences []kdexv1alpha1.PackageReference,
 ) (*kdexv1alpha1.KDexHostPackageReferences, bool, ctrl.Result, error) {
-	allPackageReferences := []kdexv1alpha1.PackageReference{}
-	for _, scriptLibrary := range hostHandler.ScriptLibraries {
-		if scriptLibrary.Spec.PackageReference != nil {
-			allPackageReferences = append(allPackageReferences, *scriptLibrary.Spec.PackageReference)
-		}
-	}
-
-	for _, p := range hostHandler.Pages.List() {
-		allPackageReferences = append(allPackageReferences, p.PackageReferences...)
-	}
-
-	uniquePackageReferences := make(map[string]kdexv1alpha1.PackageReference)
-	for _, pkgRef := range allPackageReferences {
-		uniquePackageReferences[pkgRef.Name+"@"+pkgRef.Version] = pkgRef
-	}
-
-	finalPackageReferences := []kdexv1alpha1.PackageReference{}
-	for _, pkgRef := range uniquePackageReferences {
-		finalPackageReferences = append(finalPackageReferences, pkgRef)
-	}
-
 	hostPackageReferences := &kdexv1alpha1.KDexHostPackageReferences{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      hostController.Name + "-packages",
 			Namespace: hostController.Namespace,
 		},
-	}
-
-	if len(finalPackageReferences) == 0 {
-		if err := r.Delete(ctx, hostPackageReferences); err != nil {
-			if client.IgnoreNotFound(err) != nil {
-				kdexv1alpha1.SetConditions(
-					&hostController.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionFalse,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconcileSuccess,
-					err.Error(),
-				)
-
-				return nil, true, ctrl.Result{}, err
-			}
-		}
-
-		return nil, false, ctrl.Result{}, nil
 	}
 
 	if _, err := ctrl.CreateOrUpdate(
@@ -416,7 +396,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 
 			hostPackageReferences.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
-			hostPackageReferences.Spec.PackageReferences = finalPackageReferences
+			hostPackageReferences.Spec.PackageReferences = packageReferences
 
 			return ctrl.SetControllerReference(hostController, hostPackageReferences, r.Scheme)
 		},
@@ -920,13 +900,3 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 
 	return nil
 }
-
-// func hasRootPage(pageStore *store.PageStore) bool {
-// 	for _, handler := range pageStore.List() {
-// 		if handler.Page.Spec.BasePath == "/" {
-// 			return true
-// 		}
-// 	}
-
-// 	return false
-// }

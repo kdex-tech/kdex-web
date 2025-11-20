@@ -29,24 +29,28 @@ const (
 )
 
 type HostHandler struct {
+	Name                 string
 	Mux                  *http.ServeMux
 	Pages                *page.PageStore
 	ScriptLibraries      []kdexv1alpha1.KDexScriptLibrary
 	Translations         *catalog.Builder
+	assets               []kdexv1alpha1.Asset
 	defaultLanguage      string
-	host                 *kdexv1alpha1.KDexHostController
+	host                 *kdexv1alpha1.KDexHostSpec
+	importmap            string
 	log                  logr.Logger
 	mu                   sync.RWMutex
-	theme                *kdexv1alpha1.KDexTheme
 	translationResources map[string]kdexv1alpha1.KDexTranslation
 }
 
 func NewHostHandler(
+	name string,
 	log logr.Logger,
 ) *HostHandler {
 	th := &HostHandler{
+		Name:                 name,
 		defaultLanguage:      "en",
-		log:                  log,
+		log:                  log.WithName("hostHandler"),
 		translationResources: map[string]kdexv1alpha1.KDexTranslation{},
 	}
 
@@ -58,7 +62,7 @@ func NewHostHandler(
 
 	rps := &page.PageStore{
 		Handlers: map[string]page.PageHandler{},
-		Log:      log.WithName("render-page-store"),
+		Log:      log.WithName("pageStore"),
 		OnUpdate: th.RebuildMux,
 	}
 	th.Pages = rps
@@ -84,7 +88,7 @@ func (th *HostHandler) Domains() []string {
 	if th.host == nil {
 		return []string{}
 	}
-	return th.host.Spec.Host.Routing.Domains
+	return th.host.Routing.Domains
 }
 
 func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
@@ -122,8 +126,9 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	separator := ""
 
 	if len(packageReferences) > 0 {
-		// buffer.WriteString("<script type=\"importmap\"></script>\n")
-		// TODO add middleware to inject the importmap
+		buffer.WriteString("<script type=\"importmap\">\n")
+		buffer.WriteString(th.importmap)
+		buffer.WriteString("</script>\n")
 
 		buffer.WriteString("<script type=\"module\">\n")
 		for _, pr := range packageReferences {
@@ -159,7 +164,7 @@ func (th *HostHandler) L10nRenderLocked(
 ) (string, error) {
 	renderer := render.Renderer{
 		BasePath:        handler.Page.Spec.BasePath,
-		BrandName:       th.host.Spec.Host.BrandName,
+		BrandName:       th.host.BrandName,
 		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: th.defaultLanguage,
 		Footer:          handler.FooterToHTML(),
@@ -172,7 +177,7 @@ func (th *HostHandler) L10nRenderLocked(
 		MessagePrinter:  th.messagePrinterLocked(l),
 		Meta:            th.MetaToString(handler),
 		Navigations:     handler.NavigationToHTMLMap(),
-		Organization:    th.host.Spec.Host.Organization,
+		Organization:    th.host.Organization,
 		PageMap:         pageMap,
 		PatternPath:     handler.Page.Spec.PatternPath,
 		TemplateContent: handler.Archetype.Spec.Content,
@@ -203,8 +208,8 @@ func (th *HostHandler) L10nRendersLocked(
 func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 
-	if th.host.Spec.Host.BaseMeta != "" {
-		buffer.WriteString(th.host.Spec.Host.BaseMeta)
+	if th.host.BaseMeta != "" {
+		buffer.WriteString(th.host.BaseMeta)
 		buffer.WriteRune('\n')
 	}
 
@@ -248,7 +253,7 @@ func (th *HostHandler) RebuildMux() {
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			log := logf.FromContext(r.Context())
 
-			log.Info("no pages found", "host", th.host.Name)
+			log.Info("no pages found", "host", th.Name)
 
 			http.NotFound(w, r)
 		})
@@ -311,27 +316,25 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (th *HostHandler) SetHost(
-	host *kdexv1alpha1.KDexHostController,
+	host *kdexv1alpha1.KDexHostSpec,
+	assets []kdexv1alpha1.Asset,
 	scriptLibraries []kdexv1alpha1.KDexScriptLibrary,
-	theme *kdexv1alpha1.KDexTheme,
+	importmap string,
 ) {
 	th.mu.Lock()
-	th.defaultLanguage = host.Spec.Host.DefaultLang
+	th.defaultLanguage = host.DefaultLang
 	th.host = host
 	th.ScriptLibraries = scriptLibraries
-	th.theme = theme
+	th.assets = assets
+	th.importmap = importmap
 	th.mu.Unlock()
 	th.RebuildMux()
 }
 
 func (th *HostHandler) ThemeToString() string {
-	if th.theme == nil {
-		return ""
-	}
-
 	var buffer bytes.Buffer
 	separator := ""
-	for _, asset := range th.theme.Spec.Assets {
+	for _, asset := range th.assets {
 		buffer.WriteString(separator)
 		buffer.WriteString(asset.String())
 		separator = "\n"
@@ -423,13 +426,13 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 
 		renderer := render.Renderer{
 			BasePath:        pageHandler.Page.Spec.BasePath,
-			BrandName:       th.host.Spec.Host.BrandName,
+			BrandName:       th.host.BrandName,
 			DefaultLanguage: th.defaultLanguage,
 			Language:        langTag.String(),
 			Languages:       th.availableLanguagesLocked(),
 			LastModified:    time.Now(),
 			MessagePrinter:  th.messagePrinterLocked(langTag),
-			Organization:    th.host.Spec.Host.Organization,
+			Organization:    th.host.Organization,
 			PageMap:         pageMap,
 			PatternPath:     pageHandler.Page.Spec.PatternPath,
 			Title:           pageHandler.Page.Spec.Label,
