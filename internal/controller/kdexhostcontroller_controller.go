@@ -549,7 +549,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 				ingress.Labels[key] = value
 			}
 
-			ingress.Spec = *r.getMemoizedIngress()
+			ingress.Spec = *r.getMemoizedIngress().DeepCopy()
 
 			if ingress.Spec.DefaultBackend == nil {
 				ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{}
@@ -636,7 +636,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 				deployment.Labels[key] = value
 			}
 
-			deployment.Spec = *r.getMemoizedDeployment()
+			deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
 
 			if len(deployment.Spec.Selector.MatchLabels) == 0 {
 				deployment.Spec.Selector.MatchLabels["kdex.dev/packages"] = hostPackageReferences.Name
@@ -724,7 +724,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 				service.Labels[key] = value
 			}
 
-			service.Spec = *r.getMemoizedService()
+			service.Spec = *r.getMemoizedService().DeepCopy()
 
 			if service.Spec.Selector == nil {
 				service.Spec.Selector = make(map[string]string)
@@ -794,7 +794,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 
 			deployment.Labels["kdex.dev/theme"] = theme.Name
 
-			deployment.Spec = *r.getMemoizedDeployment()
+			deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
 
 			if len(deployment.Spec.Selector.MatchLabels) == 0 {
 				deployment.Spec.Selector.MatchLabels["kdex.dev/theme"] = theme.Name
@@ -893,7 +893,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 
 			service.Labels["kdex.dev/theme"] = theme.Name
 
-			service.Spec = *r.getMemoizedService()
+			service.Spec = *r.getMemoizedService().DeepCopy()
 
 			if service.Spec.Selector == nil {
 				service.Spec.Selector = make(map[string]string)
