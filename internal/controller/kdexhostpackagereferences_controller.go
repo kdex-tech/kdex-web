@@ -25,11 +25,9 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -121,59 +119,27 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 
 	log := ctrl.Log.WithName("createOrUpdateJob")
 
-	job := &batchv1.Job{}
-	jobName := types.NamespacedName{
-		Name:      fmt.Sprintf("%s-job", hostPackageReferences.Name),
-		Namespace: hostPackageReferences.Namespace,
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-job", hostPackageReferences.Name),
+			Namespace: hostPackageReferences.Namespace,
+		},
 	}
 
-	if err := r.Get(ctx, jobName, job); err != nil {
-		if errors.IsNotFound(err) {
-			job, err = r.buildJob(ctx, hostPackageReferences, configMap, secret)
-			if err != nil {
-				kdexv1alpha1.SetConditions(
-					&hostPackageReferences.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionFalse,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconcileError,
-					err.Error(),
-				)
-
-				return ctrl.Result{}, err
+	op, err := ctrl.CreateOrUpdate(
+		ctx,
+		r.Client,
+		job,
+		func() error {
+			if job.ObjectMeta.CreationTimestamp.IsZero() {
+				r.setupJob(hostPackageReferences, job, configMap, secret)
 			}
 
-			if err := r.Create(ctx, job); err != nil {
-				kdexv1alpha1.SetConditions(
-					&hostPackageReferences.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionFalse,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconcileError,
-					err.Error(),
-				)
+			return ctrl.SetControllerReference(hostPackageReferences, job, r.Scheme)
+		},
+	)
 
-				return ctrl.Result{}, err
-			}
-
-			kdexv1alpha1.SetConditions(
-				&hostPackageReferences.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionFalse,
-					Progressing: metav1.ConditionTrue,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				"Job created, requeuing",
-			)
-
-			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-		}
-
+	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&hostPackageReferences.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
@@ -188,6 +154,8 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		return ctrl.Result{}, err
 	}
 
+	log.Info("job created", "job", job.Name, "operation", op)
+
 	if job.Labels["kdex.dev/generation"] != fmt.Sprintf("%d", hostPackageReferences.Generation) {
 		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
 			log.Error(
@@ -197,8 +165,17 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 			)
 		}
 
+		log.Info(
+			"job generation does not match, deleting and requeueing",
+			"job", job.Name,
+			"oldGeneration", job.Labels["kdex.dev/generation"],
+			"newGeneration", hostPackageReferences.Generation,
+		)
+
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
+
+	log.Info("job status", "job", job.Name, "status", job.Status)
 
 	if job.Status.Succeeded > 0 {
 		pod, err := r.getPodForJob(ctx, job)
@@ -229,9 +206,24 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 		}
 
+		var importmap string
+		for _, containerStatus := range pod.Status.InitContainerStatuses {
+			if containerStatus.Name == "importmap-generator" && containerStatus.State.Terminated != nil {
+				importmap = containerStatus.State.Terminated.Message
+				break
+			}
+		}
+
+		if importmap == "" {
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		}
+
 		imageRepo := r.Configuration.DefaultImageRegistry.Host
 		imageURL := fmt.Sprintf("%s/%s@%s", imageRepo, hostPackageReferences.Name, imageDigest)
 		hostPackageReferences.Status.Image = imageURL
+
+		// TODO add field to CRD
+		// hostPackageReferences.Status.ImportMap = importmap
 
 		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
 			log.Error(err, "failed to delete successful job after completion", "job", job.Name)
@@ -272,12 +264,24 @@ func (r *KDexHostPackageReferencesReconciler) getPodForJob(
 	return &podList.Items[0], nil
 }
 
-func (r *KDexHostPackageReferencesReconciler) buildJob(
-	ctx context.Context,
+func (r *KDexHostPackageReferencesReconciler) setupJob(
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
+	job *batchv1.Job,
 	configMap *corev1.ConfigMap,
 	npmrcSecret *corev1.Secret,
-) (*batchv1.Job, error) {
+) {
+	job.Annotations = make(map[string]string)
+	for key, value := range hostPackageReferences.Annotations {
+		job.Annotations[key] = value
+	}
+	job.Labels = make(map[string]string)
+	for key, value := range hostPackageReferences.Labels {
+		job.Labels[key] = value
+	}
+
+	job.Labels["kdex.dev/packages"] = hostPackageReferences.Name
+	job.Labels["kdex.dev/generation"] = fmt.Sprintf("%d", hostPackageReferences.Generation)
+
 	imageRepo := r.Configuration.DefaultImageRegistry.Host
 	imageTag := fmt.Sprintf("%d", hostPackageReferences.Generation)
 	imageURL := fmt.Sprintf("%s/%s:%s", imageRepo, hostPackageReferences.Name, imageTag)
@@ -342,76 +346,57 @@ func (r *KDexHostPackageReferencesReconciler) buildJob(
 	}
 
 	backoffLimit := int32(4)
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      hostPackageReferences.Name,
-			Namespace: hostPackageReferences.Namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/name": kdexWeb,
-				"kdex.dev/generation":    fmt.Sprintf("%d", hostPackageReferences.Generation),
-				"kdex.dev/packages":      hostPackageReferences.Name,
-			},
-		},
-		Spec: batchv1.JobSpec{
-			BackoffLimit: &backoffLimit,
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "kaniko",
-							Image: "gcr.io/kaniko-project/executor:latest",
-							Args:  kanikoArgs,
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "build-scripts",
-									MountPath: "/scripts",
-									ReadOnly:  true,
-								},
-								{
-									Name:      "workspace",
-									MountPath: "/workspace",
-									ReadOnly:  true,
-								},
+
+	job.Spec = batchv1.JobSpec{
+		BackoffLimit: &backoffLimit,
+		Template: corev1.PodTemplateSpec{
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "kaniko",
+						Image: "gcr.io/kaniko-project/executor:latest",
+						Args:  kanikoArgs,
+						VolumeMounts: []corev1.VolumeMount{
+							{
+								Name:      "build-scripts",
+								MountPath: "/scripts",
+								ReadOnly:  true,
+							},
+							{
+								Name:      "workspace",
+								MountPath: "/workspace",
+								ReadOnly:  true,
 							},
 						},
 					},
-					InitContainers: []corev1.Container{
-						{
-							Name:         "npm-install",
-							Image:        "node:25-alpine",
-							Command:      []string{"sh", "-c", "cp /scripts/package.json /workspace/package.json && cd /workspace && npm install"},
-							VolumeMounts: npmInstallVolumeMounts,
-						},
-						{
-							Name:         "importmap-generator",
-							Image:        "node:25-alpine",
-							Command:      []string{"sh", "-c", "cp /scripts/generate.js /workspace/generate.js && cd /workspace && node generate.js"},
-							VolumeMounts: npmInstallVolumeMounts,
-						},
-					},
-					RestartPolicy: "Never",
-					Volumes:       volumes,
 				},
+				InitContainers: []corev1.Container{
+					{
+						Name:  "importmap-generator",
+						Image: "node:25-alpine",
+						Command: []string{
+							"sh",
+							"-c",
+							`
+							set -e
+							
+							cp /scripts/package.json /workspace/package.json
+							cd /workspace
+							npm install
+							
+							cp /scripts/generate.js /workspace/generate.js
+							node generate.js
+							cat importmap.json > /dev/termination-log
+							`,
+						},
+						VolumeMounts: npmInstallVolumeMounts,
+					},
+				},
+				RestartPolicy: "Never",
+				Volumes:       volumes,
 			},
 		},
 	}
-
-	if err := ctrl.SetControllerReference(hostPackageReferences, job, r.Scheme); err != nil {
-		kdexv1alpha1.SetConditions(
-			&hostPackageReferences.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionTrue,
-				Progressing: metav1.ConditionFalse,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconcileError,
-			err.Error(),
-		)
-
-		return nil, err
-	}
-
-	return job, nil
 }
 
 func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
@@ -450,8 +435,7 @@ FROM scratch
 COPY importmap.json /modules/importmap.json
 COPY node_modules /modules
 `
-			generateJS := `
-import { Generator } from "@jspm/generator";
+			generateJS := `import { Generator } from "@jspm/generator";
 import fs from 'fs';
 
 const generator = new Generator({
@@ -484,7 +468,7 @@ try {
   "name": "importmap",
   "type": "module",
   "devDependencies": {
-    "@jspm/generator": "2.7.6"
+    "@jspm/generator": "^2.7.6"
   },
   "dependencies": {`
 			for i, pkg := range hostPackageReferences.Spec.PackageReferences {
@@ -574,18 +558,18 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobSecret(
 				}
 
 				secret.Labels["kdex.dev/packages"] = hostPackageReferences.Name
-			}
 
-			npmrcContent := fmt.Sprintf("registry=%s\n", r.Configuration.DefaultNpmRegistry.GetAddress())
-			if r.Configuration.DefaultNpmRegistry.AuthData.Token != "" {
-				npmrcContent += fmt.Sprintf("//%s/:_authToken=%s\n", registryUrl.Host, r.Configuration.DefaultNpmRegistry.AuthData.Token)
-			} else if r.Configuration.DefaultNpmRegistry.AuthData.Username != "" && r.Configuration.DefaultNpmRegistry.AuthData.Password != "" {
-				authStr := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", r.Configuration.DefaultNpmRegistry.AuthData.Username, r.Configuration.DefaultNpmRegistry.AuthData.Password)))
-				npmrcContent += fmt.Sprintf("//%s/:_auth=%s\n", registryUrl.Host, authStr)
-			}
+				npmrcContent := fmt.Sprintf("registry=%s\n", r.Configuration.DefaultNpmRegistry.GetAddress())
+				if r.Configuration.DefaultNpmRegistry.AuthData.Token != "" {
+					npmrcContent += fmt.Sprintf("//%s/:_authToken=%s\n", registryUrl.Host, r.Configuration.DefaultNpmRegistry.AuthData.Token)
+				} else if r.Configuration.DefaultNpmRegistry.AuthData.Username != "" && r.Configuration.DefaultNpmRegistry.AuthData.Password != "" {
+					authStr := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", r.Configuration.DefaultNpmRegistry.AuthData.Username, r.Configuration.DefaultNpmRegistry.AuthData.Password)))
+					npmrcContent += fmt.Sprintf("//%s/:_auth=%s\n", registryUrl.Host, authStr)
+				}
 
-			secret.StringData = map[string]string{
-				".npmrc": npmrcContent,
+				secret.StringData = map[string]string{
+					".npmrc": npmrcContent,
+				}
 			}
 
 			return ctrl.SetControllerReference(hostPackageReferences, secret, r.Scheme)
