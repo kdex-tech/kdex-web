@@ -122,6 +122,9 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	separator := ""
 
 	if len(packageReferences) > 0 {
+		// buffer.WriteString("<script type=\"importmap\"></script>\n")
+		// TODO add middleware to inject the importmap
+
 		buffer.WriteString("<script type=\"module\">\n")
 		for _, pr := range packageReferences {
 			buffer.WriteString(separator)
