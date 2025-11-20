@@ -398,8 +398,14 @@ func (r *KDexHostPackageReferencesReconciler) buildJob(
 					InitContainers: []corev1.Container{
 						{
 							Name:         "npm-install",
-							Image:        "node:18-alpine",
+							Image:        "node:25-alpine",
 							Command:      []string{"sh", "-c", "cp /scripts/package.json /workspace/package.json && cd /workspace && npm install"},
+							VolumeMounts: npmInstallVolumeMounts,
+						},
+						{
+							Name:         "importmap-generator",
+							Image:        "node:25-alpine",
+							Command:      []string{"sh", "-c", "cp /scripts/generate.js /workspace/generate.js && cd /workspace && node generate.js"},
 							VolumeMounts: npmInstallVolumeMounts,
 						},
 					},
@@ -444,7 +450,48 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
 		r.Client,
 		configMap,
 		func() error {
-			packageJSON := `{"dependencies": {`
+			dockerfile := `
+FROM scratch
+COPY importmap.json /modules/importmap.json
+COPY node_modules /modules
+`
+			generateJS := `
+import { Generator } from "@jspm/generator";
+import fs from 'fs';
+
+const generator = new Generator({
+    defaultProvider: 'nodemodules',
+    env: ['production', 'module', 'browser'],
+    integrity: true,
+});
+
+try {
+    const packageJSONStr = fs.readFileSync('package.json', 'utf8');
+    const packageJSON = JSON.parse(packageJSONStr);
+    
+    for (const [key, value] of Object.entries(packageJSON.dependencies)) {
+        await generator.install(key);
+    }
+
+    let importMap = JSON.stringify(generator.getMap(), null, 2)
+
+    importMap = importMap.replaceAll(/\.\/node_modules/g, '/modules')
+
+    console.error('The import map is:', importMap);
+
+    fs.writeFileSync('importmap.json', importMap);
+} catch (err) {
+    console.error('Error:', err);
+}
+`
+
+			packageJSON := `{
+  "name": "importmap",
+  "type": "module",
+  "devDependencies": {
+    "@jspm/generator": "2.7.6"
+  },
+  "dependencies": {`
 			for i, pkg := range hostPackageReferences.Spec.PackageReferences {
 				if i > 0 {
 					packageJSON += ","
@@ -452,11 +499,6 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
 				packageJSON += fmt.Sprintf(`"%s": "%s"`, pkg.Name, pkg.Version)
 			}
 			packageJSON += `}}`
-
-			dockerfile := `
-FROM scratch
-COPY node_modules /modules
-`
 
 			if configMap.Annotations == nil {
 				configMap.Annotations = make(map[string]string)
@@ -474,8 +516,9 @@ COPY node_modules /modules
 			configMap.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
 			configMap.Data = map[string]string{
-				"package.json": packageJSON,
 				"Dockerfile":   dockerfile,
+				"generate.js":  generateJS,
+				"package.json": packageJSON,
 			}
 
 			return ctrl.SetControllerReference(hostPackageReferences, configMap, r.Scheme)
