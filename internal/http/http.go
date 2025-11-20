@@ -42,12 +42,12 @@ func GetParamArray(name string, defaultValue []string, r *http.Request) []string
 func GetLang(r *http.Request, defaultLanguage string, languages []language.Tag) language.Tag {
 	log := logf.FromContext(r.Context())
 
-	fromParams := GetParam("l10n", "", r)
+	l10n := GetParam("l10n", "", r)
 
-	if fromParams != "" {
-		tag := language.Make(fromParams)
+	if l10n != "" {
+		tag := language.Make(l10n)
 		if tag.IsRoot() {
-			log.Info("parsing user supplied 'l10n' parameter failed, falling back to default", "l10n", fromParams, "defaultLang", defaultLanguage)
+			log.Info("parsing user supplied 'l10n' parameter failed, falling back to default", "l10n", l10n, "defaultLang", defaultLanguage, "path", r.URL.Path)
 			return language.Make(defaultLanguage)
 		} else {
 			return tag

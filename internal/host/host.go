@@ -459,6 +459,20 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 
 	mux.HandleFunc("GET /~/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}", handler)
 
+	handler = func(w http.ResponseWriter, r *http.Request) {
+		th.log.Info("unimplemented handler", "path", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, err := fmt.Fprintf(w, `{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+
+	mux.HandleFunc("GET /~/check/", handler)
+	mux.HandleFunc("GET /~/oauth/", handler)
+	mux.HandleFunc("GET /~/navigation", handler)
+	mux.HandleFunc("GET /~/state", handler)
+
 	return mux
 }
 
