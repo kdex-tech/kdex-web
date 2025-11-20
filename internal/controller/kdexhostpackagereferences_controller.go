@@ -381,6 +381,8 @@ func (r *KDexHostPackageReferencesReconciler) setupJob(
 							cp /scripts/package.json /workspace/package.json
 							cd /workspace
 							npm install
+
+							npx esbuild node_modules/**/*.js --allow-overwrite --outdir=node_modules --define:process.env.NODE_ENV=\"production\"
 							
 							cp /scripts/generate.js /workspace/generate.js
 							node generate.js
@@ -466,7 +468,8 @@ try {
   "name": "importmap",
   "type": "module",
   "devDependencies": {
-    "@jspm/generator": "^2.7.6"
+    "@jspm/generator": "^2.7.6",
+	"esbuild": "^0.27.0"
   },
   "dependencies": {`
 			for i, pkg := range hostPackageReferences.Spec.PackageReferences {
