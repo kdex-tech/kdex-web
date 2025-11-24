@@ -220,8 +220,8 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 
 		imageRepo := r.Configuration.DefaultImageRegistry.Host
 		imageURL := fmt.Sprintf("%s/%s@%s", imageRepo, hostPackageReferences.Name, imageDigest)
-		hostPackageReferences.Status.Image = imageURL
-		hostPackageReferences.Status.ImportMap = importmap
+		hostPackageReferences.Status.Attributes["image"] = imageURL
+		hostPackageReferences.Status.Attributes["importmap"] = importmap
 
 		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
 			log.Error(err, "failed to delete successful job after completion", "job", job.Name)

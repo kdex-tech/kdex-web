@@ -200,7 +200,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	hostHandler.SetHost(
 		&hostController.Spec.Host, theme.Spec.Assets, scriptLibraries,
-		hostPackageReferences.Status.ImportMap,
+		hostPackageReferences.Status.Attributes["importmap"],
 	)
 
 	return r.innerReconcile(ctx, &hostController, theme, hostPackageReferences)
@@ -415,7 +415,9 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 		return nil, true, ctrl.Result{}, err
 	}
 
-	if hostPackageReferences.Status.Image == "" {
+	if hostPackageReferences.Status.Attributes["image"] == "" ||
+		hostPackageReferences.Status.Attributes["importmap"] == "" {
+
 		kdexv1alpha1.SetConditions(
 			&hostController.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
@@ -645,7 +647,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 
 			for idx, value := range deployment.Spec.Template.Spec.Volumes {
 				if value.Name == "oci-image" {
-					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = hostPackageReferences.Status.Image
+					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = hostPackageReferences.Status.Attributes["image"]
 					deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = corev1.PullIfNotPresent
 				}
 			}
