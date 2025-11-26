@@ -20,32 +20,6 @@ type Pairs struct {
 	list     client.ObjectList
 }
 
-// func addOrUpdate(
-// 	ctx context.Context,
-// 	k8sClient client.Client,
-// 	object client.Object,
-// 	list client.ObjectList,
-// ) {
-// 	Eventually(func(g Gomega) error {
-// 		err := k8sClient.List(ctx, list, &client.ListOptions{
-// 			Namespace:     object.GetNamespace(),
-// 			FieldSelector: fields.OneTermEqualSelector("metadata.name", object.GetName()),
-// 		})
-// 		g.Expect(err).NotTo(HaveOccurred())
-
-// 		items, err := meta.ExtractList(list)
-// 		g.Expect(err).NotTo(HaveOccurred())
-// 		if len(items) > 0 {
-// 			existing := items[0].(client.Object)
-// 			existing.Spec = object.Spec
-// 			g.Eventually(k8sClient.Update(ctx, existing)).Should(Succeed())
-// 		} else {
-// 			g.Expect(k8sClient.Create(ctx, object)).To(Succeed())
-// 		}
-// 		return nil
-// 	}).Should(Succeed())
-// }
-
 func addOrUpdateHost(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -263,25 +237,22 @@ func assertResourceReady(ctx context.Context, k8sClient client.Client, name stri
 		err := k8sClient.Get(ctx, typeNamespacedName, checkResource)
 		g.Expect(err).NotTo(HaveOccurred())
 		it := reflect.ValueOf(checkResource).Elem()
+
 		statusField := it.FieldByName("Status")
-		g.Expect(statusField.IsValid()).To(BeTrue())
+
+		g.Expect(statusField.IsZero()).To(BeFalse())
 		conditionsField := statusField.FieldByName("Conditions")
-		g.Expect(conditionsField.IsValid()).To(BeTrue())
+
+		g.Expect(conditionsField.IsZero()).To(BeFalse())
 		conditions, ok := conditionsField.Interface().([]metav1.Condition)
+
 		g.Expect(ok).To(BeTrue())
-		if ready {
-			g.Expect(
-				meta.IsStatusConditionTrue(
-					conditions, string(kdexv1alpha1.ConditionTypeReady),
-				),
-			).To(BeTrue())
-		} else {
-			g.Expect(
-				meta.IsStatusConditionFalse(
-					conditions, string(kdexv1alpha1.ConditionTypeReady),
-				),
-			).To(BeTrue())
-		}
+
+		g.Expect(
+			meta.IsStatusConditionTrue(
+				conditions, string(kdexv1alpha1.ConditionTypeReady),
+			),
+		).To(BeEquivalentTo(ready))
 	}
 
 	Eventually(check, "5s").Should(Succeed())
