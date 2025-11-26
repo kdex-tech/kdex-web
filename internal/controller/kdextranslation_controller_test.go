@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("KDexTranslation Controller", func() {
@@ -38,8 +37,7 @@ var _ = Describe("KDexTranslation Controller", func() {
 
 		AfterEach(func() {
 			By("Cleanup all the test resource instances")
-			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexHost{}, client.InNamespace(namespace))).To(Succeed())
-			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexTranslation{}, client.InNamespace(namespace))).To(Succeed())
+			cleanupResources(namespace)
 		})
 
 		It("should successfully reconcile the resource", func() {
@@ -88,26 +86,6 @@ var _ = Describe("KDexTranslation Controller", func() {
 					},
 				},
 			)
-			hostSpec := kdexv1alpha1.KDexHostSpec{
-				BrandName:    "KDex Tech",
-				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-				Organization: "KDex Tech Inc.",
-				Routing: kdexv1alpha1.Routing{
-					Domains: []string{
-						"example.com",
-					},
-					Strategy: kdexv1alpha1.IngressRoutingStrategy,
-				},
-			}
-			addOrUpdateHost(
-				ctx, k8sClient, kdexv1alpha1.KDexHost{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: hostSpec,
-				},
-			)
 			addOrUpdateHostController(
 				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
@@ -115,7 +93,17 @@ var _ = Describe("KDexTranslation Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: hostSpec,
+						Host: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
+								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+							},
+						},
 					},
 				},
 			)
@@ -135,7 +123,8 @@ var _ = Describe("KDexTranslation Controller", func() {
 							Name: focalHost,
 						},
 						Label: "test",
-						PageArchetypeRef: corev1.LocalObjectReference{
+						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+							Kind: "KDexPageArchetype",
 							Name: "default",
 						},
 						Paths: kdexv1alpha1.Paths{

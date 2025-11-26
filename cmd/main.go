@@ -222,28 +222,34 @@ func main() {
 		os.Exit(1)
 	}
 	if err := (&controller.KDexPageBindingReconciler{
-		Client:       mgr.GetClient(),
-		HostStore:    hostStore,
-		RequeueDelay: requeueDelay,
-		Scheme:       mgr.GetScheme(),
+		Client:              mgr.GetClient(),
+		ControllerNamespace: controllerNamespace,
+		FocalHost:           focalHost,
+		HostStore:           hostStore,
+		RequeueDelay:        requeueDelay,
+		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexPageBinding")
 		os.Exit(1)
 	}
 	if err := (&controller.KDexTranslationReconciler{
-		Client:       mgr.GetClient(),
-		HostStore:    hostStore,
-		RequeueDelay: requeueDelay,
-		Scheme:       mgr.GetScheme(),
+		Client:              mgr.GetClient(),
+		ControllerNamespace: controllerNamespace,
+		FocalHost:           focalHost,
+		HostStore:           hostStore,
+		RequeueDelay:        requeueDelay,
+		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexTranslation")
 		os.Exit(1)
 	}
 	if err := (&controller.KDexHostPackageReferencesReconciler{
-		Client:        mgr.GetClient(),
-		Configuration: conf,
-		RequeueDelay:  requeueDelay,
-		Scheme:        mgr.GetScheme(),
+		Client:              mgr.GetClient(),
+		Configuration:       conf,
+		ControllerNamespace: controllerNamespace,
+		FocalHost:           focalHost,
+		RequeueDelay:        requeueDelay,
+		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexHostPackageReferences")
 		os.Exit(1)

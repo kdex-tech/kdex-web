@@ -18,13 +18,14 @@ func (r *KDexPageBindingReconciler) findPageBindingsForApp(
 
 	var pageBindingsList kdexv1alpha1.KDexPageBindingList
 	if err := r.List(ctx, &pageBindingsList, &client.ListOptions{
-		Namespace: app.GetNamespace(),
+		Namespace: r.ControllerNamespace,
 	}); err != nil {
 		log.Error(err, "unable to list KDexPageBindings for app", "name", app.GetName())
 		return []reconcile.Request{}
 	}
 
 	requests := []reconcile.Request{}
+
 	for _, pageBinding := range pageBindingsList.Items {
 		for _, contentEntry := range pageBinding.Spec.ContentEntries {
 			if contentEntry.AppRef == nil {
@@ -43,34 +44,6 @@ func (r *KDexPageBindingReconciler) findPageBindingsForApp(
 	return requests
 }
 
-func (r *KDexPageBindingReconciler) findPageBindingsForHost(
-	ctx context.Context,
-	host client.Object,
-) []reconcile.Request {
-	log := logf.FromContext(ctx)
-
-	var pageBindingsList kdexv1alpha1.KDexPageBindingList
-	if err := r.List(ctx, &pageBindingsList, &client.ListOptions{
-		Namespace: host.GetNamespace(),
-	}); err != nil {
-		log.Error(err, "unable to list KDexPageBindings for host", "name", host.GetName())
-		return []reconcile.Request{}
-	}
-
-	requests := []reconcile.Request{}
-	for _, pageBinding := range pageBindingsList.Items {
-		if pageBinding.Spec.HostRef.Name == host.GetName() {
-			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      pageBinding.Name,
-					Namespace: pageBinding.Namespace,
-				},
-			})
-		}
-	}
-	return requests
-}
-
 func (r *KDexPageBindingReconciler) findPageBindingsForPageArchetype(
 	ctx context.Context,
 	pageArchetype client.Object,
@@ -79,13 +52,14 @@ func (r *KDexPageBindingReconciler) findPageBindingsForPageArchetype(
 
 	var pageBindingsList kdexv1alpha1.KDexPageBindingList
 	if err := r.List(ctx, &pageBindingsList, &client.ListOptions{
-		Namespace: pageArchetype.GetNamespace(),
+		Namespace: r.ControllerNamespace,
 	}); err != nil {
 		log.Error(err, "unable to list KDexPageBindings for page archetype", "name", pageArchetype.GetName())
 		return []reconcile.Request{}
 	}
 
 	requests := []reconcile.Request{}
+
 	for _, pageBinding := range pageBindingsList.Items {
 		if pageBinding.Spec.PageArchetypeRef.Name == pageArchetype.GetName() {
 			requests = append(requests, reconcile.Request{
@@ -107,13 +81,14 @@ func (r *KDexPageBindingReconciler) findPageBindingsForPageBindings(
 
 	var pageBindingsList kdexv1alpha1.KDexPageBindingList
 	if err := r.List(ctx, &pageBindingsList, &client.ListOptions{
-		Namespace: parentPageBinding.GetNamespace(),
+		Namespace: r.ControllerNamespace,
 	}); err != nil {
 		log.Error(err, "unable to list KDexPageBindings for page binding", "name", parentPageBinding.GetName())
 		return []reconcile.Request{}
 	}
 
 	requests := []reconcile.Request{}
+
 	for _, pageBinding := range pageBindingsList.Items {
 		if pageBinding.Spec.ParentPageRef == nil {
 			continue
@@ -138,17 +113,9 @@ func (r *KDexPageBindingReconciler) findPageBindingsForPageFooter(
 
 	var pageBindingsList kdexv1alpha1.KDexPageBindingList
 	if err := r.List(ctx, &pageBindingsList, &client.ListOptions{
-		Namespace: pageFooter.GetNamespace(),
+		Namespace: r.ControllerNamespace,
 	}); err != nil {
 		log.Error(err, "unable to list KDexPageBindings for page footer", "footer", pageFooter.GetName())
-		return []reconcile.Request{}
-	}
-
-	var pageArchetypesList kdexv1alpha1.KDexPageArchetypeList
-	if err := r.List(ctx, &pageArchetypesList, &client.ListOptions{
-		Namespace: pageFooter.GetNamespace(),
-	}); err != nil {
-		log.Error(err, "unable to list KDexPageArchetypes for page footer", "footer", pageFooter.GetName())
 		return []reconcile.Request{}
 	}
 
@@ -168,24 +135,6 @@ func (r *KDexPageBindingReconciler) findPageBindingsForPageFooter(
 		}
 	}
 
-	for _, pageArchetype := range pageArchetypesList.Items {
-		if pageArchetype.Spec.DefaultFooterRef == nil {
-			continue
-		}
-		if pageArchetype.Spec.DefaultFooterRef.Name == pageFooter.GetName() {
-			for _, pageBinding := range pageBindingsList.Items {
-				if pageBinding.Spec.PageArchetypeRef.Name == pageArchetype.GetName() {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      pageBinding.Name,
-							Namespace: pageBinding.Namespace,
-						},
-					})
-				}
-			}
-		}
-	}
-
 	return requests
 }
 
@@ -197,17 +146,9 @@ func (r *KDexPageBindingReconciler) findPageBindingsForPageHeader(
 
 	var pageBindingsList kdexv1alpha1.KDexPageBindingList
 	if err := r.List(ctx, &pageBindingsList, &client.ListOptions{
-		Namespace: pageHeader.GetNamespace(),
+		Namespace: r.ControllerNamespace,
 	}); err != nil {
 		log.Error(err, "unable to list KDexPageBindings for page header", "name", pageHeader.GetName())
-		return []reconcile.Request{}
-	}
-
-	var pageArchetypesList kdexv1alpha1.KDexPageArchetypeList
-	if err := r.List(ctx, &pageArchetypesList, &client.ListOptions{
-		Namespace: pageHeader.GetNamespace(),
-	}); err != nil {
-		log.Error(err, "unable to list KDexPageArchetypes for page header", "name", pageHeader.GetName())
 		return []reconcile.Request{}
 	}
 
@@ -227,24 +168,6 @@ func (r *KDexPageBindingReconciler) findPageBindingsForPageHeader(
 		}
 	}
 
-	for _, pageArchetype := range pageArchetypesList.Items {
-		if pageArchetype.Spec.DefaultHeaderRef == nil {
-			continue
-		}
-		if pageArchetype.Spec.DefaultHeaderRef.Name == pageHeader.GetName() {
-			for _, pageBinding := range pageBindingsList.Items {
-				if pageBinding.Spec.PageArchetypeRef.Name == pageArchetype.GetName() {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      pageBinding.Name,
-							Namespace: pageBinding.Namespace,
-						},
-					})
-				}
-			}
-		}
-	}
-
 	return requests
 }
 
@@ -256,17 +179,9 @@ func (r *KDexPageBindingReconciler) findPageBindingsForPageNavigations(
 
 	var pageBindingsList kdexv1alpha1.KDexPageBindingList
 	if err := r.List(ctx, &pageBindingsList, &client.ListOptions{
-		Namespace: pageNavigation.GetNamespace(),
+		Namespace: r.ControllerNamespace,
 	}); err != nil {
 		log.Error(err, "unable to list KDexPageBindings for page navigation", "navigation", pageNavigation.GetName())
-		return []reconcile.Request{}
-	}
-
-	var pageArchetypesList kdexv1alpha1.KDexPageArchetypeList
-	if err := r.List(ctx, &pageArchetypesList, &client.ListOptions{
-		Namespace: pageNavigation.GetNamespace(),
-	}); err != nil {
-		log.Error(err, "unable to list KDexPageArchetypes for page navigation", "navigation", pageNavigation.GetName())
 		return []reconcile.Request{}
 	}
 
@@ -286,39 +201,6 @@ func (r *KDexPageBindingReconciler) findPageBindingsForPageNavigations(
 		}
 	}
 
-	for _, pageArchetype := range pageArchetypesList.Items {
-		if pageArchetype.Spec.DefaultMainNavigationRef != nil {
-			if pageArchetype.Spec.DefaultMainNavigationRef.Name == pageNavigation.GetName() {
-				for _, pageBinding := range pageBindingsList.Items {
-					if pageBinding.Spec.PageArchetypeRef.Name == pageArchetype.GetName() {
-						requests = append(requests, reconcile.Request{
-							NamespacedName: types.NamespacedName{
-								Name:      pageBinding.Name,
-								Namespace: pageBinding.Namespace,
-							},
-						})
-					}
-				}
-			}
-		}
-		if pageArchetype.Spec.ExtraNavigations != nil {
-			for _, navigationRef := range pageArchetype.Spec.ExtraNavigations {
-				if navigationRef.Name == pageNavigation.GetName() {
-					for _, pageBinding := range pageBindingsList.Items {
-						if pageBinding.Spec.PageArchetypeRef.Name == pageArchetype.GetName() {
-							requests = append(requests, reconcile.Request{
-								NamespacedName: types.NamespacedName{
-									Name:      pageBinding.Name,
-									Namespace: pageBinding.Namespace,
-								},
-							})
-						}
-					}
-				}
-			}
-		}
-	}
-
 	return requests
 }
 
@@ -330,7 +212,7 @@ func (r *KDexPageBindingReconciler) findPageBindingsForScriptLibrary(
 
 	var pageBindingList kdexv1alpha1.KDexPageBindingList
 	if err := r.List(ctx, &pageBindingList, &client.ListOptions{
-		Namespace: scriptLibrary.GetNamespace(),
+		Namespace: r.ControllerNamespace,
 	}); err != nil {
 		log.Error(err, "unable to list KDexPageBindings for scriptLibrary", "name", scriptLibrary.GetName())
 		return []reconcile.Request{}

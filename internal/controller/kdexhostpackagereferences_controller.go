@@ -38,9 +38,11 @@ import (
 // KDexHostPackageReferencesReconciler reconciles a KDexHostPackageReferences object
 type KDexHostPackageReferencesReconciler struct {
 	client.Client
-	Configuration configuration.NexusConfiguration
-	RequeueDelay  time.Duration
-	Scheme        *runtime.Scheme
+	Configuration       configuration.NexusConfiguration
+	ControllerNamespace string
+	FocalHost           string
+	RequeueDelay        time.Duration
+	Scheme              *runtime.Scheme
 }
 
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostpackagereferences,verbs=get;list;watch;create;update;patch;delete
@@ -63,9 +65,8 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 	defer func() {
 		hostPackageReferences.Status.ObservedGeneration = hostPackageReferences.Generation
 		if updateErr := r.Status().Update(ctx, &hostPackageReferences); updateErr != nil {
-			if res == (ctrl.Result{}) {
-				err = updateErr
-			}
+			err = updateErr
+			res = ctrl.Result{}
 		}
 	}()
 

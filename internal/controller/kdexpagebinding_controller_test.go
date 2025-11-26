@@ -49,7 +49,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name: "non-existent-host",
 					},
 					Label: "foo",
-					PageArchetypeRef: corev1.LocalObjectReference{
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
 						Name: "non-existent-page-archetype",
 					},
 					Paths: kdexv1alpha1.Paths{
@@ -78,7 +79,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name: "non-existent-host",
 					},
 					Label: "foo",
-					PageArchetypeRef: corev1.LocalObjectReference{
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
 						Name: "non-existent-page-archetype",
 					},
 					Paths: kdexv1alpha1.Paths{
@@ -107,7 +109,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name: focalHost,
 					},
 					Label: "foo",
-					PageArchetypeRef: corev1.LocalObjectReference{
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
 						Name: "non-existent-page-archetype",
 					},
 					Paths: kdexv1alpha1.Paths{
@@ -134,27 +137,6 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-			hostSpec := kdexv1alpha1.KDexHostSpec{
-				BrandName:    "KDex Tech",
-				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-				Organization: "KDex Tech Inc.",
-				Routing: kdexv1alpha1.Routing{
-					Domains: []string{
-						"example.com",
-					},
-					Strategy: kdexv1alpha1.IngressRoutingStrategy,
-				},
-			}
-			addOrUpdateHost(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexHost{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: hostSpec,
-				},
-			)
 			addOrUpdateHostController(
 				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
@@ -162,7 +144,17 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: hostSpec,
+						Host: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
+								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+							},
+						},
 					},
 				},
 			)
@@ -189,16 +181,20 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name: focalHost,
 					},
 					Label: "foo",
-					OverrideFooterRef: &corev1.LocalObjectReference{
+					OverrideFooterRef: &kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageFooter",
 						Name: "non-existent-footer",
 					},
-					OverrideHeaderRef: &corev1.LocalObjectReference{
+					OverrideHeaderRef: &kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageHeader",
 						Name: "non-existent-header",
 					},
-					OverrideMainNavigationRef: &corev1.LocalObjectReference{
+					OverrideMainNavigationRef: &kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageNavigation",
 						Name: "non-existent-navigation",
 					},
-					PageArchetypeRef: corev1.LocalObjectReference{
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
 						Name: "non-existent-page-archetype",
 					},
 					Paths: kdexv1alpha1.Paths{
@@ -225,27 +221,6 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-			hostSpec := kdexv1alpha1.KDexHostSpec{
-				BrandName:    "KDex Tech",
-				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-				Organization: "KDex Tech Inc.",
-				Routing: kdexv1alpha1.Routing{
-					Domains: []string{
-						"example.com",
-					},
-					Strategy: kdexv1alpha1.IngressRoutingStrategy,
-				},
-			}
-			addOrUpdateHost(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexHost{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: hostSpec,
-				},
-			)
 			addOrUpdateHostController(
 				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
@@ -253,7 +228,17 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: hostSpec,
+						Host: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
+								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+							},
+						},
 					},
 				},
 			)
@@ -314,7 +299,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name: focalHost,
 					},
 					Label: "foo",
-					PageArchetypeRef: corev1.LocalObjectReference{
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
 						Name: "non-existent-page-archetype",
 					},
 					ParentPageRef: &corev1.LocalObjectReference{
@@ -340,27 +326,6 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-			hostSpec := kdexv1alpha1.KDexHostSpec{
-				BrandName:    "KDex Tech",
-				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-				Organization: "KDex Tech Inc.",
-				Routing: kdexv1alpha1.Routing{
-					Domains: []string{
-						"example.com",
-					},
-					Strategy: kdexv1alpha1.IngressRoutingStrategy,
-				},
-			}
-			addOrUpdateHost(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexHost{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: hostSpec,
-				},
-			)
 			addOrUpdateHostController(
 				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
@@ -368,7 +333,17 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: hostSpec,
+						Host: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
+								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+							},
+						},
 					},
 				},
 			)
@@ -393,7 +368,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name: focalHost,
 					},
 					Label: "foo",
-					PageArchetypeRef: corev1.LocalObjectReference{
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
 						Name: "non-existent-page-archetype",
 					},
 					Paths: kdexv1alpha1.Paths{
@@ -426,10 +402,12 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name: focalHost,
 					},
 					Label: "foo",
-					OverrideHeaderRef: &corev1.LocalObjectReference{
+					OverrideHeaderRef: &kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageHeader",
 						Name: "non-existent-header",
 					},
-					PageArchetypeRef: corev1.LocalObjectReference{
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
 						Name: "non-existent-page-archetype",
 					},
 					Paths: kdexv1alpha1.Paths{
@@ -456,27 +434,6 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-			hostSpec := kdexv1alpha1.KDexHostSpec{
-				BrandName:    "KDex Tech",
-				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-				Organization: "KDex Tech Inc.",
-				Routing: kdexv1alpha1.Routing{
-					Domains: []string{
-						"example.com",
-					},
-					Strategy: kdexv1alpha1.IngressRoutingStrategy,
-				},
-			}
-			addOrUpdateHost(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexHost{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: hostSpec,
-				},
-			)
 			addOrUpdateHostController(
 				ctx, k8sClient, kdexv1alpha1.KDexHostController{
 					ObjectMeta: metav1.ObjectMeta{
@@ -484,7 +441,17 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Namespace: namespace,
 					},
 					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: hostSpec,
+						Host: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
+								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+							},
+						},
 					},
 				},
 			)
@@ -556,7 +523,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name: focalHost,
 					},
 					Label: "foo",
-					PageArchetypeRef: corev1.LocalObjectReference{
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
 						Name: "non-existent-page-archetype",
 					},
 					Paths: kdexv1alpha1.Paths{
@@ -571,54 +539,6 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, false)
 
-			addOrUpdatePageArchetype(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexPageArchetype{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "non-existent-page-archetype",
-						Namespace: namespace,
-					},
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: "<h1>Hello, World!</h1>",
-						DefaultHeaderRef: &corev1.LocalObjectReference{
-							Name: "non-existent-header",
-						},
-					},
-				},
-			)
-			hostSpec := kdexv1alpha1.KDexHostSpec{
-				BrandName:    "KDex Tech",
-				ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-				Organization: "KDex Tech Inc.",
-				Routing: kdexv1alpha1.Routing{
-					Domains: []string{
-						"example.com",
-					},
-					Strategy: kdexv1alpha1.IngressRoutingStrategy,
-				},
-			}
-			addOrUpdateHost(
-				ctx, k8sClient,
-				kdexv1alpha1.KDexHost{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: hostSpec,
-				},
-			)
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: hostSpec,
-					},
-				},
-			)
-
 			addOrUpdatePageHeader(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexPageHeader{
@@ -631,6 +551,57 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
+
+			assertResourceReady(
+				ctx, k8sClient, "non-existent-header", namespace,
+				&kdexv1alpha1.KDexPageHeader{}, true)
+
+			addOrUpdatePageArchetype(
+				ctx, k8sClient,
+				kdexv1alpha1.KDexPageArchetype{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "non-existent-page-archetype",
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: "<h1>Hello, World!</h1>",
+						DefaultHeaderRef: &kdexv1alpha1.KDexObjectReference{
+							Kind: "KDexPageHeader",
+							Name: "non-existent-header",
+						},
+					},
+				},
+			)
+
+			assertResourceReady(
+				ctx, k8sClient, "non-existent-page-archetype", namespace,
+				&kdexv1alpha1.KDexPageArchetype{}, true)
+
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      focalHost,
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						Host: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
+								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+							},
+						},
+					},
+				},
+			)
+
+			assertResourceReady(
+				ctx, k8sClient, focalHost, namespace,
+				&kdexv1alpha1.KDexHostController{}, true)
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
@@ -657,9 +628,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				},
 			)
 
+			assertResourceReady(
+				ctx, k8sClient, "non-existent-header", namespace,
+				&kdexv1alpha1.KDexPageHeader{}, true)
+
 			check := func(g Gomega) {
-				hostHandler, ok = hostStore.Get(focalHost)
-				g.Expect(ok).To(BeTrue())
+				hostHandler, ok := hostStore.Get(focalHost)
+				Expect(ok).To(BeTrue())
 
 				pageHandler, ok = hostHandler.Pages.Get(resource.Name)
 				g.Expect(ok).To(BeTrue())

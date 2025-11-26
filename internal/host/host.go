@@ -257,10 +257,19 @@ func (th *HostHandler) RebuildMux() {
 
 			http.NotFound(w, r)
 		})
+
+		th.Mux = mux
+
+		return
 	}
 
 	for _, handler := range pageList {
 		p := handler.Page
+
+		if p.Spec.BasePath == "" {
+			th.log.Info("page has empty basePath somehow...", "page", p)
+			continue
+		}
 
 		l10nRenders := th.L10nRendersLocked(handler, nil)
 

@@ -22,15 +22,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal/host"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 const translationFinalizerName = "kdex.dev/kdex-web-translation-finalizer"
@@ -38,12 +35,13 @@ const translationFinalizerName = "kdex.dev/kdex-web-translation-finalizer"
 // KDexTranslationReconciler reconciles a KDexTranslation object
 type KDexTranslationReconciler struct {
 	client.Client
-	HostStore    *host.HostStore
-	RequeueDelay time.Duration
-	Scheme       *runtime.Scheme
+	ControllerNamespace string
+	FocalHost           string
+	HostStore           *host.HostStore
+	RequeueDelay        time.Duration
+	Scheme              *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhosts,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdextranslations,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdextranslations/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdextranslations/finalizers,verbs=update
@@ -69,9 +67,8 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	defer func() {
 		translation.Status.ObservedGeneration = translation.Generation
 		if updateErr := r.Status().Update(ctx, &translation); updateErr != nil {
-			if res == (ctrl.Result{}) {
-				err = updateErr
-			}
+			err = updateErr
+			res = ctrl.Result{}
 		}
 	}()
 
@@ -108,11 +105,6 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		kdexv1alpha1.ConditionReasonReconciling,
 		"Reconciling",
 	)
-
-	_, shouldReturn, r1, err := resolveHost(ctx, r.Client, &translation, &translation.Status.Conditions, &translation.Spec.HostRef, r.RequeueDelay)
-	if shouldReturn {
-		return r1, err
-	}
 
 	hostHandler, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
 
@@ -153,37 +145,6 @@ func (r *KDexTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 func (r *KDexTranslationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexTranslation{}).
-		Watches(
-			&kdexv1alpha1.KDexHost{},
-			handler.EnqueueRequestsFromMapFunc(r.findTranslationsForHost)).
 		Named("kdextranslation").
 		Complete(r)
-}
-
-func (r *KDexTranslationReconciler) findTranslationsForHost(
-	ctx context.Context,
-	h client.Object,
-) []reconcile.Request {
-	log := logf.FromContext(ctx)
-
-	var translationList kdexv1alpha1.KDexTranslationList
-	if err := r.List(ctx, &translationList, &client.ListOptions{
-		Namespace: h.GetNamespace(),
-	}); err != nil {
-		log.Error(err, "unable to list KDexTranslation for host", "name", h.GetName())
-		return []reconcile.Request{}
-	}
-
-	requests := make([]reconcile.Request, 0, len(translationList.Items))
-	for _, translation := range translationList.Items {
-		if translation.Spec.HostRef.Name == h.GetName() {
-			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      translation.Name,
-					Namespace: translation.Namespace,
-				},
-			})
-		}
-	}
-	return requests
 }

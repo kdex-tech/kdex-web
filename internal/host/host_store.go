@@ -1,6 +1,7 @@
 package host
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -40,19 +41,22 @@ func (s *HostStore) GetOrUpdate(name string) *HostHandler {
 	if !ok {
 		handler = NewHostHandler(name, s.log)
 		s.handlers[name] = handler
-		s.log.Info("adding new host", "host", name)
+		s.log.Info("adding new host", name, fmt.Sprintf("%v", handler))
 	} else {
-		s.log.Info("updating existing host", "host", name)
+		s.log.Info("updating existing host", name, fmt.Sprintf("%v", handler))
 	}
 	return handler
 }
 
-func (s *HostStore) List() []*HostHandler {
+func (s *HostStore) List() map[string]*HostHandler {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	handlers := []*HostHandler{}
-	for _, handler := range s.handlers {
-		handlers = append(handlers, handler)
+	handlers := make(map[string]*HostHandler)
+	if len(s.handlers) == 0 {
+		return handlers
+	}
+	for k, handler := range s.handlers {
+		handlers[k] = handler
 	}
 	return handlers
 }

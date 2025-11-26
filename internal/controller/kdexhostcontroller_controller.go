@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -81,13 +82,16 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if hostController.Status.Attributes == nil {
+		hostController.Status.Attributes = make(map[string]string)
+	}
+
 	// Defer status update
 	defer func() {
 		hostController.Status.ObservedGeneration = hostController.Generation
 		if updateErr := r.Status().Update(ctx, &hostController); updateErr != nil {
-			if res == (ctrl.Result{}) {
-				err = updateErr
-			}
+			err = updateErr
+			res = ctrl.Result{}
 		}
 	}()
 
@@ -122,34 +126,56 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		"Reconciling",
 	)
 
-	theme, shouldReturn, r1, err := resolveTheme(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.Host.DefaultThemeRef, r.RequeueDelay)
+	themeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.Host.DefaultThemeRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
+	}
+
+	var theme *kdexv1alpha1.KDexTheme
+	var themeAssets []kdexv1alpha1.Asset
+
+	if themeObj != nil {
+		hostController.Status.Attributes["theme.generation"] = fmt.Sprintf("%d", themeObj.GetGeneration())
+
+		theme = themeObj.(*kdexv1alpha1.KDexTheme)
+		themeAssets = theme.Spec.Assets
 	}
 
 	var scriptLibraries []kdexv1alpha1.KDexScriptLibrary
 
-	scriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.Host.ScriptLibraryRef, r.RequeueDelay)
+	scriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.Host.ScriptLibraryRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
 
-	if scriptLibrary != nil {
+	if scriptLibraryObj != nil {
+		hostController.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
+
+		scriptLibrary := scriptLibraryObj.(*kdexv1alpha1.KDexScriptLibrary)
 		scriptLibraries = append(scriptLibraries, *scriptLibrary)
 	}
 
 	if theme != nil {
-		themeScriptLibrary, shouldReturn, r1, err := resolveScriptLibrary(ctx, r.Client, &hostController, &hostController.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
+		themeScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
 		if shouldReturn {
 			return r1, err
 		}
 
-		if themeScriptLibrary != nil {
-			scriptLibraries = append(scriptLibraries, *themeScriptLibrary)
+		if themeScriptLibraryObj != nil {
+			hostController.Status.Attributes["theme.scriptLibrary.generation"] = fmt.Sprintf("%d", themeScriptLibraryObj.GetGeneration())
+
+			scriptLibrary := themeScriptLibraryObj.(*kdexv1alpha1.KDexScriptLibrary)
+			scriptLibraries = append(scriptLibraries, *scriptLibrary)
 		}
 	}
 
 	hostHandler := r.HostStore.GetOrUpdate(hostController.Name)
+
+	log := logf.Log.WithName("HostController-hostStoreList")
+
+	for name, handler := range r.HostStore.List() {
+		log.Info("printing host", name, fmt.Sprintf("%v", handler))
+	}
 
 	allPackageReferences := []kdexv1alpha1.PackageReference{}
 	for _, scriptLibrary := range scriptLibraries {
@@ -172,12 +198,16 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		finalPackageReferences = append(finalPackageReferences, pkgRef)
 	}
 
-	hostPackageReferences, shouldReturn, r1, err := r.createOrUpdatePackageReferences(ctx, &hostController, finalPackageReferences)
-	if shouldReturn {
-		return r1, err
+	hostPackageReferences := &kdexv1alpha1.KDexHostPackageReferences{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      hostController.Name + "-packages",
+			Namespace: hostController.Namespace,
+		},
 	}
 
-	if len(finalPackageReferences) == 0 && hostPackageReferences != nil {
+	var importmap string
+
+	if len(finalPackageReferences) == 0 {
 		if err := r.Delete(ctx, hostPackageReferences); err != nil {
 			if client.IgnoreNotFound(err) != nil {
 				kdexv1alpha1.SetConditions(
@@ -196,12 +226,16 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 
 		hostPackageReferences = nil
+	} else {
+		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &hostController, hostPackageReferences, finalPackageReferences)
+		if shouldReturn {
+			return r1, err
+		}
+
+		importmap = hostPackageReferences.Status.Attributes["importmap"]
 	}
 
-	hostHandler.SetHost(
-		&hostController.Spec.Host, theme.Spec.Assets, scriptLibraries,
-		hostPackageReferences.Status.Attributes["importmap"],
-	)
+	hostHandler.SetHost(&hostController.Spec.Host, themeAssets, scriptLibraries, importmap)
 
 	return r.innerReconcile(ctx, &hostController, theme, hostPackageReferences)
 }
@@ -367,15 +401,9 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
+	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 	packageReferences []kdexv1alpha1.PackageReference,
-) (*kdexv1alpha1.KDexHostPackageReferences, bool, ctrl.Result, error) {
-	hostPackageReferences := &kdexv1alpha1.KDexHostPackageReferences{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      hostController.Name + "-packages",
-			Namespace: hostController.Namespace,
-		},
-	}
-
+) (bool, ctrl.Result, error) {
 	if _, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
@@ -412,7 +440,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 			err.Error(),
 		)
 
-		return nil, true, ctrl.Result{}, err
+		return true, ctrl.Result{}, err
 	}
 
 	if hostPackageReferences.Status.Attributes["image"] == "" ||
@@ -429,10 +457,10 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 			"image not available yet, requeueing",
 		)
 
-		return nil, true, ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		return true, ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	return hostPackageReferences, false, ctrl.Result{}, nil
+	return false, ctrl.Result{}, nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdateIngress(
