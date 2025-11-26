@@ -255,7 +255,7 @@ func assertResourceReady(ctx context.Context, k8sClient client.Client, name stri
 		).To(BeEquivalentTo(ready))
 	}
 
-	Eventually(check, "50s").Should(Succeed())
+	Eventually(check, "5s").Should(Succeed())
 }
 
 func cleanupResources(namespace string) {
