@@ -2,25 +2,31 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal/page"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func resolveContents(
+func ResolveContents(
 	ctx context.Context,
 	c client.Client,
 	pageBinding *kdexv1alpha1.KDexPageBinding,
 	requeueDelay time.Duration,
 ) (map[string]page.ResolvedContentEntry, bool, ctrl.Result, error) {
-	contents := map[string]page.ResolvedContentEntry{}
+	contents := make(map[string]page.ResolvedContentEntry)
 
 	for _, contentEntry := range pageBinding.Spec.ContentEntries {
 		appRef := contentEntry.AppRef
@@ -33,36 +39,13 @@ func resolveContents(
 			continue
 		}
 
-		var app kdexv1alpha1.KDexApp
-		appName := types.NamespacedName{
-			Name:      appRef.Name,
-			Namespace: pageBinding.Namespace,
-		}
-		if err := c.Get(ctx, appName, &app); err != nil {
-			if errors.IsNotFound(err) {
-				kdexv1alpha1.SetConditions(
-					&pageBinding.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionFalse,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconcileError,
-					err.Error(),
-				)
-
-				return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
-			}
-
-			return nil, true, ctrl.Result{}, err
-		}
-
-		if isReady, r1, err := isReady(ctx, c, pageBinding, &app, &app.Status.Conditions, requeueDelay); !isReady {
-			return nil, true, r1, err
+		app, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, c, pageBinding, &pageBinding.Status.Conditions, appRef, requeueDelay)
+		if shouldReturn {
+			return nil, shouldReturn, r1, err
 		}
 
 		contents[contentEntry.Slot] = page.ResolvedContentEntry{
-			App:               &app,
+			App:               app.(*kdexv1alpha1.KDexApp),
 			CustomElementName: contentEntry.CustomElementName,
 			Slot:              contentEntry.Slot,
 		}
@@ -71,7 +54,7 @@ func resolveContents(
 	return contents, false, ctrl.Result{}, nil
 }
 
-func resolveHost(
+func ResolveHost(
 	ctx context.Context,
 	c client.Client,
 	object client.Object,
@@ -107,199 +90,25 @@ func resolveHost(
 		return nil, true, ctrl.Result{}, err
 	}
 
-	if isReady, r1, err := isReady(ctx, c, object, &host, &host.Status.Conditions, requeueDelay); !isReady {
+	if isReady, r1, err := isReady(&host, &host.Status.Conditions, requeueDelay); !isReady {
 		return nil, true, r1, err
 	}
 
 	return &host, false, ctrl.Result{}, nil
 }
 
-func resolvePageArchetype(
+func ResolvePageNavigations(
 	ctx context.Context,
 	c client.Client,
 	object client.Object,
 	objectConditions *[]metav1.Condition,
-	pageArchetypeRef *corev1.LocalObjectReference,
-	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexPageArchetype, bool, ctrl.Result, error) {
-	if pageArchetypeRef == nil {
-		return nil, false, ctrl.Result{}, nil
-	}
-
-	var pageArchetype kdexv1alpha1.KDexPageArchetype
-	pageArchetypeName := types.NamespacedName{
-		Name:      pageArchetypeRef.Name,
-		Namespace: object.GetNamespace(),
-	}
-	if err := c.Get(ctx, pageArchetypeName, &pageArchetype); err != nil {
-		if errors.IsNotFound(err) {
-			kdexv1alpha1.SetConditions(
-				objectConditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
-
-			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
-		}
-
-		return nil, true, ctrl.Result{}, err
-	}
-
-	if isReady, r1, err := isReady(ctx, c, object, &pageArchetype, &pageArchetype.Status.Conditions, requeueDelay); !isReady {
-		return nil, true, r1, err
-	}
-
-	return &pageArchetype, false, ctrl.Result{}, nil
-}
-
-func resolvePageFooter(
-	ctx context.Context,
-	c client.Client,
-	object client.Object,
-	objectConditions *[]metav1.Condition,
-	footerRef *corev1.LocalObjectReference,
-	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexPageFooter, bool, ctrl.Result, error) {
-	if footerRef == nil {
-		return nil, false, ctrl.Result{}, nil
-	}
-
-	var footer kdexv1alpha1.KDexPageFooter
-	footerName := types.NamespacedName{
-		Name:      footerRef.Name,
-		Namespace: object.GetNamespace(),
-	}
-
-	if err := c.Get(ctx, footerName, &footer); err != nil {
-		if errors.IsNotFound(err) {
-			kdexv1alpha1.SetConditions(
-				objectConditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
-
-			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
-		}
-
-		return nil, true, ctrl.Result{}, err
-	}
-
-	if isReady, r1, err := isReady(ctx, c, object, &footer, &footer.Status.Conditions, requeueDelay); !isReady {
-		return nil, true, r1, err
-	}
-
-	return &footer, false, ctrl.Result{}, nil
-}
-
-func resolvePageHeader(
-	ctx context.Context,
-	c client.Client,
-	object client.Object,
-	objectConditions *[]metav1.Condition,
-	headerRef *corev1.LocalObjectReference,
-	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexPageHeader, bool, ctrl.Result, error) {
-	if headerRef == nil {
-		return nil, false, ctrl.Result{}, nil
-	}
-
-	var header kdexv1alpha1.KDexPageHeader
-	headerName := types.NamespacedName{
-		Name:      headerRef.Name,
-		Namespace: object.GetNamespace(),
-	}
-
-	if err := c.Get(ctx, headerName, &header); err != nil {
-		if errors.IsNotFound(err) {
-			kdexv1alpha1.SetConditions(
-				objectConditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
-
-			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
-		}
-
-		return nil, true, ctrl.Result{}, err
-	}
-
-	if isReady, r1, err := isReady(ctx, c, object, &header, &header.Status.Conditions, requeueDelay); !isReady {
-		return nil, true, r1, err
-	}
-
-	return &header, false, ctrl.Result{}, nil
-}
-
-func resolvePageNavigation(
-	ctx context.Context,
-	c client.Client,
-	object client.Object,
-	objectConditions *[]metav1.Condition,
-	navigationRef *corev1.LocalObjectReference,
-	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexPageNavigation, bool, ctrl.Result, error) {
-	if navigationRef == nil {
-		return nil, false, ctrl.Result{}, nil
-	}
-
-	var navigation kdexv1alpha1.KDexPageNavigation
-	navigationName := types.NamespacedName{
-		Name:      navigationRef.Name,
-		Namespace: object.GetNamespace(),
-	}
-	if err := c.Get(ctx, navigationName, &navigation); err != nil {
-		if errors.IsNotFound(err) {
-			kdexv1alpha1.SetConditions(
-				objectConditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
-
-			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
-		}
-
-		return nil, true, ctrl.Result{}, err
-	}
-
-	if isReady, r1, err := isReady(ctx, c, object, &navigation, &navigation.Status.Conditions, requeueDelay); !isReady {
-		return nil, true, r1, err
-	}
-
-	return &navigation, false, ctrl.Result{}, nil
-}
-
-func resolvePageNavigations(
-	ctx context.Context,
-	c client.Client,
-	object client.Object,
-	objectConditions *[]metav1.Condition,
-	navigationRef *corev1.LocalObjectReference,
-	extraNavigations map[string]*corev1.LocalObjectReference,
+	navigationRef *kdexv1alpha1.KDexObjectReference,
+	extraNavigations map[string]*kdexv1alpha1.KDexObjectReference,
 	requeueDelay time.Duration,
 ) (map[string]*kdexv1alpha1.KDexPageNavigation, bool, ctrl.Result, error) {
 	navigations := make(map[string]*kdexv1alpha1.KDexPageNavigation)
 
-	navigation, shouldReturn, response, err := resolvePageNavigation(
+	navigation, shouldReturn, response, err := ResolveKDexObjectReference(
 		ctx, c, object, objectConditions, navigationRef, requeueDelay)
 
 	if shouldReturn {
@@ -307,15 +116,15 @@ func resolvePageNavigations(
 	}
 
 	if navigation != nil {
-		navigations["main"] = navigation
+		navigations["main"] = navigation.(*kdexv1alpha1.KDexPageNavigation)
 	}
 
 	if extraNavigations == nil {
-		extraNavigations = map[string]*corev1.LocalObjectReference{}
+		extraNavigations = map[string]*kdexv1alpha1.KDexObjectReference{}
 	}
 
 	for navigationName, navigationRef := range extraNavigations {
-		navigation, shouldReturn, response, err := resolvePageNavigation(
+		navigation, shouldReturn, response, err := ResolveKDexObjectReference(
 			ctx, c, object, objectConditions, navigationRef, requeueDelay)
 
 		if shouldReturn {
@@ -323,14 +132,14 @@ func resolvePageNavigations(
 		}
 
 		if navigation != nil {
-			navigations[navigationName] = navigation
+			navigations[navigationName] = navigation.(*kdexv1alpha1.KDexPageNavigation)
 		}
 	}
 
 	return navigations, false, ctrl.Result{}, nil
 }
 
-func resolvePageBinding(
+func ResolvePageBinding(
 	ctx context.Context,
 	c client.Client,
 	object client.Object,
@@ -366,34 +175,58 @@ func resolvePageBinding(
 		return nil, true, ctrl.Result{}, err
 	}
 
-	if isReady, r1, err := isReady(ctx, c, object, &pageBinding, &pageBinding.Status.Conditions, requeueDelay); !isReady {
+	if isReady, r1, err := isReady(&pageBinding, &pageBinding.Status.Conditions, requeueDelay); !isReady {
 		return nil, true, r1, err
 	}
 
 	return &pageBinding, false, ctrl.Result{}, nil
 }
 
-func resolveScriptLibrary(
+func ResolveKDexObjectReference(
 	ctx context.Context,
 	c client.Client,
-	object client.Object,
-	objectConditions *[]metav1.Condition,
-	scriptLibraryRef *corev1.LocalObjectReference,
+	referrer client.Object,
+	referrerConditions *[]metav1.Condition,
+	objectRef *kdexv1alpha1.KDexObjectReference,
 	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexScriptLibrary, bool, ctrl.Result, error) {
-	if scriptLibraryRef == nil {
-		return nil, false, ctrl.Result{}, nil
+) (client.Object, bool, ctrl.Result, error) {
+	if objectRef == nil {
+		return nil, false, reconcile.Result{}, nil
 	}
 
-	var scriptLibrary kdexv1alpha1.KDexScriptLibrary
-	scriptLibraryName := types.NamespacedName{
-		Name:      scriptLibraryRef.Name,
-		Namespace: object.GetNamespace(),
+	t := reflect.TypeOf(referrer)
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
-	if err := c.Get(ctx, scriptLibraryName, &scriptLibrary); err != nil {
+
+	referrerKind := t.Name()
+	isReferrerClustered := strings.Contains(referrerKind, "Cluster")
+
+	if isReferrerClustered && !strings.Contains(objectRef.Kind, "Cluster") {
+		return nil, true, reconcile.Result{}, fmt.Errorf(
+			"referrer %s is cluster scoped so %s must also be cluster scoped", referrerKind, objectRef.Kind)
+	}
+
+	gvk := schema.GroupVersionKind{Group: "kdex.dev", Version: "v1alpha1", Kind: objectRef.Kind}
+	obj, err := c.Scheme().New(gvk)
+	if err != nil {
+		return nil, true, reconcile.Result{}, fmt.Errorf("unknown kind %s", objectRef.Kind)
+	}
+
+	key := client.ObjectKey{Name: objectRef.Name}
+
+	if !isReferrerClustered && !strings.Contains(objectRef.Kind, "Cluster") {
+		key.Namespace = referrer.GetNamespace()
+		if objectRef.Namespace != "" {
+			key.Namespace = objectRef.Namespace
+		}
+	}
+
+	if err := c.Get(ctx, key, obj.(client.Object)); err != nil {
 		if errors.IsNotFound(err) {
 			kdexv1alpha1.SetConditions(
-				objectConditions,
+				referrerConditions,
 				kdexv1alpha1.ConditionStatuses{
 					Degraded:    metav1.ConditionTrue,
 					Progressing: metav1.ConditionFalse,
@@ -405,15 +238,22 @@ func resolveScriptLibrary(
 
 			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
 		}
-
-		return nil, true, ctrl.Result{}, err
 	}
 
-	if isReady, r1, err := isReady(ctx, c, object, &scriptLibrary, &scriptLibrary.Status.Conditions, requeueDelay); !isReady {
+	it := reflect.ValueOf(obj).Elem()
+	statusField := it.FieldByName("Status")
+	conditionsField := statusField.FieldByName("Conditions")
+	conditions, ok := conditionsField.Interface().([]metav1.Condition)
+
+	if !ok {
+		return nil, true, reconcile.Result{}, fmt.Errorf("no condition field on status %v", obj)
+	}
+
+	if isReady, r1, err := isReady(obj.(client.Object), &conditions, requeueDelay); !isReady {
 		return nil, true, r1, err
 	}
 
-	return &scriptLibrary, false, ctrl.Result{}, nil
+	return obj.(client.Object), false, reconcile.Result{}, nil
 }
 
 func ResolveSecret(
@@ -453,45 +293,32 @@ func ResolveSecret(
 	return &secret, false, ctrl.Result{}, nil
 }
 
-func resolveTheme(
-	ctx context.Context,
-	c client.Client,
-	object client.Object,
-	objectConditions *[]metav1.Condition,
-	themeRef *corev1.LocalObjectReference,
+func isReady(
+	referred client.Object,
+	referredConditions *[]metav1.Condition,
 	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexTheme, bool, ctrl.Result, error) {
-	if themeRef == nil {
-		return nil, false, ctrl.Result{}, nil
+) (bool, ctrl.Result, error) {
+	t := reflect.TypeOf(referred)
+	if t == nil {
+		return false, ctrl.Result{}, fmt.Errorf("referred is nil")
+	}
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
 
-	var theme kdexv1alpha1.KDexTheme
-	themeName := types.NamespacedName{
-		Name:      themeRef.Name,
-		Namespace: object.GetNamespace(),
-	}
-	if err := c.Get(ctx, themeName, &theme); err != nil {
-		if errors.IsNotFound(err) {
-			kdexv1alpha1.SetConditions(
-				objectConditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
+	if !meta.IsStatusConditionTrue(*referredConditions, string(kdexv1alpha1.ConditionTypeReady)) {
+		meta.SetStatusCondition(
+			referredConditions,
+			*kdexv1alpha1.NewCondition(
+				kdexv1alpha1.ConditionTypeReady,
+				metav1.ConditionFalse,
 				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
+				fmt.Sprintf("referenced %s %s is not ready", t.Name(), referred.GetName()),
+			),
+		)
 
-			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
-		}
-
-		return nil, true, ctrl.Result{}, err
+		return false, ctrl.Result{RequeueAfter: requeueDelay}, nil
 	}
 
-	if isReady, r1, err := isReady(ctx, c, object, &theme, &theme.Status.Conditions, requeueDelay); !isReady {
-		return nil, true, r1, err
-	}
-
-	return &theme, false, ctrl.Result{}, nil
+	return true, ctrl.Result{}, nil
 }
