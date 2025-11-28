@@ -117,40 +117,31 @@ func (r *MockPageArchetypeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageArchetype{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageArchetype{},
-			LikeNamedHandler,
-		).
+			LikeNamedHandler).
 		Watches(
 			&kdexv1alpha1.KDexPageFooter{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultFooterRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultFooterRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageFooter{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultFooterRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultFooterRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageHeader{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultHeaderRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultHeaderRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageHeader{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultHeaderRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultHeaderRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageNavigation{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultMainNavigationRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultMainNavigationRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageNavigation{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultMainNavigationRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultMainNavigationRef}")).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.ScriptLibraryRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.ScriptLibraryRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.ScriptLibraryRef}")).
 		Named("mockpagearchetypereconciler").
 		Complete(r)
 }
@@ -231,16 +222,13 @@ func (r *MockPageFooterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageFooter{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageFooter{},
-			LikeNamedHandler,
-		).
+			LikeNamedHandler).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}, "{.Spec.ScriptLibraryRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}, "{.Spec.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}, "{.Spec.ScriptLibraryRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}, "{.Spec.ScriptLibraryRef}")).
 		Named("mockpagefooterreconciler").
 		Complete(r)
 }
@@ -321,16 +309,13 @@ func (r *MockPageHeaderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageHeader{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageHeader{},
-			LikeNamedHandler,
-		).
+			LikeNamedHandler).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageHeader{}, &kdexv1alpha1.KDexPageHeaderList{}, "{.Spec.ScriptLibraryRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageHeader{}, &kdexv1alpha1.KDexPageHeaderList{}, "{.Spec.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageHeader{}, &kdexv1alpha1.KDexPageHeaderList{}, "{.Spec.ScriptLibraryRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageHeader{}, &kdexv1alpha1.KDexPageHeaderList{}, "{.Spec.ScriptLibraryRef}")).
 		Named("mockpageheaderreconciler").
 		Complete(r)
 }
@@ -411,16 +396,13 @@ func (r *MockPageNavigationReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		For(&kdexv1alpha1.KDexPageNavigation{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageNavigation{},
-			LikeNamedHandler,
-		).
+			LikeNamedHandler).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageNavigation{}, &kdexv1alpha1.KDexPageNavigationList{}, "{.Spec.ScriptLibraryRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageNavigation{}, &kdexv1alpha1.KDexPageNavigationList{}, "{.Spec.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageNavigation{}, &kdexv1alpha1.KDexPageNavigationList{}, "{.Spec.ScriptLibraryRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageNavigation{}, &kdexv1alpha1.KDexPageNavigationList{}, "{.Spec.ScriptLibraryRef}")).
 		Named("mockpagenavigationreconciler").
 		Complete(r)
 }
@@ -503,12 +485,10 @@ func (r *MockScriptLibraryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexScriptLibrary{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			LikeNamedHandler,
-		).
+			LikeNamedHandler).
 		Watches(
 			&corev1.Secret{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexScriptLibrary{}, &kdexv1alpha1.KDexScriptLibraryList{}, "{.Spec.PackageReference.SecretRef}"),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexScriptLibrary{}, &kdexv1alpha1.KDexScriptLibraryList{}, "{.Spec.PackageReference.SecretRef}")).
 		Named("mockscriptlibraryreconciler").
 		Complete(r)
 }
