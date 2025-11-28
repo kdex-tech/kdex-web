@@ -101,7 +101,7 @@ cleanup-test-e2e: ## Tear down the Kind cluster used for e2e tests
 coverage: test ## Generate and view test coverage report.
 	@echo "--> Generating coverage report"
 	go tool cover -html=cover.out -o cover.html
-	@echo "--> Coverage report generated at file:./cover.html"
+	@echo "--> Coverage report generated at file://$$(pwd)/cover.html"
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
