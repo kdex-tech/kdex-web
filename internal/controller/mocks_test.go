@@ -6,90 +6,13 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/jsonpath"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
-
-var mockHandler = handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: o.GetName()}}}
-})
-
-var handlerMaker = func(c client.Client, t client.ObjectList, refPath string) handler.EventHandler {
-	jpRef := jsonpath.New("ref-path")
-	if err := jpRef.Parse(refPath); err != nil {
-		panic(err)
-	}
-	jpName := jsonpath.New("name-path")
-	if err := jpName.Parse("{.Name}"); err != nil {
-		panic(err)
-	}
-	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-		if err := c.List(ctx, t, &client.ListOptions{
-			Namespace: o.GetNamespace(),
-		}); err != nil {
-			return []reconcile.Request{}
-		}
-
-		items, err := meta.ExtractList(t)
-		if err != nil {
-			return []reconcile.Request{}
-		}
-
-		requests := make([]reconcile.Request, 0, len(items))
-		for _, item := range items {
-			i := item.(client.Object)
-
-			refResults, err := jpRef.FindResults(i)
-			if err != nil {
-				panic(err)
-			}
-
-			if len(refResults) == 0 || len(refResults[0]) == 0 {
-				continue
-			}
-
-			if refResults[0][0].IsNil() {
-				continue
-			}
-
-			res := refResults[0][0].Interface()
-
-			if res == nil {
-				continue
-			}
-
-			nameResults, err := jpName.FindResults(res)
-			if err != nil {
-				panic(err)
-			}
-
-			if len(nameResults) == 0 || len(nameResults[0]) == 0 {
-				continue
-			}
-
-			name := nameResults[0][0].Interface()
-
-			if name == o.GetName() {
-				requests = append(requests, reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      i.GetName(),
-						Namespace: i.GetNamespace(),
-					},
-				})
-			}
-		}
-		return requests
-	})
-}
 
 type MockPageArchetypeReconciler struct {
 	client.Client
@@ -194,39 +117,39 @@ func (r *MockPageArchetypeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageArchetype{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageArchetype{},
-			mockHandler,
+			LikeNamedHandler,
 		).
 		Watches(
 			&kdexv1alpha1.KDexPageFooter{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultFooterRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultFooterRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageFooter{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultFooterRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultFooterRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexPageHeader{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultHeaderRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultHeaderRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageHeader{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultHeaderRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultHeaderRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexPageNavigation{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultMainNavigationRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultMainNavigationRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageNavigation{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultMainNavigationRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultMainNavigationRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.ScriptLibraryRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.ScriptLibraryRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.ScriptLibraryRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.ScriptLibraryRef}"),
 		).
 		Named("mockpagearchetypereconciler").
 		Complete(r)
@@ -308,15 +231,15 @@ func (r *MockPageFooterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageFooter{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageFooter{},
-			mockHandler,
+			LikeNamedHandler,
 		).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageFooterList{}, "{.Spec.ScriptLibraryRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}, "{.Spec.ScriptLibraryRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageFooterList{}, "{.Spec.ScriptLibraryRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}, "{.Spec.ScriptLibraryRef}"),
 		).
 		Named("mockpagefooterreconciler").
 		Complete(r)
@@ -398,15 +321,15 @@ func (r *MockPageHeaderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageHeader{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageHeader{},
-			mockHandler,
+			LikeNamedHandler,
 		).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageHeaderList{}, "{.Spec.ScriptLibraryRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageHeader{}, &kdexv1alpha1.KDexPageHeaderList{}, "{.Spec.ScriptLibraryRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageHeaderList{}, "{.Spec.ScriptLibraryRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageHeader{}, &kdexv1alpha1.KDexPageHeaderList{}, "{.Spec.ScriptLibraryRef}"),
 		).
 		Named("mockpageheaderreconciler").
 		Complete(r)
@@ -488,15 +411,15 @@ func (r *MockPageNavigationReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		For(&kdexv1alpha1.KDexPageNavigation{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageNavigation{},
-			mockHandler,
+			LikeNamedHandler,
 		).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageNavigationList{}, "{.Spec.ScriptLibraryRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageNavigation{}, &kdexv1alpha1.KDexPageNavigationList{}, "{.Spec.ScriptLibraryRef}"),
 		).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			handlerMaker(r.Client, &kdexv1alpha1.KDexPageNavigationList{}, "{.Spec.ScriptLibraryRef}"),
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageNavigation{}, &kdexv1alpha1.KDexPageNavigationList{}, "{.Spec.ScriptLibraryRef}"),
 		).
 		Named("mockpagenavigationreconciler").
 		Complete(r)
@@ -580,11 +503,11 @@ func (r *MockScriptLibraryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexScriptLibrary{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			mockHandler,
+			LikeNamedHandler,
 		).
 		Watches(
 			&corev1.Secret{},
-			mockHandler,
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexScriptLibrary{}, &kdexv1alpha1.KDexScriptLibraryList{}, "{.Spec.PackageReference.SecretRef}"),
 		).
 		Named("mockscriptlibraryreconciler").
 		Complete(r)

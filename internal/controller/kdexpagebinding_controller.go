@@ -128,10 +128,10 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForApp)).
 		Watches(
 			&kdexv1alpha1.KDexPageArchetype{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageArchetype)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.PageArchetypeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageArchetype{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageArchetype)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.PageArchetypeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageBinding{},
 			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageBindings)).
@@ -180,9 +180,16 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 
 	pageBinding.Status.Attributes["archetype.generation"] = fmt.Sprintf("%d", archetypeObj.GetGeneration())
 
-	archetype := archetypeObj.(*kdexv1alpha1.KDexPageArchetype)
+	var pageArchetypeSpec kdexv1alpha1.KDexPageArchetypeSpec
 
-	archetypeScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, archetype.Spec.ScriptLibraryRef, r.RequeueDelay)
+	switch v := archetypeObj.(type) {
+	case *kdexv1alpha1.KDexPageArchetype:
+		pageArchetypeSpec = v.Spec
+	case *kdexv1alpha1.KDexClusterPageArchetype:
+		pageArchetypeSpec = v.Spec
+	}
+
+	archetypeScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, pageArchetypeSpec.ScriptLibraryRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
@@ -207,9 +214,9 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 
 	navigationRef := pageBinding.Spec.OverrideMainNavigationRef
 	if navigationRef == nil {
-		navigationRef = archetype.Spec.DefaultMainNavigationRef
+		navigationRef = pageArchetypeSpec.DefaultMainNavigationRef
 	}
-	navigations, shouldReturn, response, err := ResolvePageNavigations(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, navigationRef, archetype.Spec.ExtraNavigations, r.RequeueDelay)
+	navigations, shouldReturn, response, err := ResolvePageNavigations(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, navigationRef, pageArchetypeSpec.ExtraNavigations, r.RequeueDelay)
 	if shouldReturn {
 		return response, err
 	}
@@ -241,7 +248,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 
 	headerRef := pageBinding.Spec.OverrideHeaderRef
 	if headerRef == nil {
-		headerRef = archetype.Spec.DefaultHeaderRef
+		headerRef = pageArchetypeSpec.DefaultHeaderRef
 	}
 	headerObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, headerRef, r.RequeueDelay)
 	if shouldReturn {
@@ -269,7 +276,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 
 	footerRef := pageBinding.Spec.OverrideFooterRef
 	if footerRef == nil {
-		footerRef = archetype.Spec.DefaultFooterRef
+		footerRef = pageArchetypeSpec.DefaultFooterRef
 	}
 	footerObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, footerRef, r.RequeueDelay)
 	if shouldReturn {
@@ -360,7 +367,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 	}
 
 	hostHandler.Pages.Set(page.PageHandler{
-		Archetype:         archetype,
+		Archetype:         &pageArchetypeSpec,
 		Content:           contents,
 		Footer:            footer,
 		Header:            header,

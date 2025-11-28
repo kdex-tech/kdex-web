@@ -32,12 +32,12 @@ import (
 	"golang.org/x/mod/modfile"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	"kdex.dev/web/internal/host"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -51,14 +51,15 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	ctx       context.Context
-	cancel    context.CancelFunc
-	testEnv   *envtest.Environment
-	cfg       *rest.Config
-	hostStore *host.HostStore
-	k8sClient client.Client
-	focalHost string
-	namespace string
+	ctx             context.Context
+	cancel          context.CancelFunc
+	testEnv         *envtest.Environment
+	cfg             *rest.Config
+	hostStore       *host.HostStore
+	k8sClient       client.Client
+	focalHost       string
+	namespace       string
+	secondNamespace string
 )
 
 func TestControllers(t *testing.T) {
@@ -129,13 +130,18 @@ var _ = BeforeSuite(func() {
 
 	focalHost = "test-host"
 	namespace = "default"
+	secondNamespace = "second-namespace"
+
+	ns2 := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: secondNamespace}}
+	Expect(k8sClient.Create(ctx, ns2)).To(Succeed())
 
 	k8sManager, err := manager.New(cfg, manager.Options{
-		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				namespace: {},
-			},
-		},
+		// Cache: cache.Options{
+		// 	DefaultNamespaces: map[string]cache.Config{
+		// 		namespace:       {},
+		// 		secondNamespace: {},
+		// 	},
+		// },
 		Scheme: scheme.Scheme,
 	})
 	Expect(err).NotTo(HaveOccurred())

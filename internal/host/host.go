@@ -180,7 +180,7 @@ func (th *HostHandler) L10nRenderLocked(
 		Organization:    th.host.Organization,
 		PageMap:         pageMap,
 		PatternPath:     handler.Page.Spec.PatternPath,
-		TemplateContent: handler.Archetype.Spec.Content,
+		TemplateContent: handler.Archetype.Content,
 		TemplateName:    handler.Page.Name,
 		Theme:           th.ThemeToString(),
 		Title:           handler.Page.Spec.Label,

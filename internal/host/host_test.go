@@ -80,10 +80,8 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						},
 					},
 				},
-				Archetype: &kdexv1alpha1.KDexPageArchetype{
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: primaryTemplate,
-					},
+				Archetype: &kdexv1alpha1.KDexPageArchetypeSpec{
+					Content: primaryTemplate,
 				},
 				Content: map[string]page.ResolvedContentEntry{
 					"main": {
@@ -160,10 +158,8 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						},
 					},
 				},
-				Archetype: &kdexv1alpha1.KDexPageArchetype{
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: primaryTemplate,
-					},
+				Archetype: &kdexv1alpha1.KDexPageArchetypeSpec{
+					Content: primaryTemplate,
 				},
 				Content: map[string]page.ResolvedContentEntry{
 					"main": {
@@ -240,10 +236,8 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						},
 					},
 				},
-				Archetype: &kdexv1alpha1.KDexPageArchetype{
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: primaryTemplate,
-					},
+				Archetype: &kdexv1alpha1.KDexPageArchetypeSpec{
+					Content: primaryTemplate,
 				},
 				Content: map[string]page.ResolvedContentEntry{
 					"main": {
@@ -330,10 +324,8 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 						},
 					},
 				},
-				Archetype: &kdexv1alpha1.KDexPageArchetype{
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: primaryTemplate,
-					},
+				Archetype: &kdexv1alpha1.KDexPageArchetypeSpec{
+					Content: primaryTemplate,
 				},
 				Content: map[string]page.ResolvedContentEntry{
 					"main": {

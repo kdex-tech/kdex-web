@@ -24,7 +24,7 @@ type PageHandler struct {
 	Page *kdexv1alpha1.KDexPageBinding
 
 	// dereferenced resources
-	Archetype         *kdexv1alpha1.KDexPageArchetype
+	Archetype         *kdexv1alpha1.KDexPageArchetypeSpec
 	Content           map[string]ResolvedContentEntry
 	Footer            *kdexv1alpha1.KDexPageFooter
 	Header            *kdexv1alpha1.KDexPageHeader

@@ -66,6 +66,28 @@ func addOrUpdateHostController(
 	}).Should(Succeed())
 }
 
+func addOrUpdateClusterPageArchetype(
+	ctx context.Context,
+	k8sClient client.Client,
+	pageArchetype kdexv1alpha1.KDexClusterPageArchetype,
+) {
+	Eventually(func(g Gomega) error {
+		list := &kdexv1alpha1.KDexClusterPageArchetypeList{}
+		err := k8sClient.List(ctx, list, &client.ListOptions{
+			FieldSelector: fields.OneTermEqualSelector("metadata.name", pageArchetype.Name),
+		})
+		g.Expect(err).NotTo(HaveOccurred())
+		if len(list.Items) > 0 {
+			existing := list.Items[0]
+			existing.Spec = pageArchetype.Spec
+			g.Expect(k8sClient.Update(ctx, &existing)).To(Succeed())
+		} else {
+			g.Expect(k8sClient.Create(ctx, &pageArchetype)).To(Succeed())
+		}
+		return nil
+	}).Should(Succeed())
+}
+
 func addOrUpdatePageArchetype(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -229,8 +251,11 @@ func addOrUpdateTheme(
 
 func assertResourceReady(ctx context.Context, k8sClient client.Client, name string, namespace string, checkResource client.Object, ready bool) {
 	typeNamespacedName := types.NamespacedName{
-		Name:      name,
-		Namespace: namespace,
+		Name: name,
+	}
+
+	if namespace != "" {
+		typeNamespacedName.Namespace = namespace
 	}
 
 	check := func(g Gomega) {
@@ -263,8 +288,16 @@ func cleanupResources(namespace string) {
 
 	for _, pair := range []Pairs{
 		{&kdexv1alpha1.KDexApp{}, &kdexv1alpha1.KDexAppList{}},
+		{&kdexv1alpha1.KDexClusterApp{}, &kdexv1alpha1.KDexClusterAppList{}},
+		{&kdexv1alpha1.KDexClusterPageArchetype{}, &kdexv1alpha1.KDexClusterPageArchetypeList{}},
+		{&kdexv1alpha1.KDexClusterPageFooter{}, &kdexv1alpha1.KDexClusterPageFooterList{}},
+		{&kdexv1alpha1.KDexClusterPageHeader{}, &kdexv1alpha1.KDexClusterPageHeaderList{}},
+		{&kdexv1alpha1.KDexClusterPageNavigation{}, &kdexv1alpha1.KDexClusterPageNavigationList{}},
+		{&kdexv1alpha1.KDexClusterScriptLibrary{}, &kdexv1alpha1.KDexClusterScriptLibraryList{}},
+		{&kdexv1alpha1.KDexClusterTheme{}, &kdexv1alpha1.KDexClusterThemeList{}},
 		{&kdexv1alpha1.KDexHost{}, &kdexv1alpha1.KDexHostList{}},
 		{&kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}},
+		{&kdexv1alpha1.KDexHostPackageReferences{}, &kdexv1alpha1.KDexHostPackageReferencesList{}},
 		{&kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}},
 		{&kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}},
 		{&kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}},

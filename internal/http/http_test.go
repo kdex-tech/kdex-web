@@ -138,40 +138,45 @@ func setupHandler(
 	languages *[]language.Tag,
 	headers *map[string]string,
 ) Results {
-	mux := http.NewServeMux()
-	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		results := Results{}
-		for _, name := range parameterNames {
-			values := GetParamArray(name, []string{}, r)
-			if len(values) > 0 {
-				if results.Parameters == nil {
-					results.Parameters = map[string][]string{}
-				}
-				results.Parameters[name] = values
-			}
-		}
+	server := MockServer(
+		func(mux *http.ServeMux) {
+			mux.HandleFunc(
+				path,
+				func(w http.ResponseWriter, r *http.Request) {
+					results := Results{}
+					for _, name := range parameterNames {
+						values := GetParamArray(name, []string{}, r)
+						if len(values) > 0 {
+							if results.Parameters == nil {
+								results.Parameters = map[string][]string{}
+							}
+							results.Parameters[name] = values
+						}
+					}
 
-		if languages == nil {
-			languages = &[]language.Tag{
-				language.Make("en"),
-			}
-		}
+					if languages == nil {
+						languages = &[]language.Tag{
+							language.Make("en"),
+						}
+					}
 
-		lang := GetLang(r, "en", *languages)
+					lang := GetLang(r, "en", *languages)
 
-		results.Lang = lang.String()
+					results.Lang = lang.String()
 
-		jsonBytes, err := json.Marshal(results)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(jsonBytes)
-		w.WriteHeader(http.StatusOK)
-	})
+					jsonBytes, err := json.Marshal(results)
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					w.Header().Set("Content-Type", "application/json")
+					w.Write(jsonBytes)
+					w.WriteHeader(http.StatusOK)
+				},
+			)
+		},
+	)
 
-	server := httptest.NewServer(mux)
 	defer server.Close()
 
 	req, err := http.NewRequest("GET", server.URL+url, nil)
@@ -197,4 +202,14 @@ func setupHandler(
 	g.Expect(err).NotTo(HaveOccurred())
 
 	return results
+}
+
+func MockServer(setup func(mux *http.ServeMux)) *httptest.Server {
+	mux := http.NewServeMux()
+
+	setup(mux)
+
+	server := httptest.NewServer(mux)
+
+	return server
 }

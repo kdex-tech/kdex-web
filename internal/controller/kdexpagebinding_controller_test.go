@@ -644,5 +644,167 @@ var _ = Describe("KDexPageBinding Controller", func() {
 
 			Eventually(check).Should(Succeed())
 		})
+
+		It("cross namespace reference", func() {
+			resource := &kdexv1alpha1.KDexPageBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: namespace,
+				},
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							RawHTML: "<h1>Hello, World!</h1>",
+							Slot:    "main",
+						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind:      "KDexPageArchetype",
+						Name:      "non-existent-page-archetype",
+						Namespace: secondNamespace,
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/foo",
+					},
+				},
+			}
+
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+			assertResourceReady(
+				ctx, k8sClient, resourceName, namespace,
+				&kdexv1alpha1.KDexPageBinding{}, false)
+
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      focalHost,
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						Host: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
+								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+							},
+						},
+					},
+				},
+			)
+
+			assertResourceReady(
+				ctx, k8sClient, focalHost, namespace,
+				&kdexv1alpha1.KDexHostController{}, true)
+
+			addOrUpdatePageArchetype(
+				ctx, k8sClient,
+				kdexv1alpha1.KDexPageArchetype{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "non-existent-page-archetype",
+						Namespace: secondNamespace,
+					},
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: "<h1>Hello, World!</h1>",
+					},
+				},
+			)
+
+			assertResourceReady(
+				ctx, k8sClient, "non-existent-page-archetype", secondNamespace,
+				&kdexv1alpha1.KDexPageArchetype{}, true)
+
+			assertResourceReady(
+				ctx, k8sClient, resourceName, namespace,
+				&kdexv1alpha1.KDexPageBinding{}, true)
+		})
+
+		It("cluster reference", func() {
+			resource := &kdexv1alpha1.KDexPageBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      resourceName,
+					Namespace: namespace,
+				},
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							RawHTML: "<h1>Hello, World!</h1>",
+							Slot:    "main",
+						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexClusterPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/foo",
+					},
+				},
+			}
+
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+
+			assertResourceReady(
+				ctx, k8sClient, resourceName, namespace,
+				&kdexv1alpha1.KDexPageBinding{}, false)
+
+			addOrUpdateHostController(
+				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      focalHost,
+						Namespace: namespace,
+					},
+					Spec: kdexv1alpha1.KDexHostControllerSpec{
+						Host: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
+								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+							},
+						},
+					},
+				},
+			)
+
+			assertResourceReady(
+				ctx, k8sClient, focalHost, namespace,
+				&kdexv1alpha1.KDexHostController{}, true)
+
+			addOrUpdateClusterPageArchetype(
+				ctx, k8sClient,
+				kdexv1alpha1.KDexClusterPageArchetype{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "non-existent-page-archetype",
+					},
+					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
+						Content: "<h1>Hello, World!</h1>",
+					},
+				},
+			)
+
+			assertResourceReady(
+				ctx, k8sClient, "non-existent-page-archetype", "",
+				&kdexv1alpha1.KDexClusterPageArchetype{}, true)
+
+			assertResourceReady(
+				ctx, k8sClient, resourceName, namespace,
+				&kdexv1alpha1.KDexPageBinding{}, true)
+		})
 	})
 })

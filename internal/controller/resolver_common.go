@@ -307,14 +307,15 @@ func isReady(
 	}
 
 	if !meta.IsStatusConditionTrue(*referredConditions, string(kdexv1alpha1.ConditionTypeReady)) {
-		meta.SetStatusCondition(
+		kdexv1alpha1.SetConditions(
 			referredConditions,
-			*kdexv1alpha1.NewCondition(
-				kdexv1alpha1.ConditionTypeReady,
-				metav1.ConditionFalse,
-				kdexv1alpha1.ConditionReasonReconcileError,
-				fmt.Sprintf("referenced %s %s is not ready", t.Name(), referred.GetName()),
-			),
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			fmt.Sprintf("referenced %s %s is not ready", t.Name(), referred.GetName()),
 		)
 
 		return false, ctrl.Result{RequeueAfter: requeueDelay}, nil
