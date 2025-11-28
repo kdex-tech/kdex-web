@@ -32,7 +32,7 @@ type HostHandler struct {
 	Name                 string
 	Mux                  *http.ServeMux
 	Pages                *page.PageStore
-	ScriptLibraries      []kdexv1alpha1.KDexScriptLibrary
+	ScriptLibraries      []kdexv1alpha1.KDexScriptLibrarySpec
 	Translations         *catalog.Builder
 	assets               []kdexv1alpha1.Asset
 	defaultLanguage      string
@@ -96,14 +96,14 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	separator := ""
 
 	for _, scriptLibrary := range th.ScriptLibraries {
-		for _, script := range scriptLibrary.Spec.Scripts {
+		for _, script := range scriptLibrary.Scripts {
 			buffer.WriteString(separator)
 			buffer.WriteString(script.ToScriptTag(true))
 			separator = "\n"
 		}
 	}
 	for _, scriptLibrary := range handler.ScriptLibraries {
-		for _, script := range scriptLibrary.Spec.Scripts {
+		for _, script := range scriptLibrary.Scripts {
 			buffer.WriteString(separator)
 			buffer.WriteString(script.ToScriptTag(true))
 			separator = "\n"
@@ -116,8 +116,8 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	packageReferences := []kdexv1alpha1.PackageReference{}
 	for _, scriptLibrary := range th.ScriptLibraries {
-		if scriptLibrary.Spec.PackageReference != nil {
-			packageReferences = append(packageReferences, *scriptLibrary.Spec.PackageReference)
+		if scriptLibrary.PackageReference != nil {
+			packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
 		}
 	}
 	packageReferences = append(packageReferences, handler.PackageReferences...)
@@ -140,14 +140,14 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	}
 
 	for _, scriptLibrary := range th.ScriptLibraries {
-		for _, script := range scriptLibrary.Spec.Scripts {
+		for _, script := range scriptLibrary.Scripts {
 			buffer.WriteString(separator)
 			buffer.WriteString(script.ToScriptTag(false))
 			separator = "\n"
 		}
 	}
 	for _, scriptLibrary := range handler.ScriptLibraries {
-		for _, script := range scriptLibrary.Spec.Scripts {
+		for _, script := range scriptLibrary.Scripts {
 			buffer.WriteString(separator)
 			buffer.WriteString(script.ToScriptTag(false))
 			separator = "\n"
@@ -327,7 +327,7 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (th *HostHandler) SetHost(
 	host *kdexv1alpha1.KDexHostSpec,
 	assets []kdexv1alpha1.Asset,
-	scriptLibraries []kdexv1alpha1.KDexScriptLibrary,
+	scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec,
 	importmap string,
 ) {
 	th.mu.Lock()

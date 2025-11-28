@@ -141,7 +141,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		themeAssets = theme.Spec.Assets
 	}
 
-	var scriptLibraries []kdexv1alpha1.KDexScriptLibrary
+	var scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec
 
 	scriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.Host.ScriptLibraryRef, r.RequeueDelay)
 	if shouldReturn {
@@ -151,8 +151,16 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	if scriptLibraryObj != nil {
 		hostController.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
 
-		scriptLibrary := scriptLibraryObj.(*kdexv1alpha1.KDexScriptLibrary)
-		scriptLibraries = append(scriptLibraries, *scriptLibrary)
+		var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
+
+		switch v := scriptLibraryObj.(type) {
+		case *kdexv1alpha1.KDexScriptLibrary:
+			scriptLibrary = v.Spec
+		case *kdexv1alpha1.KDexClusterScriptLibrary:
+			scriptLibrary = v.Spec
+		}
+
+		scriptLibraries = append(scriptLibraries, scriptLibrary)
 	}
 
 	if theme != nil {
@@ -164,8 +172,16 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		if themeScriptLibraryObj != nil {
 			hostController.Status.Attributes["theme.scriptLibrary.generation"] = fmt.Sprintf("%d", themeScriptLibraryObj.GetGeneration())
 
-			scriptLibrary := themeScriptLibraryObj.(*kdexv1alpha1.KDexScriptLibrary)
-			scriptLibraries = append(scriptLibraries, *scriptLibrary)
+			var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
+
+			switch v := themeScriptLibraryObj.(type) {
+			case *kdexv1alpha1.KDexScriptLibrary:
+				scriptLibrary = v.Spec
+			case *kdexv1alpha1.KDexClusterScriptLibrary:
+				scriptLibrary = v.Spec
+			}
+
+			scriptLibraries = append(scriptLibraries, scriptLibrary)
 		}
 	}
 
@@ -179,8 +195,8 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	allPackageReferences := []kdexv1alpha1.PackageReference{}
 	for _, scriptLibrary := range scriptLibraries {
-		if scriptLibrary.Spec.PackageReference != nil {
-			allPackageReferences = append(allPackageReferences, *scriptLibrary.Spec.PackageReference)
+		if scriptLibrary.PackageReference != nil {
+			allPackageReferences = append(allPackageReferences, *scriptLibrary.PackageReference)
 		}
 	}
 

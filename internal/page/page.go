@@ -30,7 +30,7 @@ type PageHandler struct {
 	Header            *kdexv1alpha1.KDexPageHeader
 	Navigations       map[string]*kdexv1alpha1.KDexPageNavigation
 	PackageReferences []kdexv1alpha1.PackageReference
-	ScriptLibraries   []kdexv1alpha1.KDexScriptLibrary
+	ScriptLibraries   []kdexv1alpha1.KDexScriptLibrarySpec
 }
 
 func (p *PageHandler) ContentToHTMLMap() map[string]string {

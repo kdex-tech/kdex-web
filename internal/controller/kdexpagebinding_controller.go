@@ -170,7 +170,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		pageBinding.Status.Attributes = make(map[string]string)
 	}
 
-	scriptLibraries := []kdexv1alpha1.KDexScriptLibrary{}
+	scriptLibraries := []kdexv1alpha1.KDexScriptLibrarySpec{}
 
 	archetypeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, &pageBinding.Spec.PageArchetypeRef, r.RequeueDelay)
 	if shouldReturn {
@@ -196,8 +196,16 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 	if archetypeScriptLibraryObj != nil {
 		pageBinding.Status.Attributes["archetype.scriptLibrary.generation"] = fmt.Sprintf("%d", archetypeScriptLibraryObj.GetGeneration())
 
-		scriptLibrary := archetypeScriptLibraryObj.(*kdexv1alpha1.KDexScriptLibrary)
-		scriptLibraries = append(scriptLibraries, *scriptLibrary)
+		var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
+
+		switch v := archetypeScriptLibraryObj.(type) {
+		case *kdexv1alpha1.KDexScriptLibrary:
+			scriptLibrary = v.Spec
+		case *kdexv1alpha1.KDexClusterScriptLibrary:
+			scriptLibrary = v.Spec
+		}
+
+		scriptLibraries = append(scriptLibraries, scriptLibrary)
 	}
 
 	contents, shouldReturn, response, err := ResolveContents(ctx, r.Client, pageBinding, r.RequeueDelay)
@@ -231,8 +239,16 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		if navigationScriptLibraryObj != nil {
 			pageBinding.Status.Attributes[k+".navigation.scriptLibrary.generation"] = fmt.Sprintf("%d", navigationScriptLibraryObj.GetGeneration())
 
-			scriptLibrary := navigationScriptLibraryObj.(*kdexv1alpha1.KDexScriptLibrary)
-			scriptLibraries = append(scriptLibraries, *scriptLibrary)
+			var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
+
+			switch v := navigationScriptLibraryObj.(type) {
+			case *kdexv1alpha1.KDexScriptLibrary:
+				scriptLibrary = v.Spec
+			case *kdexv1alpha1.KDexClusterScriptLibrary:
+				scriptLibrary = v.Spec
+			}
+
+			scriptLibraries = append(scriptLibraries, scriptLibrary)
 		}
 	}
 
@@ -268,8 +284,16 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		if headerScriptLibraryObj != nil {
 			pageBinding.Status.Attributes["header.scriptLibrary.generation"] = fmt.Sprintf("%d", headerScriptLibraryObj.GetGeneration())
 
-			scriptLibrary := headerScriptLibraryObj.(*kdexv1alpha1.KDexScriptLibrary)
-			scriptLibraries = append(scriptLibraries, *scriptLibrary)
+			var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
+
+			switch v := headerScriptLibraryObj.(type) {
+			case *kdexv1alpha1.KDexScriptLibrary:
+				scriptLibrary = v.Spec
+			case *kdexv1alpha1.KDexClusterScriptLibrary:
+				scriptLibrary = v.Spec
+			}
+
+			scriptLibraries = append(scriptLibraries, scriptLibrary)
 		}
 	}
 
@@ -296,8 +320,16 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		if footerScriptLibraryObj != nil {
 			pageBinding.Status.Attributes["footer.scriptLibrary.generation"] = fmt.Sprintf("%d", footerScriptLibraryObj.GetGeneration())
 
-			scriptLibrary := footerScriptLibraryObj.(*kdexv1alpha1.KDexScriptLibrary)
-			scriptLibraries = append(scriptLibraries, *scriptLibrary)
+			var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
+
+			switch v := footerScriptLibraryObj.(type) {
+			case *kdexv1alpha1.KDexScriptLibrary:
+				scriptLibrary = v.Spec
+			case *kdexv1alpha1.KDexClusterScriptLibrary:
+				scriptLibrary = v.Spec
+			}
+
+			scriptLibraries = append(scriptLibraries, scriptLibrary)
 		}
 	}
 
@@ -309,8 +341,16 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 	if scriptLibraryObj != nil {
 		pageBinding.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
 
-		scriptLibrary := scriptLibraryObj.(*kdexv1alpha1.KDexScriptLibrary)
-		scriptLibraries = append(scriptLibraries, *scriptLibrary)
+		var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
+
+		switch v := scriptLibraryObj.(type) {
+		case *kdexv1alpha1.KDexScriptLibrary:
+			scriptLibrary = v.Spec
+		case *kdexv1alpha1.KDexClusterScriptLibrary:
+			scriptLibrary = v.Spec
+		}
+
+		scriptLibraries = append(scriptLibraries, scriptLibrary)
 	}
 
 	if pageBinding.Spec.BasePath == "/" && pageBinding.Spec.ParentPageRef != nil {
@@ -337,8 +377,8 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		}
 	}
 	for _, scriptLibrary := range scriptLibraries {
-		if scriptLibrary.Spec.PackageReference != nil {
-			packageReferences = append(packageReferences, *scriptLibrary.Spec.PackageReference)
+		if scriptLibrary.PackageReference != nil {
+			packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
 		}
 	}
 
