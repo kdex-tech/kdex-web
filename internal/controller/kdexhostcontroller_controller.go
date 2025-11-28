@@ -253,7 +253,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	hostHandler.SetHost(&hostController.Spec.Host, themeAssets, scriptLibraries, importmap)
 
-	return r.innerReconcile(ctx, &hostController, theme, hostPackageReferences)
+	return ctrl.Result{}, r.innerReconcile(ctx, &hostController, theme, hostPackageReferences)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -372,32 +372,32 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 	hostController *kdexv1alpha1.KDexHostController,
 	theme *kdexv1alpha1.KDexTheme,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
-) (ctrl.Result, error) {
+) error {
 	log := logf.FromContext(ctx)
 
 	if err := r.createOrUpdatePackagesDeployment(ctx, hostController, hostPackageReferences); err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if err := r.createOrUpdatePackagesService(ctx, hostController, hostPackageReferences); err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if err := r.createOrUpdateThemeDeployment(ctx, hostController, theme); err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if err := r.createOrUpdateThemeService(ctx, hostController, theme); err != nil {
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if hostController.Spec.Host.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
 		if err := r.createOrUpdateHTTPRoute(ctx, hostController, theme, hostPackageReferences); err != nil {
-			return ctrl.Result{}, err
+			return err
 		}
 	} else {
 		if err := r.createOrUpdateIngress(ctx, hostController, theme, hostPackageReferences); err != nil {
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 
@@ -414,7 +414,7 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 
 	log.Info("reconciled KDexHostController")
 
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(

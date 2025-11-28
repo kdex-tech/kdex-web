@@ -132,7 +132,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		r.Client,
 		job,
 		func() error {
-			if job.ObjectMeta.CreationTimestamp.IsZero() {
+			if job.CreationTimestamp.IsZero() {
 				r.setupJob(hostPackageReferences, job, configMap, secret)
 			}
 
@@ -418,7 +418,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
 		r.Client,
 		configmap,
 		func() error {
-			if configmap.ObjectMeta.CreationTimestamp.IsZero() {
+			if configmap.CreationTimestamp.IsZero() {
 				configmap.Annotations = make(map[string]string)
 				for key, value := range hostPackageReferences.Annotations {
 					configmap.Annotations[key] = value
@@ -549,7 +549,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobSecret(
 		r.Client,
 		secret,
 		func() error {
-			if secret.ObjectMeta.CreationTimestamp.IsZero() {
+			if secret.CreationTimestamp.IsZero() {
 				secret.Annotations = make(map[string]string)
 				for key, value := range hostPackageReferences.Annotations {
 					secret.Annotations[key] = value
