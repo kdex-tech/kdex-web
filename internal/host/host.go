@@ -410,11 +410,11 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 			return
 		}
 
-		var nav *kdexv1alpha1.KDexPageNavigation
+		var nav *kdexv1alpha1.KDexPageNavigationSpec
 
 		for key, n := range pageHandler.Navigations {
 			if key == navKey {
-				nav = n
+				nav = n.Spec
 				break
 			}
 		}
@@ -453,7 +453,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 			return
 		}
 
-		rendered, err := renderer.RenderOne(nav.Name, nav.Spec.Content, templateData)
+		rendered, err := renderer.RenderOne(navKey, nav.Content, templateData)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -44,8 +44,19 @@ func ResolveContents(
 			return nil, shouldReturn, r1, err
 		}
 
+		var appSpec *kdexv1alpha1.KDexAppSpec
+
+		switch v := app.(type) {
+		case *kdexv1alpha1.KDexApp:
+			appSpec = &v.Spec
+		case *kdexv1alpha1.KDexClusterApp:
+			appSpec = &v.Spec
+		}
+
 		contents[contentEntry.Slot] = page.ResolvedContentEntry{
-			App:               app.(*kdexv1alpha1.KDexApp),
+			App:               appSpec,
+			AppName:           app.GetName(),
+			AppGeneration:     fmt.Sprintf("%d", app.GetGeneration()),
 			CustomElementName: contentEntry.CustomElementName,
 			Slot:              contentEntry.Slot,
 		}
@@ -105,8 +116,8 @@ func ResolvePageNavigations(
 	navigationRef *kdexv1alpha1.KDexObjectReference,
 	extraNavigations map[string]*kdexv1alpha1.KDexObjectReference,
 	requeueDelay time.Duration,
-) (map[string]*kdexv1alpha1.KDexPageNavigation, bool, ctrl.Result, error) {
-	navigations := make(map[string]*kdexv1alpha1.KDexPageNavigation)
+) (map[string]page.ResolvedNavigationSpec, bool, ctrl.Result, error) {
+	navigations := make(map[string]page.ResolvedNavigationSpec)
 
 	navigation, shouldReturn, response, err := ResolveKDexObjectReference(
 		ctx, c, object, objectConditions, navigationRef, requeueDelay)
@@ -116,7 +127,20 @@ func ResolvePageNavigations(
 	}
 
 	if navigation != nil {
-		navigations["main"] = navigation.(*kdexv1alpha1.KDexPageNavigation)
+		var navigationSpec *kdexv1alpha1.KDexPageNavigationSpec
+
+		switch v := navigation.(type) {
+		case *kdexv1alpha1.KDexPageNavigation:
+			navigationSpec = &v.Spec
+		case *kdexv1alpha1.KDexClusterPageNavigation:
+			navigationSpec = &v.Spec
+		}
+
+		navigations["main"] = page.ResolvedNavigationSpec{
+			Generation: navigation.GetGeneration(),
+			Name:       navigation.GetName(),
+			Spec:       navigationSpec,
+		}
 	}
 
 	if extraNavigations == nil {
@@ -132,7 +156,20 @@ func ResolvePageNavigations(
 		}
 
 		if navigation != nil {
-			navigations[navigationName] = navigation.(*kdexv1alpha1.KDexPageNavigation)
+			var navigationSpec *kdexv1alpha1.KDexPageNavigationSpec
+
+			switch v := navigation.(type) {
+			case *kdexv1alpha1.KDexPageNavigation:
+				navigationSpec = &v.Spec
+			case *kdexv1alpha1.KDexClusterPageNavigation:
+				navigationSpec = &v.Spec
+			}
+
+			navigations[navigationName] = page.ResolvedNavigationSpec{
+				Generation: navigation.GetGeneration(),
+				Name:       navigation.GetName(),
+				Spec:       navigationSpec,
+			}
 		}
 	}
 

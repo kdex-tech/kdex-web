@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	customElementTemplate = `<%s id="content-%s" data-app-name="%s" data-app-resource-version="%s"></%s>`
+	customElementTemplate = `<%s id="content-%s" data-app-name="%s" data-app-generation="%s"></%s>`
 	navigationTemplate    = `<div id="navigation-%s"></div>
 <script type="text/javascript">
 fetch('/~/navigation/%s/{{ .Language }}%s')
@@ -19,6 +19,12 @@ fetch('/~/navigation/%s/{{ .Language }}%s')
 	rawHTMLTemplate = `<div id="content-%s">%s</div>`
 )
 
+type ResolvedNavigationSpec struct {
+	Generation int64
+	Name       string
+	Spec       *kdexv1alpha1.KDexPageNavigationSpec
+}
+
 type PageHandler struct {
 	// root object
 	Page *kdexv1alpha1.KDexPageBinding
@@ -28,7 +34,7 @@ type PageHandler struct {
 	Content           map[string]ResolvedContentEntry
 	Footer            *kdexv1alpha1.KDexPageFooter
 	Header            *kdexv1alpha1.KDexPageHeader
-	Navigations       map[string]*kdexv1alpha1.KDexPageNavigation
+	Navigations       map[string]ResolvedNavigationSpec
 	PackageReferences []kdexv1alpha1.PackageReference
 	ScriptLibraries   []kdexv1alpha1.KDexScriptLibrarySpec
 }
@@ -70,7 +76,9 @@ func (p PageHandler) NavigationToHTMLMap() map[string]string {
 }
 
 type ResolvedContentEntry struct {
-	App               *kdexv1alpha1.KDexApp
+	App               *kdexv1alpha1.KDexAppSpec
+	AppName           string
+	AppGeneration     string
 	Content           string
 	CustomElementName string
 	Slot              string
@@ -81,5 +89,5 @@ func (r *ResolvedContentEntry) ToHTML() string {
 		return fmt.Sprintf(rawHTMLTemplate, r.Slot, r.Content)
 	}
 
-	return fmt.Sprintf(customElementTemplate, r.CustomElementName, r.Slot, r.App.Name, r.App.ResourceVersion, r.CustomElementName)
+	return fmt.Sprintf(customElementTemplate, r.CustomElementName, r.Slot, r.AppName, r.AppGeneration, r.CustomElementName)
 }

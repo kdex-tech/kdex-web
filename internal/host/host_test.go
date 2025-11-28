@@ -99,9 +99,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						Content: `{{ l10n "key" }}`,
 					},
 				},
-				Navigations: map[string]*kdexv1alpha1.KDexPageNavigation{
+				Navigations: map[string]page.ResolvedNavigationSpec{
 					"main": {
-						Spec: kdexv1alpha1.KDexPageNavigationSpec{
+						Name:       "main",
+						Generation: 1,
+						Spec: &kdexv1alpha1.KDexPageNavigationSpec{
 							Content: "NAV",
 						},
 					},
@@ -177,9 +179,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						Content: `{{ l10n "key" }}`,
 					},
 				},
-				Navigations: map[string]*kdexv1alpha1.KDexPageNavigation{
+				Navigations: map[string]page.ResolvedNavigationSpec{
 					"main": {
-						Spec: kdexv1alpha1.KDexPageNavigationSpec{
+						Name:       "main",
+						Generation: 1,
+						Spec: &kdexv1alpha1.KDexPageNavigationSpec{
 							Content: "NAV",
 						},
 					},
@@ -255,9 +259,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						Content: `{{ l10n "key" }}`,
 					},
 				},
-				Navigations: map[string]*kdexv1alpha1.KDexPageNavigation{
+				Navigations: map[string]page.ResolvedNavigationSpec{
 					"main": {
-						Spec: kdexv1alpha1.KDexPageNavigationSpec{
+						Name:       "main",
+						Generation: 1,
+						Spec: &kdexv1alpha1.KDexPageNavigationSpec{
 							Content: "NAV",
 						},
 					},
@@ -343,9 +349,11 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 						Content: `{{ l10n "key" }}`,
 					},
 				},
-				Navigations: map[string]*kdexv1alpha1.KDexPageNavigation{
+				Navigations: map[string]page.ResolvedNavigationSpec{
 					"main": {
-						Spec: kdexv1alpha1.KDexPageNavigationSpec{
+						Name:       "main",
+						Generation: 1,
+						Spec: &kdexv1alpha1.KDexPageNavigationSpec{
 							Content: "NAV",
 						},
 					},

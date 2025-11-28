@@ -215,7 +215,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 
 	for k, content := range contents {
 		if content.App != nil {
-			pageBinding.Status.Attributes[k+".content.generation"] = fmt.Sprintf("%d", content.App.Generation)
+			pageBinding.Status.Attributes[k+".content.generation"] = content.AppGeneration
 		}
 	}
 
@@ -229,7 +229,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 	}
 
 	for k, navigation := range navigations {
-		pageBinding.Status.Attributes[k+".navigation.generation"] = fmt.Sprintf("%d", navigation.GetGeneration())
+		pageBinding.Status.Attributes[k+".navigation.generation"] = fmt.Sprintf("%d", navigation.Generation)
 
 		navigationScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, navigation.Spec.ScriptLibraryRef, r.RequeueDelay)
 		if shouldReturn {
@@ -373,7 +373,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 	packageReferences := []kdexv1alpha1.PackageReference{}
 	for _, content := range contents {
 		if content.App != nil {
-			packageReferences = append(packageReferences, content.App.Spec.PackageReference)
+			packageReferences = append(packageReferences, content.App.PackageReference)
 		}
 	}
 	for _, scriptLibrary := range scriptLibraries {
