@@ -65,10 +65,10 @@ func MakeHandlerByReferencePath(
 		}
 
 		requests := []reconcile.Request{}
-		for _, item := range items {
-			i := item.(client.Object)
+		for _, i := range items {
+			item := i.(client.Object)
 
-			jsonPathReference, err := jpRef.FindResults(i)
+			jsonPathReference, err := jpRef.FindResults(item)
 			if err != nil {
 				panic(err)
 			}
@@ -76,62 +76,64 @@ func MakeHandlerByReferencePath(
 				continue
 			}
 
-			ref := reflect.ValueOf(jsonPathReference[0][0].Interface())
-			isNil := false
-			switch ref.Kind() {
-			case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
-				isNil = ref.IsNil()
-			}
-			if ref.IsZero() || isNil {
-				continue
-			}
+			for _, curRef := range jsonPathReference[0] {
+				ref := reflect.ValueOf(curRef.Interface())
+				isNil := false
+				switch ref.Kind() {
+				case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+					isNil = ref.IsNil()
+				}
+				if ref.IsZero() || isNil {
+					continue
+				}
 
-			theReferenceStruct := ref.Interface()
+				theReferenceStruct := ref.Interface()
 
-			switch v := theReferenceStruct.(type) {
-			case corev1.LocalObjectReference:
-				if v.Name == o.GetName() {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      i.GetName(),
-							Namespace: i.GetNamespace(),
-						},
-					})
-				}
-			case *corev1.LocalObjectReference:
-				if v.Name == o.GetName() {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      i.GetName(),
-							Namespace: i.GetNamespace(),
-						},
-					})
-				}
-			case kdexv1alpha1.KDexObjectReference:
-				namespace := i.GetNamespace()
-				if v.Namespace != "" {
-					namespace = v.Namespace
-				}
-				if v.Kind == objKind && v.Name == o.GetName() && i.GetNamespace() == namespace {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      i.GetName(),
-							Namespace: i.GetNamespace(),
-						},
-					})
-				}
-			case *kdexv1alpha1.KDexObjectReference:
-				namespace := i.GetNamespace()
-				if v.Namespace != "" {
-					namespace = v.Namespace
-				}
-				if v.Kind == objKind && v.Name == o.GetName() && i.GetNamespace() == namespace {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      i.GetName(),
-							Namespace: i.GetNamespace(),
-						},
-					})
+				switch v := theReferenceStruct.(type) {
+				case corev1.LocalObjectReference:
+					if v.Name == o.GetName() {
+						requests = append(requests, reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Name:      item.GetName(),
+								Namespace: item.GetNamespace(),
+							},
+						})
+					}
+				case *corev1.LocalObjectReference:
+					if v.Name == o.GetName() {
+						requests = append(requests, reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Name:      item.GetName(),
+								Namespace: item.GetNamespace(),
+							},
+						})
+					}
+				case kdexv1alpha1.KDexObjectReference:
+					namespace := item.GetNamespace()
+					if v.Namespace != "" {
+						namespace = v.Namespace
+					}
+					if v.Kind == objKind && v.Name == o.GetName() && item.GetNamespace() == namespace {
+						requests = append(requests, reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Name:      item.GetName(),
+								Namespace: item.GetNamespace(),
+							},
+						})
+					}
+				case *kdexv1alpha1.KDexObjectReference:
+					namespace := item.GetNamespace()
+					if v.Namespace != "" {
+						namespace = v.Namespace
+					}
+					if v.Kind == objKind && v.Name == o.GetName() && item.GetNamespace() == namespace {
+						requests = append(requests, reconcile.Request{
+							NamespacedName: types.NamespacedName{
+								Name:      item.GetName(),
+								Namespace: item.GetNamespace(),
+							},
+						})
+					}
 				}
 			}
 		}

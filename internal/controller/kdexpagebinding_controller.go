@@ -29,7 +29,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -122,10 +121,10 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageBinding{}).
 		Watches(
 			&kdexv1alpha1.KDexApp{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForApp)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ContentEntries[*].AppRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterApp{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForApp)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ContentEntries[*].AppRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageArchetype{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.PageArchetypeRef}")).
@@ -134,31 +133,31 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.PageArchetypeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageBinding{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageBindings)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ParentPageRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageFooter{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageFooter)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideFooterRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageFooter{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageFooter)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideFooterRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageHeader{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageHeader)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideHeaderRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageHeader{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageHeader)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideHeaderRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageNavigation{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageNavigations)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideMainNavigationRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageNavigation{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForPageNavigations)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideMainNavigationRef}")).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForScriptLibrary)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			handler.EnqueueRequestsFromMapFunc(r.findPageBindingsForScriptLibrary)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ScriptLibraryRef}")).
 		Named("kdexpagebinding").
 		Complete(r)
 }
