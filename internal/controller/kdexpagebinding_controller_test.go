@@ -478,7 +478,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 			pageHandler, ok := hostHandler.Pages.Get(resource.Name)
 			Expect(ok).To(BeTrue())
 
-			Expect(pageHandler.Header.Spec.Content).To(Equal("BEFORE"))
+			Expect(pageHandler.Header.Content).To(Equal("BEFORE"))
 
 			addOrUpdatePageHeader(
 				ctx, k8sClient,
@@ -500,7 +500,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				pageHandler, ok = hostHandler.Pages.Get(resource.Name)
 				g.Expect(ok).To(BeTrue())
 
-				g.Expect(pageHandler.Header.Spec.Content).To(Equal("AFTER"))
+				g.Expect(pageHandler.Header.Content).To(Equal("AFTER"))
 			}
 
 			Eventually(check).Should(Succeed())
@@ -613,7 +613,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 			pageHandler, ok := hostHandler.Pages.Get(resource.Name)
 			Expect(ok).To(BeTrue())
 
-			Expect(pageHandler.Header.Spec.Content).To(Equal("BEFORE"))
+			Expect(pageHandler.Header.Content).To(Equal("BEFORE"))
 
 			addOrUpdatePageHeader(
 				ctx, k8sClient,
@@ -639,7 +639,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				pageHandler, ok = hostHandler.Pages.Get(resource.Name)
 				g.Expect(ok).To(BeTrue())
 
-				g.Expect(pageHandler.Header.Spec.Content).To(Equal("AFTER"))
+				g.Expect(pageHandler.Header.Content).To(Equal("AFTER"))
 			}
 
 			Eventually(check).Should(Succeed())

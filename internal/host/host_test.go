@@ -89,15 +89,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						Slot:    "main",
 					},
 				},
-				Footer: &kdexv1alpha1.KDexPageFooter{
-					Spec: kdexv1alpha1.KDexPageFooterSpec{
-						Content: "FOOTER",
-					},
+				Footer: &kdexv1alpha1.KDexPageFooterSpec{
+					Content: "FOOTER",
 				},
-				Header: &kdexv1alpha1.KDexPageHeader{
-					Spec: kdexv1alpha1.KDexPageHeaderSpec{
-						Content: `{{ l10n "key" }}`,
-					},
+				Header: &kdexv1alpha1.KDexPageHeaderSpec{
+					Content: `{{ l10n "key" }}`,
 				},
 				Navigations: map[string]page.ResolvedNavigationSpec{
 					"main": {
@@ -169,15 +165,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						Slot:    "main",
 					},
 				},
-				Footer: &kdexv1alpha1.KDexPageFooter{
-					Spec: kdexv1alpha1.KDexPageFooterSpec{
-						Content: "FOOTER",
-					},
+				Footer: &kdexv1alpha1.KDexPageFooterSpec{
+					Content: "FOOTER",
 				},
-				Header: &kdexv1alpha1.KDexPageHeader{
-					Spec: kdexv1alpha1.KDexPageHeaderSpec{
-						Content: `{{ l10n "key" }}`,
-					},
+				Header: &kdexv1alpha1.KDexPageHeaderSpec{
+					Content: `{{ l10n "key" }}`,
 				},
 				Navigations: map[string]page.ResolvedNavigationSpec{
 					"main": {
@@ -249,15 +241,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						Slot:    "main",
 					},
 				},
-				Footer: &kdexv1alpha1.KDexPageFooter{
-					Spec: kdexv1alpha1.KDexPageFooterSpec{
-						Content: "FOOTER",
-					},
+				Footer: &kdexv1alpha1.KDexPageFooterSpec{
+					Content: "FOOTER",
 				},
-				Header: &kdexv1alpha1.KDexPageHeader{
-					Spec: kdexv1alpha1.KDexPageHeaderSpec{
-						Content: `{{ l10n "key" }}`,
-					},
+				Header: &kdexv1alpha1.KDexPageHeaderSpec{
+					Content: `{{ l10n "key" }}`,
 				},
 				Navigations: map[string]page.ResolvedNavigationSpec{
 					"main": {
@@ -339,15 +327,11 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 						Slot:    "main",
 					},
 				},
-				Footer: &kdexv1alpha1.KDexPageFooter{
-					Spec: kdexv1alpha1.KDexPageFooterSpec{
-						Content: "FOOTER",
-					},
+				Footer: &kdexv1alpha1.KDexPageFooterSpec{
+					Content: "FOOTER",
 				},
-				Header: &kdexv1alpha1.KDexPageHeader{
-					Spec: kdexv1alpha1.KDexPageHeaderSpec{
-						Content: `{{ l10n "key" }}`,
-					},
+				Header: &kdexv1alpha1.KDexPageHeaderSpec{
+					Content: `{{ l10n "key" }}`,
 				},
 				Navigations: map[string]page.ResolvedNavigationSpec{
 					"main": {

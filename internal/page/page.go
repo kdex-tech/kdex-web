@@ -32,8 +32,8 @@ type PageHandler struct {
 	// dereferenced resources
 	Archetype         *kdexv1alpha1.KDexPageArchetypeSpec
 	Content           map[string]ResolvedContentEntry
-	Footer            *kdexv1alpha1.KDexPageFooter
-	Header            *kdexv1alpha1.KDexPageHeader
+	Footer            *kdexv1alpha1.KDexPageFooterSpec
+	Header            *kdexv1alpha1.KDexPageHeaderSpec
 	Navigations       map[string]ResolvedNavigationSpec
 	PackageReferences []kdexv1alpha1.PackageReference
 	ScriptLibraries   []kdexv1alpha1.KDexScriptLibrarySpec
@@ -54,7 +54,7 @@ func (p PageHandler) FooterToHTML() string {
 		return ""
 	}
 
-	return p.Footer.Spec.Content
+	return p.Footer.Content
 }
 
 func (p PageHandler) HeaderToHTML() string {
@@ -62,7 +62,7 @@ func (p PageHandler) HeaderToHTML() string {
 		return ""
 	}
 
-	return p.Header.Spec.Content
+	return p.Header.Content
 }
 
 func (p PageHandler) NavigationToHTMLMap() map[string]string {

@@ -270,13 +270,19 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		return r1, err
 	}
 
-	var header *kdexv1alpha1.KDexPageHeader
+	var header *kdexv1alpha1.KDexPageHeaderSpec
 
 	if headerObj != nil {
 		pageBinding.Status.Attributes["header.generation"] = fmt.Sprintf("%d", headerObj.GetGeneration())
 
-		header = headerObj.(*kdexv1alpha1.KDexPageHeader)
-		headerScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, header.Spec.ScriptLibraryRef, r.RequeueDelay)
+		switch v := headerObj.(type) {
+		case *kdexv1alpha1.KDexPageHeader:
+			header = &v.Spec
+		case *kdexv1alpha1.KDexClusterPageHeader:
+			header = &v.Spec
+		}
+
+		headerScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, header.ScriptLibraryRef, r.RequeueDelay)
 		if shouldReturn {
 			return r1, err
 		}
@@ -306,13 +312,19 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		return r1, err
 	}
 
-	var footer *kdexv1alpha1.KDexPageFooter
+	var footer *kdexv1alpha1.KDexPageFooterSpec
 
 	if footerObj != nil {
 		pageBinding.Status.Attributes["footer.generation"] = fmt.Sprintf("%d", footerObj.GetGeneration())
 
-		footer = footerObj.(*kdexv1alpha1.KDexPageFooter)
-		footerScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, footer.Spec.ScriptLibraryRef, r.RequeueDelay)
+		switch v := footerObj.(type) {
+		case *kdexv1alpha1.KDexPageFooter:
+			footer = &v.Spec
+		case *kdexv1alpha1.KDexClusterPageFooter:
+			footer = &v.Spec
+		}
+
+		footerScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, footer.ScriptLibraryRef, r.RequeueDelay)
 		if shouldReturn {
 			return r1, err
 		}
