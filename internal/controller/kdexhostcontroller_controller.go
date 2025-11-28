@@ -280,19 +280,22 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&networkingv1.Ingress{}).
 		Watches(
 			&kdexv1alpha1.KDexHostPackageReferences{},
-			cr_handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &kdexv1alpha1.KDexHostController{}, cr_handler.OnlyControllerOwner()),
-		).
+			cr_handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &kdexv1alpha1.KDexHostController{}, cr_handler.OnlyControllerOwner())).
 		Watches(
 			&kdexv1alpha1.KDexPageBinding{},
-			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForPageBinding),
-		).
+			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForPageBinding)).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForScriptLibrary),
-		).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.Host.ScriptLibraryRef}")).
+		Watches(
+			&kdexv1alpha1.KDexClusterScriptLibrary{},
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.Host.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexTheme{},
-			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForTheme)).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.Host.DefaultThemeRef}")).
+		Watches(
+			&kdexv1alpha1.KDexClusterTheme{},
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.Host.DefaultThemeRef}")).
 		Named("kdexhostcontroller").
 		Complete(r)
 }
