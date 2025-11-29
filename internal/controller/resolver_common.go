@@ -116,8 +116,8 @@ func ResolvePageNavigations(
 	navigationRef *kdexv1alpha1.KDexObjectReference,
 	extraNavigations map[string]*kdexv1alpha1.KDexObjectReference,
 	requeueDelay time.Duration,
-) (map[string]page.ResolvedNavigationSpec, bool, ctrl.Result, error) {
-	navigations := make(map[string]page.ResolvedNavigationSpec)
+) (map[string]page.ResolvedNavigation, bool, ctrl.Result, error) {
+	navigations := make(map[string]page.ResolvedNavigation)
 
 	navigation, shouldReturn, response, err := ResolveKDexObjectReference(
 		ctx, c, object, objectConditions, navigationRef, requeueDelay)
@@ -136,7 +136,7 @@ func ResolvePageNavigations(
 			navigationSpec = &v.Spec
 		}
 
-		navigations["main"] = page.ResolvedNavigationSpec{
+		navigations["main"] = page.ResolvedNavigation{
 			Generation: navigation.GetGeneration(),
 			Name:       navigation.GetName(),
 			Spec:       navigationSpec,
@@ -165,7 +165,7 @@ func ResolvePageNavigations(
 				navigationSpec = &v.Spec
 			}
 
-			navigations[navigationName] = page.ResolvedNavigationSpec{
+			navigations[navigationName] = page.ResolvedNavigation{
 				Generation: navigation.GetGeneration(),
 				Name:       navigation.GetName(),
 				Spec:       navigationSpec,
