@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.24.5
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.12.9
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.12.11
 
 require (
 	github.com/go-logr/logr v1.4.3
@@ -37,18 +37,18 @@ require (
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.22.3 // indirect
 	github.com/go-openapi/jsonreference v0.21.3 // indirect
-	github.com/go-openapi/swag v0.25.3 // indirect
-	github.com/go-openapi/swag/cmdutils v0.25.3 // indirect
-	github.com/go-openapi/swag/conv v0.25.3 // indirect
-	github.com/go-openapi/swag/fileutils v0.25.3 // indirect
-	github.com/go-openapi/swag/jsonname v0.25.3 // indirect
-	github.com/go-openapi/swag/jsonutils v0.25.3 // indirect
-	github.com/go-openapi/swag/loading v0.25.3 // indirect
-	github.com/go-openapi/swag/mangling v0.25.3 // indirect
-	github.com/go-openapi/swag/netutils v0.25.3 // indirect
-	github.com/go-openapi/swag/stringutils v0.25.3 // indirect
-	github.com/go-openapi/swag/typeutils v0.25.3 // indirect
-	github.com/go-openapi/swag/yamlutils v0.25.3 // indirect
+	github.com/go-openapi/swag v0.25.4 // indirect
+	github.com/go-openapi/swag/cmdutils v0.25.4 // indirect
+	github.com/go-openapi/swag/conv v0.25.4 // indirect
+	github.com/go-openapi/swag/fileutils v0.25.4 // indirect
+	github.com/go-openapi/swag/jsonname v0.25.4 // indirect
+	github.com/go-openapi/swag/jsonutils v0.25.4 // indirect
+	github.com/go-openapi/swag/loading v0.25.4 // indirect
+	github.com/go-openapi/swag/mangling v0.25.4 // indirect
+	github.com/go-openapi/swag/netutils v0.25.4 // indirect
+	github.com/go-openapi/swag/stringutils v0.25.4 // indirect
+	github.com/go-openapi/swag/typeutils v0.25.4 // indirect
+	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/btree v1.1.3 // indirect
@@ -85,7 +85,7 @@ require (
 	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/exp v0.0.0-20251113190631-e25ba8c21ef6 // indirect
+	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.33.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
