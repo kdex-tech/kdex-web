@@ -65,18 +65,21 @@ type KDexHostControllerReconciler struct {
 	memoizedService    *corev1.ServiceSpec
 }
 
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,                       verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=services,                          verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,   verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,            verbs=get;list;watch;create;update;patch;delete
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers,           verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers/status,    verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostpackagereferences,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostpackagereferences,     verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings,              verbs=get;list;watch
+
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,           verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterscriptlibraries,    verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,                    verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterthemes,             verbs=get;list;watch
 
 func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	var hostController kdexv1alpha1.KDexHostController
