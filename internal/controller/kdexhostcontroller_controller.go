@@ -27,6 +27,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	"kdex.dev/web/internal/host"
@@ -38,6 +39,7 @@ import (
 	cr_handler "sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -266,6 +268,8 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
+		case *kdexv1alpha1.KDexTranslation:
+			return t.Spec.HostRef.Name == r.FocalHost
 		default:
 			return true
 		}
@@ -295,23 +299,40 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&kdexv1alpha1.KDexHostPackageReferences{}).
 		Owns(&networkingv1.Ingress{}).
 		Watches(
-			&kdexv1alpha1.KDexHostPackageReferences{},
-			cr_handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &kdexv1alpha1.KDexHostController{}, cr_handler.OnlyControllerOwner())).
-		Watches(
 			&kdexv1alpha1.KDexPageBinding{},
 			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForPageBinding)).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.Host.ScriptLibraryRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}, "{.Spec.Host.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.Host.ScriptLibraryRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}, "{.Spec.Host.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexTheme{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.Host.DefaultThemeRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}, "{.Spec.Host.DefaultThemeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterTheme{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.Host.DefaultThemeRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}, "{.Spec.Host.DefaultThemeRef}")).
+		Watches(
+			&kdexv1alpha1.KDexTranslation{},
+			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+				var requests []reconcile.Request
+				translation, ok := o.(*kdexv1alpha1.KDexTranslation)
+				if !ok {
+					return requests
+				}
+
+				if translation.Spec.HostRef.Name != r.FocalHost {
+					requests = append(requests, reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      translation.Spec.HostRef.Name,
+							Namespace: translation.Namespace,
+						},
+					})
+				}
+
+				return requests
+			})).
 		Named("kdexhostcontroller").
 		Complete(r)
 }

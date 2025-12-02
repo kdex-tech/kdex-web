@@ -32,7 +32,6 @@ import (
 	"kdex.dev/crds/configuration"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // KDexHostPackageReferencesReconciler reconciles a KDexHostPackageReferences object
@@ -96,10 +95,6 @@ func (r *KDexHostPackageReferencesReconciler) SetupWithManager(mgr ctrl.Manager)
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
-		Watches(
-			&batchv1.Job{},
-			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &kdexv1alpha1.KDexHostPackageReferences{}, handler.OnlyControllerOwner()),
-		).
 		Named("kdexhostpackagereferences").
 		Complete(r)
 }
