@@ -216,6 +216,10 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 
 		imageRepo := r.Configuration.DefaultImageRegistry.Host
 		imageURL := fmt.Sprintf("%s/%s@%s", imageRepo, hostPackageReferences.Name, imageDigest)
+
+		if hostPackageReferences.Status.Attributes == nil {
+			hostPackageReferences.Status.Attributes = make(map[string]string)
+		}
 		hostPackageReferences.Status.Attributes["image"] = imageURL
 		hostPackageReferences.Status.Attributes["importmap"] = importmap
 
