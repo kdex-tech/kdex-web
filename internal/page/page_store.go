@@ -88,10 +88,11 @@ func (s *PageStore) BuildMenuEntries(
 			}
 
 			pageEntry := render.PageEntry{
-				Href:   href,
-				Label:  label,
-				Name:   page.Name,
-				Weight: resource.MustParse("0"),
+				BasePath: page.Spec.BasePath,
+				Href:     href,
+				Label:    label,
+				Name:     page.Name,
+				Weight:   resource.MustParse("0"),
 			}
 
 			if page.Spec.NavigationHints != nil {

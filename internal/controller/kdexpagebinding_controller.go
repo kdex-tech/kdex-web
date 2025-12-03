@@ -66,7 +66,7 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	log := logf.Log.WithName("KDexPageBindingReconciler")
+	log := logf.Log.WithName("KDexPageBindingReconciler").WithValues("name", req.Name, "namespace", req.Namespace)
 
 	// Defer status update
 	defer func() {
@@ -166,6 +166,8 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *KDexPageBindingReconciler) innerReconcile(
 	ctx context.Context, pageBinding *kdexv1alpha1.KDexPageBinding,
 ) (ctrl.Result, error) {
+	log := logf.Log.WithName("KDexPageBindingReconciler").WithValues("name", pageBinding.Name, "namespace", pageBinding.Namespace)
+
 	if pageBinding.Status.Attributes == nil {
 		pageBinding.Status.Attributes = make(map[string]string)
 	}
@@ -392,12 +394,6 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		if scriptLibrary.PackageReference != nil {
 			packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
 		}
-	}
-
-	log := logf.Log.WithName("PageBinding-hostStoreList")
-
-	for name, handler := range r.HostStore.List() {
-		log.Info("printing host", name, fmt.Sprintf("%v", handler))
 	}
 
 	hostHandler, ok := r.HostStore.Get(pageBinding.Spec.HostRef.Name)
