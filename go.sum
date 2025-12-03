@@ -117,8 +117,8 @@ github.com/joshdk/go-junit v1.0.0 h1:S86cUKIdwBHWwA6xCmFlf3RTLfVXYQfvanM5Uh+K6GE
 github.com/joshdk/go-junit v1.0.0/go.mod h1:TiiV0PqkaNfFXjEiyjWM3XXrhVyCa1K4Zfga6W52ung=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
-github.com/kdex-tech/kdex-crds v0.12.14 h1:DX7HmlLNS+qtmAzcI/rrsEBXTvtNDDqrlcaQCT4DxXg=
-github.com/kdex-tech/kdex-crds v0.12.14/go.mod h1:gIEuQMjx6JvJibAqCCzws8FfEWo9GsDcAl4FCPFvKIE=
+github.com/kdex-tech/kdex-crds v0.12.17 h1:tQFpmx7ZSh8uxsY1weKPPSRA1w3jLWSBkn4w1B8/ERM=
+github.com/kdex-tech/kdex-crds v0.12.17/go.mod h1:gIEuQMjx6JvJibAqCCzws8FfEWo9GsDcAl4FCPFvKIE=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
