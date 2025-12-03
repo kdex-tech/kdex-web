@@ -159,7 +159,7 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 
 func (th *HostHandler) L10nRenderLocked(
 	handler page.PageHandler,
-	pageMap *map[string]*render.PageEntry,
+	pageMap map[string]interface{},
 	l language.Tag,
 ) (string, error) {
 	renderer := render.Renderer{
@@ -191,7 +191,7 @@ func (th *HostHandler) L10nRenderLocked(
 
 func (th *HostHandler) L10nRendersLocked(
 	handler page.PageHandler,
-	pageMaps map[language.Tag]*map[string]*render.PageEntry,
+	pageMaps map[language.Tag]map[string]interface{},
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, l := range th.Translations.Languages() {
@@ -431,7 +431,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 
 		rootEntry := &render.PageEntry{}
 		th.Pages.BuildMenuEntries(rootEntry, &langTag, langTag.String() == th.defaultLanguage, nil)
-		pageMap := rootEntry.Children
+		pageMap := *rootEntry.Children
 
 		renderer := render.Renderer{
 			BasePath:        pageHandler.Page.Spec.BasePath,

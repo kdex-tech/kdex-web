@@ -18,7 +18,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 		name              string
 		items             *map[string]PageHandler
 		isDefaultLanguage bool
-		want              *map[string]*render.PageEntry
+		want              *map[string]interface{}
 	}{
 		{
 			name:  "empty",
@@ -43,12 +43,13 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*render.PageEntry{
-				"Foo": {
-					Href:   "/foo",
-					Label:  "Foo",
-					Name:   "foo",
-					Weight: resource.MustParse("0"),
+			want: &map[string]interface{}{
+				"Foo": render.PageEntry{
+					BasePath: "/foo",
+					Href:     "/foo",
+					Label:    "Foo",
+					Name:     "foo",
+					Weight:   resource.MustParse("0"),
 				},
 			},
 		},
@@ -102,14 +103,16 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*render.PageEntry{
-				"Home": {
-					Children: &map[string]*render.PageEntry{
-						"Foo": {
-							Href:   "/foo",
-							Label:  "Foo",
-							Name:   "foo",
-							Weight: resource.MustParse("0"),
+			want: &map[string]interface{}{
+				"Home": render.PageEntry{
+					BasePath: "/home",
+					Children: &map[string]interface{}{
+						"Foo": render.PageEntry{
+							BasePath: "/foo",
+							Href:     "/foo",
+							Label:    "Foo",
+							Name:     "foo",
+							Weight:   resource.MustParse("0"),
 						},
 					},
 					Href:   "/home",
@@ -117,11 +120,12 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 					Name:   "home",
 					Weight: resource.MustParse("0"),
 				},
-				"Contact Us": {
-					Href:   "/contact",
-					Label:  "Contact Us",
-					Name:   "contact",
-					Weight: resource.MustParse("100"),
+				"Contact Us": render.PageEntry{
+					BasePath: "/contact",
+					Href:     "/contact",
+					Label:    "Contact Us",
+					Name:     "contact",
+					Weight:   resource.MustParse("100"),
 				},
 			},
 		},
@@ -143,19 +147,20 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]*render.PageEntry{
-				"Foo": {
-					Name:   "foo",
-					Label:  "Foo",
-					Href:   "/en/foo",
-					Weight: resource.MustParse("0"),
+			want: &map[string]interface{}{
+				"Foo": render.PageEntry{
+					BasePath: "/foo",
+					Href:     "/en/foo",
+					Label:    "Foo",
+					Name:     "foo",
+					Weight:   resource.MustParse("0"),
 				},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rps := PageStore{
+			ps := PageStore{
 				Handlers: *tt.items,
 			}
 			tag := language.English
@@ -163,8 +168,9 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 			catalogBuilder.SetString(language.English, "Foo", "Foo Translated")
 			got := &render.PageEntry{}
 
-			rps.BuildMenuEntries(got, &tag, tt.isDefaultLanguage, nil)
-			assert.Equal(t, tt.want, got.Children)
+			ps.BuildMenuEntries(got, &tag, tt.isDefaultLanguage, nil)
+			children := got.Children
+			assert.Equal(t, tt.want, children)
 		})
 	}
 }

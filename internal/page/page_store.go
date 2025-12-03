@@ -77,7 +77,7 @@ func (s *PageStore) BuildMenuEntries(
 			}
 
 			if entry.Children == nil {
-				entry.Children = &map[string]*render.PageEntry{}
+				entry.Children = &map[string]interface{}{}
 			}
 
 			label := page.Spec.Label
@@ -100,9 +100,9 @@ func (s *PageStore) BuildMenuEntries(
 				pageEntry.Weight = page.Spec.NavigationHints.Weight
 			}
 
-			(*entry.Children)[label] = &pageEntry
-
 			s.BuildMenuEntries(&pageEntry, l, isDefaultLanguage, page)
+
+			(*entry.Children)[label] = pageEntry
 		}
 	}
 }

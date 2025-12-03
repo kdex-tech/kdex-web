@@ -9,7 +9,6 @@ import (
 	"golang.org/x/text/message"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/crds/render"
 	"kdex.dev/web/internal/page"
 )
 
@@ -269,7 +268,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translation)
 
-			got, gotErr := th.L10nRenderLocked(tt.pageHandler, &map[string]*render.PageEntry{}, language.Make(tt.lang))
+			got, gotErr := th.L10nRenderLocked(tt.pageHandler, map[string]interface{}{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 
@@ -383,7 +382,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translation)
 
-			got := th.L10nRendersLocked(tt.pageHandler, map[language.Tag]*map[string]*render.PageEntry{})
+			got := th.L10nRendersLocked(tt.pageHandler, map[language.Tag]map[string]interface{}{})
 
 			for key, values := range tt.want {
 				l10nRender := got[key]
