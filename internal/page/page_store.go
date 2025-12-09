@@ -50,7 +50,7 @@ func (s *PageStore) List() []PageHandler {
 }
 
 func (s *PageStore) Set(handler PageHandler) {
-	s.Log.Info("set render page", "name", handler.Page.Name)
+	s.Log.V(3).Info("set render page", "name", handler.Page.Name)
 	s.mu.Lock()
 	s.Handlers[handler.Page.Name] = handler
 	s.mu.Unlock()

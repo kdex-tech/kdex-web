@@ -41,9 +41,9 @@ func (s *HostStore) GetOrUpdate(name string) *HostHandler {
 	if !ok {
 		handler = NewHostHandler(name, s.log)
 		s.handlers[name] = handler
-		s.log.Info("adding new host", name, fmt.Sprintf("%v", handler))
+		s.log.V(3).Info("adding new host", name, fmt.Sprintf("%v", handler))
 	} else {
-		s.log.Info("updating existing host", name, fmt.Sprintf("%v", handler))
+		s.log.V(3).Info("updating existing host", name, fmt.Sprintf("%v", handler))
 	}
 	return handler
 }

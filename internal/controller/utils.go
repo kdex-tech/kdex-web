@@ -76,9 +76,12 @@ func MakeHandlerByReferencePath(
 				continue
 			}
 
-			for _, node := range jsonPathReference {
+			for idx, node := range jsonPathReference {
 				for _, curRef := range node {
 					ref := reflect.ValueOf(curRef.Interface())
+
+					log.V(3).Info("reference", "reference", ref, "object", item.GetName(), "node", idx)
+
 					isNil := false
 					switch ref.Kind() {
 					case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
@@ -89,6 +92,8 @@ func MakeHandlerByReferencePath(
 					}
 
 					theReferenceStruct := ref.Interface()
+
+					log.V(3).Info("struct", "interface", theReferenceStruct, "object", item.GetName(), "node", idx)
 
 					switch v := theReferenceStruct.(type) {
 					case corev1.LocalObjectReference:

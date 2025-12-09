@@ -25,13 +25,14 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // KDexHostPackageReferencesReconciler reconciles a KDexHostPackageReferences object
@@ -55,6 +56,8 @@ type KDexHostPackageReferencesReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+
 	var hostPackageReferences kdexv1alpha1.KDexHostPackageReferences
 	if err := r.Get(ctx, req.NamespacedName, &hostPackageReferences); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -67,12 +70,9 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 			err = updateErr
 			res = ctrl.Result{}
 		}
-	}()
 
-	if meta.IsStatusConditionTrue(hostPackageReferences.Status.Conditions, string(kdexv1alpha1.ConditionTypeReady)) &&
-		hostPackageReferences.Generation == hostPackageReferences.Status.ObservedGeneration {
-		return ctrl.Result{}, nil
-	}
+		log.V(3).Info("status", "status", hostPackageReferences.Status, "err", err, "res", res)
+	}()
 
 	kdexv1alpha1.SetConditions(
 		&hostPackageReferences.Status.Conditions,
@@ -103,17 +103,40 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 	ctx context.Context,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) (ctrl.Result, error) {
-	configMap, err := r.createOrUpdateJobConfigMap(ctx, hostPackageReferences)
+	log := logf.FromContext(ctx)
+
+	configMapOp, configMap, err := r.createOrUpdateJobConfigMap(ctx, hostPackageReferences)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	secret, err := r.createOrUpdateJobSecret(ctx, hostPackageReferences)
+	secretOp, secret, err := r.createOrUpdateJobSecret(ctx, hostPackageReferences)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	log := ctrl.Log.WithName("createOrUpdateJob")
+	if configMapOp == controllerutil.OperationResultNone &&
+		secretOp == controllerutil.OperationResultNone &&
+		hostPackageReferences.Generation == hostPackageReferences.Status.ObservedGeneration &&
+		len(hostPackageReferences.Status.Attributes) > 0 &&
+		hostPackageReferences.Status.Attributes["image"] != "" &&
+		hostPackageReferences.Status.Attributes["importmap"] != "" {
+
+		kdexv1alpha1.SetConditions(
+			&hostPackageReferences.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionFalse,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionTrue,
+			},
+			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			"Reconciliation successful, package image ready",
+		)
+
+		log.V(2).Info("reconciled")
+
+		return ctrl.Result{}, nil
+	}
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -122,7 +145,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		},
 	}
 
-	op, err := ctrl.CreateOrUpdate(
+	jobOp, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
 		job,
@@ -150,7 +173,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		return ctrl.Result{}, err
 	}
 
-	log.Info("job created", "job", job.Name, "operation", op)
+	log.V(3).Info("job created", "job", job.Name, "operation", jobOp)
 
 	if job.Labels["kdex.dev/generation"] != fmt.Sprintf("%d", hostPackageReferences.Generation) {
 		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
@@ -161,7 +184,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 			)
 		}
 
-		log.Info(
+		log.V(3).Info(
 			"job generation does not match, deleting and requeueing",
 			"job", job.Name,
 			"oldGeneration", job.Labels["kdex.dev/generation"],
@@ -171,7 +194,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	log.Info("job status", "job", job.Name, "status", job.Status)
+	log.V(3).Info("job status", "job", job.Name, "status", job.Status)
 
 	if job.Status.Succeeded > 0 {
 		pod, err := r.getPodForJob(ctx, job)
@@ -242,6 +265,8 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		kdexv1alpha1.ConditionReasonReconcileSuccess,
 		"Reconciliation successful, package image ready",
 	)
+
+	log.V(2).Info("reconciled")
 
 	return ctrl.Result{}, nil
 }
@@ -402,7 +427,7 @@ func (r *KDexHostPackageReferencesReconciler) setupJob(
 func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
 	ctx context.Context,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
-) (*corev1.ConfigMap, error) {
+) (controllerutil.OperationResult, *corev1.ConfigMap, error) {
 	log := ctrl.Log.WithName("createOrUpdateJobConfigMap")
 
 	configmap := &corev1.ConfigMap{
@@ -502,20 +527,20 @@ try {
 			err.Error(),
 		)
 
-		return nil, err
+		return controllerutil.OperationResultNone, nil, err
 	}
 
-	log.Info("configmap created", "configmap", configmap.Name, "operation", op)
+	log.V(2).Info("configmap created", "configmap", configmap.Name, "operation", op)
 
-	return configmap, nil
+	return op, configmap, nil
 }
 
 func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobSecret(
 	ctx context.Context,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
-) (*corev1.Secret, error) {
+) (controllerutil.OperationResult, *corev1.Secret, error) {
 	if r.Configuration.DefaultNpmRegistry.Host == "" {
-		return nil, nil
+		return controllerutil.OperationResultNone, nil, nil
 	}
 
 	registryUrl, err := url.Parse(r.Configuration.DefaultNpmRegistry.GetAddress())
@@ -531,7 +556,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobSecret(
 			err.Error(),
 		)
 
-		return nil, err
+		return controllerutil.OperationResultNone, nil, err
 	}
 
 	log := ctrl.Log.WithName("createOrUpdateJobSecret")
@@ -589,10 +614,10 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobSecret(
 			err.Error(),
 		)
 
-		return nil, err
+		return controllerutil.OperationResultNone, nil, err
 	}
 
-	log.Info("secret created", "secret", secret.Name, "operation", op)
+	log.V(2).Info("secret created", "secret", secret.Name, "operation", op)
 
-	return secret, nil
+	return op, secret, nil
 }

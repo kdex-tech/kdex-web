@@ -61,12 +61,12 @@ type KDexPageBindingReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterscriptlibraries, verbs=get;list;watch
 
 func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+
 	var pageBinding kdexv1alpha1.KDexPageBinding
 	if err := r.Get(ctx, req.NamespacedName, &pageBinding); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-
-	log := logf.Log.WithName("KDexPageBindingReconciler").WithValues("name", req.Name, "namespace", req.Namespace)
 
 	// Defer status update
 	defer func() {
@@ -75,7 +75,8 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			err = updateErr
 			res = ctrl.Result{}
 		}
-		log.Info("print status", "status", pageBinding.Status, "err", err, "res", res)
+
+		log.V(3).Info("status", "status", pageBinding.Status, "err", err, "res", res)
 	}()
 
 	if pageBinding.DeletionTimestamp.IsZero() {
@@ -435,7 +436,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		"Reconciliation successful",
 	)
 
-	log.Info("reconciled KDexPageBinding")
+	log.V(2).Info("reconciled")
 
 	return ctrl.Result{}, nil
 }

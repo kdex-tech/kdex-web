@@ -82,6 +82,8 @@ type KDexHostControllerReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterthemes,             verbs=get;list;watch
 
 func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+	log := logf.FromContext(ctx)
+
 	var hostController kdexv1alpha1.KDexHostController
 	if err := r.Get(ctx, req.NamespacedName, &hostController); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -98,6 +100,8 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 			err = updateErr
 			res = ctrl.Result{}
 		}
+
+		log.V(3).Info("status", "status", hostController.Status, "err", err, "res", res)
 	}()
 
 	if hostController.DeletionTimestamp.IsZero() {
@@ -430,7 +434,7 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 		"Reconciliation successful",
 	)
 
-	log.Info("reconciled KDexHostController")
+	log.V(2).Info("reconciled")
 
 	return nil
 }

@@ -74,7 +74,7 @@ func (th *HostHandler) AddOrUpdateTranslation(translation *kdexv1alpha1.KDexTran
 	if translation == nil {
 		return
 	}
-	th.log.Info("add or update translation", "translation", translation.Name)
+	th.log.V(3).Info("add or update translation", "translation", translation.Name)
 	th.mu.Lock()
 	th.translationResources[translation.Name] = *translation
 	th.rebuildTranslationsLocked()
@@ -235,7 +235,7 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 }
 
 func (th *HostHandler) RebuildMux() {
-	th.log.Info("rebuilding mux")
+	th.log.V(3).Info("rebuilding mux")
 	th.mu.Lock()
 	defer th.mu.Unlock()
 
@@ -267,7 +267,7 @@ func (th *HostHandler) RebuildMux() {
 		p := handler.Page
 
 		if p.Spec.BasePath == "" {
-			th.log.Info("page has empty basePath somehow...", "page", p)
+			th.log.V(3).Info("page has empty basePath somehow...", "page", p)
 			continue
 		}
 
@@ -305,7 +305,7 @@ func (th *HostHandler) RebuildMux() {
 }
 
 func (th *HostHandler) RemoveTranslation(translation kdexv1alpha1.KDexTranslation) {
-	th.log.Info("delete translation", "translation", translation.Name)
+	th.log.V(3).Info("delete translation", "translation", translation.Name)
 	th.mu.Lock()
 	delete(th.translationResources, translation.Name)
 	th.rebuildTranslationsLocked()
@@ -394,7 +394,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		l10n := r.PathValue("l10n")
 		navKey := r.PathValue("navKey")
 
-		th.log.Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
+		th.log.V(3).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
 
 		var pageHandler *page.PageHandler
 
@@ -469,7 +469,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 	mux.HandleFunc("GET /~/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}", handler)
 
 	handler = func(w http.ResponseWriter, r *http.Request) {
-		th.log.Info("unimplemented handler", "path", r.URL.Path)
+		th.log.V(3).Info("unimplemented handler", "path", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, err := fmt.Fprintf(w, `{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
 		if err != nil {
