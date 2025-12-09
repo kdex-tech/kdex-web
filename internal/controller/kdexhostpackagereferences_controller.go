@@ -63,6 +63,10 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if hostPackageReferences.Status.Attributes == nil {
+		hostPackageReferences.Status.Attributes = make(map[string]string)
+	}
+
 	// Defer status update
 	defer func() {
 		hostPackageReferences.Status.ObservedGeneration = hostPackageReferences.Generation
@@ -118,7 +122,6 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 	if configMapOp == controllerutil.OperationResultNone &&
 		secretOp == controllerutil.OperationResultNone &&
 		hostPackageReferences.Generation == hostPackageReferences.Status.ObservedGeneration &&
-		len(hostPackageReferences.Status.Attributes) > 0 &&
 		hostPackageReferences.Status.Attributes["image"] != "" &&
 		hostPackageReferences.Status.Attributes["importmap"] != "" {
 
@@ -173,7 +176,17 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		return ctrl.Result{}, err
 	}
 
-	log.V(3).Info("job created", "job", job.Name, "operation", jobOp)
+	log.V(2).Info(
+		"create or update job",
+		"job", job.Name,
+		"jobOp", jobOp,
+		"configMapOp", configMapOp,
+		"secretOp", secretOp,
+		"generation", hostPackageReferences.Generation,
+		"observedGeneration", hostPackageReferences.Status.ObservedGeneration,
+		"jobGeneration", job.Labels["kdex.dev/generation"],
+		"statusAttributes", hostPackageReferences.Status.Attributes,
+	)
 
 	if job.Labels["kdex.dev/generation"] != fmt.Sprintf("%d", hostPackageReferences.Generation) {
 		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
@@ -240,9 +253,6 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		imageRepo := r.Configuration.DefaultImageRegistry.Host
 		imageURL := fmt.Sprintf("%s/%s@%s", imageRepo, hostPackageReferences.Name, imageDigest)
 
-		if hostPackageReferences.Status.Attributes == nil {
-			hostPackageReferences.Status.Attributes = make(map[string]string)
-		}
 		hostPackageReferences.Status.Attributes["image"] = imageURL
 		hostPackageReferences.Status.Attributes["importmap"] = importmap
 
