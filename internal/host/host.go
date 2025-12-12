@@ -15,7 +15,6 @@ import (
 	"kdex.dev/crds/render"
 	kdexhttp "kdex.dev/web/internal/http"
 	"kdex.dev/web/internal/page"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type HostHandler struct {
@@ -245,9 +244,7 @@ func (th *HostHandler) RebuildMux() {
 
 	if len(pageList) == 0 {
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			log := logf.FromContext(r.Context())
-
-			log.V(1).Info("no pages found", "host", th.Name)
+			th.log.V(1).Info("no pages found")
 
 			http.NotFound(w, r)
 		})
@@ -261,7 +258,7 @@ func (th *HostHandler) RebuildMux() {
 		p := handler.Page
 
 		if p.Spec.BasePath == "" {
-			th.log.V(1).Info("page has empty basePath somehow...", "page", p)
+			th.log.V(1).Info("somehow page has empty basePath, skipping", "page", p)
 			continue
 		}
 
@@ -276,6 +273,8 @@ func (th *HostHandler) RebuildMux() {
 				http.Error(w, "not found", http.StatusNotFound)
 				return
 			}
+
+			th.log.V(1).Info("serving", "page", p.Spec.BasePath, "language", l.String())
 
 			w.Header().Set("Content-Language", l.String())
 			w.Header().Set("Content-Type", "text/html")

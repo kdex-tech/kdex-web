@@ -23,7 +23,9 @@ func New(address string, store *host.HostStore) *http.Server {
 		http.NotFound(w, r)
 	})
 
-	hostHandler := middleware.WithHost(store)(handler)
+	hostHandler := middleware.WithHost(store)(
+		middleware.WithLogger(logf.Log.WithName("server"))(handler),
+	)
 
 	return &http.Server{
 		Addr:    address,
