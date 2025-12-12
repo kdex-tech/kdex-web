@@ -11,51 +11,63 @@ import (
 )
 
 type PageStore struct {
-	Log      logr.Logger
+	handlers map[string]PageHandler
+	log      logr.Logger
 	mu       sync.RWMutex
-	OnUpdate func()
-	Handlers map[string]PageHandler
+	onUpdate func()
+}
+
+func NewPageStore(host string, onUpdate func(), log logr.Logger) *PageStore {
+	return &PageStore{
+		handlers: map[string]PageHandler{},
+		onUpdate: onUpdate,
+		log:      log,
+	}
 }
 
 func (s *PageStore) Count() int {
+	s.log.V(1).Info("count")
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.Handlers)
+	return len(s.handlers)
 }
 
 func (s *PageStore) Delete(name string) {
+	s.log.V(1).Info("delete", "name", name)
 	s.mu.Lock()
-	delete(s.Handlers, name)
+	delete(s.handlers, name)
 	s.mu.Unlock()
-	if s.OnUpdate != nil {
-		s.OnUpdate()
+	if s.onUpdate != nil {
+		s.onUpdate()
 	}
 }
 
 func (s *PageStore) Get(name string) (PageHandler, bool) {
+	s.log.V(1).Info("get", "name", name)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	page, ok := s.Handlers[name]
+	page, ok := s.handlers[name]
 	return page, ok
 }
 
 func (s *PageStore) List() []PageHandler {
+	s.log.V(1).Info("list")
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	pages := []PageHandler{}
-	for _, page := range s.Handlers {
+	for _, page := range s.handlers {
 		pages = append(pages, page)
 	}
 	return pages
 }
 
 func (s *PageStore) Set(handler PageHandler) {
-	s.Log.V(4).Info("set render page", "name", handler.Page.Name)
+	s.log.V(1).Info("set", "name", handler.Page.Name)
 	s.mu.Lock()
-	s.Handlers[handler.Page.Name] = handler
+	s.handlers[handler.Page.Name] = handler
 	s.mu.Unlock()
-	if s.OnUpdate != nil {
-		s.OnUpdate()
+	if s.onUpdate != nil {
+		s.onUpdate()
 	}
 }
 

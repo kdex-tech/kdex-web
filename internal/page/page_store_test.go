@@ -3,6 +3,7 @@ package page
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message/catalog"
@@ -160,8 +161,9 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ps := PageStore{
-				Handlers: *tt.items,
+			ps := NewPageStore("test", nil, logr.Discard())
+			for _, it := range *tt.items {
+				ps.Set(it)
 			}
 			tag := language.English
 			catalogBuilder := catalog.NewBuilder()

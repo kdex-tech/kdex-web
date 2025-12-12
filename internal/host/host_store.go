@@ -17,7 +17,7 @@ type HostStore struct {
 func NewHostStore() *HostStore {
 	return &HostStore{
 		handlers: make(map[string]*HostHandler),
-		log:      ctrl.Log.WithName("hostStore"),
+		log:      ctrl.Log.WithName("hosts"),
 	}
 }
 
@@ -39,7 +39,7 @@ func (s *HostStore) GetOrUpdate(name string) *HostHandler {
 	defer s.mu.Unlock()
 	handler, ok := s.handlers[name]
 	if !ok {
-		handler = NewHostHandler(name, s.log)
+		handler = NewHostHandler(name)
 		s.handlers[name] = handler
 		s.log.V(1).Info("adding new host", name, fmt.Sprintf("%v", handler))
 	} else {

@@ -15,17 +15,8 @@ import (
 	"kdex.dev/crds/render"
 	kdexhttp "kdex.dev/web/internal/http"
 	"kdex.dev/web/internal/page"
+	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-)
-
-const (
-	kdexUIMetaTemplate = `<meta
-  name="kdex-ui"
-  data-page-basepath="%s"
-  data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
-  data-page-patternpath="%s"
-/>
-`
 )
 
 type HostHandler struct {
@@ -43,14 +34,11 @@ type HostHandler struct {
 	translationResources map[string]kdexv1alpha1.KDexTranslation
 }
 
-func NewHostHandler(
-	name string,
-	log logr.Logger,
-) *HostHandler {
+func NewHostHandler(name string) *HostHandler {
 	th := &HostHandler{
 		Name:                 name,
 		defaultLanguage:      "en",
-		log:                  log.WithName("hostHandler"),
+		log:                  ctrl.Log.WithName("host").WithName(name),
 		translationResources: map[string]kdexv1alpha1.KDexTranslation{},
 	}
 
@@ -58,14 +46,13 @@ func NewHostHandler(
 	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
 		th.log.Error(err, "failed to add default placeholder translation")
 	}
-	th.Translations = catalogBuilder
 
-	rps := &page.PageStore{
-		Handlers: map[string]page.PageHandler{},
-		Log:      log.WithName("pageStore"),
-		OnUpdate: th.RebuildMux,
-	}
-	th.Pages = rps
+	th.Translations = catalogBuilder
+	th.Pages = page.NewPageStore(
+		name,
+		th.RebuildMux,
+		th.log.WithName("pages"),
+	)
 	th.RebuildMux()
 	return th
 }
@@ -205,6 +192,16 @@ func (th *HostHandler) L10nRendersLocked(
 	return l10nRenders
 }
 
+const (
+	kdexUIMetaTemplate = `<meta
+  name="kdex-ui"
+  data-page-basepath="%s"
+  data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
+  data-page-patternpath="%s"
+/>
+`
+)
+
 func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 
@@ -244,8 +241,6 @@ func (th *HostHandler) RebuildMux() {
 	}
 
 	mux := th.muxWithDefaultsLocked()
-
-	// l10nPageMaps := th.generatePageMapsLocked()
 
 	pageList := th.Pages.List()
 
@@ -363,18 +358,6 @@ func (th *HostHandler) availableLanguagesLocked() []string {
 
 	return availableLangs
 }
-
-// func (th *HostHandler) generatePageMapsLocked() map[language.Tag]*map[string]*render.PageEntry {
-// 	l10nPageMaps := map[language.Tag]*map[string]*render.PageEntry{}
-
-// 	for _, l := range th.Translations.Languages() {
-// 		rootEntry := &render.PageEntry{}
-// 		th.Pages.BuildMenuEntries(rootEntry, &l, l.String() == th.defaultLanguage, nil)
-// 		l10nPageMaps[l] = rootEntry.Children
-// 	}
-
-// 	return l10nPageMaps
-// }
 
 func (th *HostHandler) messagePrinterLocked(tag language.Tag) *message.Printer {
 	return message.NewPrinter(
