@@ -89,7 +89,8 @@ func main() {
 	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file.")
 	flag.StringVar(&focalHost, "focal-host", "", "The name of a KDexHost resource to focus the controller instance's "+
 		"attention on.")
-	flag.Var(&namedLogLevels, "named-log-level", "Specify a named log level pair (format: NAME=LEVEL) (can be used multiple times)")
+	flag.Var(&namedLogLevels, "named-log-level", "Specify a named log level pair (format: NAME=LEVEL) (can be used "+
+		"multiple times)")
 	flag.IntVar(&requeueDelaySeconds, "requeue-delay-seconds", 15, "Set the delay for requeuing reconciliation loops")
 	flag.StringVar(&serviceName, "service-name", "", "The name of the controller service so it can self configure an "+
 		"ingress/httproute with itself as backend.")
