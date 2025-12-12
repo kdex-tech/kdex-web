@@ -112,8 +112,6 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 	ctx context.Context,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) (ctrl.Result, error) {
-	log := logf.FromContext(ctx)
-
 	configMapOp, configMap, err := r.createOrUpdateJobConfigMap(ctx, hostPackageReferences)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -123,6 +121,16 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-job", hostPackageReferences.Name),
+			Namespace: hostPackageReferences.Namespace,
+		},
+	}
+
+	log := logf.FromContext(ctx).WithName("createOrUpdateJob").WithValues(
+		"job", job.Name, "configmap", configMap.Name, "secret", secret.Name)
 
 	if configMapOp == controllerutil.OperationResultNone &&
 		secretOp == controllerutil.OperationResultNone &&
@@ -138,19 +146,12 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 				Ready:       metav1.ConditionTrue,
 			},
 			kdexv1alpha1.ConditionReasonReconcileSuccess,
-			"Reconciliation successful, package image ready",
+			"Reconciliation successful",
 		)
 
-		log.V(1).Info("reconciled")
+		log.V(1).Info("up to date")
 
 		return ctrl.Result{}, nil
-	}
-
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-job", hostPackageReferences.Name),
-			Namespace: hostPackageReferences.Namespace,
-		},
 	}
 
 	jobOp, err := ctrl.CreateOrUpdate(
@@ -182,15 +183,16 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 	}
 
 	log.V(1).Info(
-		"create or update job",
+		"result",
 		"job", job.Name,
+		"status", job.Status,
 		"jobOp", jobOp,
 		"configMapOp", configMapOp,
 		"secretOp", secretOp,
 		"generation", hostPackageReferences.Generation,
+		"labelGeneration", job.Labels["kdex.dev/generation"],
 		"observedGeneration", hostPackageReferences.Status.ObservedGeneration,
-		"jobGeneration", job.Labels["kdex.dev/generation"],
-		"statusAttributes", hostPackageReferences.Status.Attributes,
+		"attributes", hostPackageReferences.Status.Attributes,
 	)
 
 	if job.Labels["kdex.dev/generation"] != fmt.Sprintf("%d", hostPackageReferences.Generation) {
@@ -211,8 +213,6 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
-
-	log.V(1).Info("job status", "job", job.Name, "status", job.Status)
 
 	if job.Status.Succeeded > 0 {
 		pod, err := r.getPodForJob(ctx, job)
@@ -281,7 +281,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		"Reconciliation successful, package image ready",
 	)
 
-	log.V(1).Info("reconciled")
+	log.V(1).Info("reconciled", "as", jobOp)
 
 	return ctrl.Result{}, nil
 }
@@ -443,14 +443,14 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobConfigMap(
 	ctx context.Context,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) (controllerutil.OperationResult, *corev1.ConfigMap, error) {
-	log := ctrl.Log.WithName("createOrUpdateJobConfigMap")
-
 	configmap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-configmap", hostPackageReferences.Name),
 			Namespace: hostPackageReferences.Namespace,
 		},
 	}
+
+	log := logf.FromContext(ctx).WithName("createOrUpdateJobConfigMap").WithValues("configmap", configmap.Name)
 
 	op, err := ctrl.CreateOrUpdate(
 		ctx,
@@ -545,7 +545,7 @@ try {
 		return controllerutil.OperationResultNone, nil, err
 	}
 
-	log.V(1).Info("configmap created", "configmap", configmap.Name, "operation", op)
+	log.V(1).Info("reconciled", "as", op)
 
 	return op, configmap, nil
 }
@@ -574,14 +574,14 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobSecret(
 		return controllerutil.OperationResultNone, nil, err
 	}
 
-	log := ctrl.Log.WithName("createOrUpdateJobSecret")
-
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-secret", hostPackageReferences.Name),
 			Namespace: hostPackageReferences.Namespace,
 		},
 	}
+
+	log := logf.FromContext(ctx).WithName("createOrUpdateJobSecret").WithValues("secret", secret.Name)
 
 	op, err := ctrl.CreateOrUpdate(
 		ctx,
@@ -632,7 +632,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobSecret(
 		return controllerutil.OperationResultNone, nil, err
 	}
 
-	log.V(1).Info("secret created", "secret", secret.Name, "operation", op)
+	log.V(1).Info("reconciled", "as", op)
 
 	return op, secret, nil
 }

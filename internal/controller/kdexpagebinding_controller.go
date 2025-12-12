@@ -172,7 +172,7 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *KDexPageBindingReconciler) innerReconcile(
 	ctx context.Context, pageBinding *kdexv1alpha1.KDexPageBinding,
 ) (ctrl.Result, error) {
-	log := logf.Log.WithName("KDexPageBindingReconciler").WithValues("name", pageBinding.Name, "namespace", pageBinding.Namespace)
+	log := logf.FromContext(ctx)
 
 	if pageBinding.Status.Attributes == nil {
 		pageBinding.Status.Attributes = make(map[string]string)

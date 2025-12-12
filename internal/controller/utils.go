@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"reflect"
+	"strings"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -42,9 +43,8 @@ func MakeHandlerByReferencePath(
 	}
 
 	log := logf.Log.WithName(
-		"WATCH",
+		strings.ToLower(watcherKind),
 	).WithValues(
-		"watcherKind", watcherKind,
 		"referencePath", referencePath,
 	)
 
