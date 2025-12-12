@@ -36,7 +36,7 @@ func NewHostHandler(name string, log logr.Logger) *HostHandler {
 	th := &HostHandler{
 		Name:                 name,
 		defaultLanguage:      "en",
-		log:                  log.WithName(name),
+		log:                  log.WithValues("host", name),
 		translationResources: map[string]kdexv1alpha1.KDexTranslation{},
 	}
 

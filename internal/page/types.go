@@ -1,6 +1,8 @@
 package page
 
-import kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+import (
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+)
 
 type PageHandler struct {
 	// root object
