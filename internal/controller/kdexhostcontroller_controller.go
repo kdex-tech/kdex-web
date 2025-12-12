@@ -34,6 +34,7 @@ import (
 	"kdex.dev/web/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	cr_handler "sigs.k8s.io/controller-runtime/pkg/handler"
@@ -334,6 +335,9 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 
 				return requests
 			})).
+		WithOptions(controller.TypedOptions[reconcile.Request]{
+			LogConstructor: LogConstructor("kdexhostcontroller", mgr),
+		}).
 		Named("kdexhostcontroller").
 		Complete(r)
 }

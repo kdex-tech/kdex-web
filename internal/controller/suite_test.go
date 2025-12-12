@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -37,8 +38,10 @@ import (
 	"k8s.io/client-go/rest"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
+	kdexlog "kdex.dev/crds/log"
 	"kdex.dev/web/internal/host"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -74,11 +77,30 @@ func TestControllers(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+	flags := flag.NewFlagSet("dummy-flags", flag.ContinueOnError)
+	opts := zap.Options{
+		Development: true,
+		DestWriter:  GinkgoWriter,
+	}
+	opts.BindFlags(flags)
+	simulatedArgs := []string{
+		"--zap-log-level=debug",
+		"--zap-encoder=console",
+		"--zap-stacktrace-level=error",
+	}
+	err := flags.Parse(simulatedArgs)
+	if err != nil {
+		panic(err)
+	}
+
+	logger, err := kdexlog.New(&opts, map[string]string{})
+	if err != nil {
+		panic(err)
+	}
+	logf.SetLogger(logger)
 
 	ctx, cancel = context.WithCancel(context.TODO())
 
-	var err error
 	// +kubebuilder:scaffold:scheme
 
 	By("bootstrapping test environment")
@@ -136,12 +158,10 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient.Create(ctx, ns2)).To(Succeed())
 
 	k8sManager, err := manager.New(cfg, manager.Options{
-		// Cache: cache.Options{
-		// 	DefaultNamespaces: map[string]cache.Config{
-		// 		namespace:       {},
-		// 		secondNamespace: {},
-		// 	},
-		// },
+		Controller: config.Controller{
+			Logger: logger,
+		},
+		Logger: logger,
 		Scheme: scheme.Scheme,
 	})
 	Expect(err).NotTo(HaveOccurred())
