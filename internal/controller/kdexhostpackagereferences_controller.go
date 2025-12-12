@@ -77,7 +77,7 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 			res = ctrl.Result{}
 		}
 
-		log.V(3).Info("status", "status", hostPackageReferences.Status, "err", err, "res", res)
+		log.V(1).Info("status", "status", hostPackageReferences.Status, "err", err, "res", res)
 	}()
 
 	kdexv1alpha1.SetConditions(
@@ -141,7 +141,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 			"Reconciliation successful, package image ready",
 		)
 
-		log.V(2).Info("reconciled")
+		log.V(1).Info("reconciled")
 
 		return ctrl.Result{}, nil
 	}
@@ -181,7 +181,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		return ctrl.Result{}, err
 	}
 
-	log.V(2).Info(
+	log.V(1).Info(
 		"create or update job",
 		"job", job.Name,
 		"jobOp", jobOp,
@@ -212,7 +212,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	log.V(3).Info("job status", "job", job.Name, "status", job.Status)
+	log.V(1).Info("job status", "job", job.Name, "status", job.Status)
 
 	if job.Status.Succeeded > 0 {
 		pod, err := r.getPodForJob(ctx, job)
@@ -281,7 +281,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		"Reconciliation successful, package image ready",
 	)
 
-	log.V(2).Info("reconciled")
+	log.V(1).Info("reconciled")
 
 	return ctrl.Result{}, nil
 }
@@ -545,7 +545,7 @@ try {
 		return controllerutil.OperationResultNone, nil, err
 	}
 
-	log.V(2).Info("configmap created", "configmap", configmap.Name, "operation", op)
+	log.V(1).Info("configmap created", "configmap", configmap.Name, "operation", op)
 
 	return op, configmap, nil
 }
@@ -632,7 +632,7 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJobSecret(
 		return controllerutil.OperationResultNone, nil, err
 	}
 
-	log.V(2).Info("secret created", "secret", secret.Name, "operation", op)
+	log.V(1).Info("secret created", "secret", secret.Name, "operation", op)
 
 	return op, secret, nil
 }

@@ -78,7 +78,7 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			res = ctrl.Result{}
 		}
 
-		log.V(3).Info("status", "status", pageBinding.Status, "err", err, "res", res)
+		log.V(1).Info("status", "status", pageBinding.Status, "err", err, "res", res)
 	}()
 
 	if pageBinding.DeletionTimestamp.IsZero() {
@@ -441,7 +441,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		"Reconciliation successful",
 	)
 
-	log.V(2).Info("reconciled")
+	log.V(1).Info("reconciled")
 
 	return ctrl.Result{}, nil
 }

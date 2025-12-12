@@ -102,7 +102,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 			res = ctrl.Result{}
 		}
 
-		log.V(3).Info("status", "status", hostController.Status, "err", err, "res", res)
+		log.V(1).Info("status", "status", hostController.Status, "err", err, "res", res)
 	}()
 
 	if hostController.DeletionTimestamp.IsZero() {
@@ -438,7 +438,7 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 		"Reconciliation successful",
 	)
 
-	log.V(2).Info("reconciled")
+	log.V(1).Info("reconciled")
 
 	return nil
 }

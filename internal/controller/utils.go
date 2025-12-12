@@ -82,7 +82,7 @@ func MakeHandlerByReferencePath(
 				for _, curRef := range node {
 					ref := reflect.ValueOf(curRef.Interface())
 
-					log.V(3).Info("reference", "reference", ref, "object", item.GetName(), "node", idx)
+					log.V(1).Info("reference", "reference", ref, "object", item.GetName(), "node", idx)
 
 					isNil := false
 					switch ref.Kind() {
@@ -95,7 +95,7 @@ func MakeHandlerByReferencePath(
 
 					theReferenceStruct := ref.Interface()
 
-					log.V(3).Info("struct", "interface", theReferenceStruct, "object", item.GetName(), "node", idx)
+					log.V(1).Info("struct", "interface", theReferenceStruct, "object", item.GetName(), "node", idx)
 
 					switch v := theReferenceStruct.(type) {
 					case corev1.LocalObjectReference:

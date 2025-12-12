@@ -18,7 +18,7 @@ func New(address string, store *host.HostStore) *http.Server {
 
 		log := logf.FromContext(r.Context())
 
-		log.V(3).Info("no host was found")
+		log.V(1).Info("no host was found")
 
 		http.NotFound(w, r)
 	})

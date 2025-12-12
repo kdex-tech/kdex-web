@@ -47,7 +47,7 @@ func GetLang(r *http.Request, defaultLanguage string, languages []language.Tag) 
 	if l10n != "" {
 		tag := language.Make(l10n)
 		if tag.IsRoot() {
-			log.V(3).Info("parsing user supplied 'l10n' parameter failed, falling back to default", "l10n", l10n, "defaultLang", defaultLanguage, "path", r.URL.Path)
+			log.V(1).Info("parsing user supplied 'l10n' parameter failed, falling back to default", "l10n", l10n, "defaultLang", defaultLanguage, "path", r.URL.Path)
 			return language.Make(defaultLanguage)
 		} else {
 			return tag
