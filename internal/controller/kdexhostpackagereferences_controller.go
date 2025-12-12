@@ -163,6 +163,8 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 				r.setupJob(hostPackageReferences, job, configMap, secret)
 			}
 
+			job.Labels["kdex.dev/generation"] = fmt.Sprintf("%d", hostPackageReferences.Generation)
+
 			return ctrl.SetControllerReference(hostPackageReferences, job, r.Scheme)
 		},
 	)
@@ -194,25 +196,6 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 		"observedGeneration", hostPackageReferences.Status.ObservedGeneration,
 		"attributes", hostPackageReferences.Status.Attributes,
 	)
-
-	if job.Labels["kdex.dev/generation"] != fmt.Sprintf("%d", hostPackageReferences.Generation) {
-		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
-			log.Error(
-				err, "failed to delete old job", "job", job.Name,
-				"oldGeneration", job.Labels["kdex.dev/generation"],
-				"newGeneration", hostPackageReferences.Generation,
-			)
-		}
-
-		log.V(3).Info(
-			"job generation does not match, deleting and requeueing",
-			"job", job.Name,
-			"oldGeneration", job.Labels["kdex.dev/generation"],
-			"newGeneration", hostPackageReferences.Generation,
-		)
-
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-	}
 
 	if job.Status.Succeeded > 0 {
 		pod, err := r.getPodForJob(ctx, job)
@@ -260,10 +243,6 @@ func (r *KDexHostPackageReferencesReconciler) createOrUpdateJob(
 
 		hostPackageReferences.Status.Attributes["image"] = imageURL
 		hostPackageReferences.Status.Attributes["importmap"] = importmap
-
-		if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
-			log.Error(err, "failed to delete successful job after completion", "job", job.Name)
-		}
 	} else if job.Status.Failed > 0 {
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	} else {
@@ -318,7 +297,6 @@ func (r *KDexHostPackageReferencesReconciler) setupJob(
 	}
 
 	job.Labels["kdex.dev/packages"] = hostPackageReferences.Name
-	job.Labels["kdex.dev/generation"] = fmt.Sprintf("%d", hostPackageReferences.Generation)
 
 	imageRepo := r.Configuration.DefaultImageRegistry.Host
 	imageTag := fmt.Sprintf("%d", hostPackageReferences.Generation)
