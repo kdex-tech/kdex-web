@@ -195,7 +195,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	hostHandler := r.HostStore.GetOrUpdate(hostController.Name)
+	hostHandler := r.HostStore.GetOrCreate(hostController.Name)
 
 	allPackageReferences := []kdexv1alpha1.PackageReference{}
 	for _, scriptLibrary := range scriptLibraries {

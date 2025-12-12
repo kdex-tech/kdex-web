@@ -23,3 +23,10 @@ func DomainsToMatcher(domains []string) string {
 
 	return buffer.String()
 }
+
+func IfElse[T any](predicate bool, trueVal T, elseVal T) T {
+	if predicate {
+		return trueVal
+	}
+	return elseVal
+}
