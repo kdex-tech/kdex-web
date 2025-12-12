@@ -39,7 +39,7 @@ func (s *HostStore) GetOrUpdate(name string) *HostHandler {
 	defer s.mu.Unlock()
 	handler, ok := s.handlers[name]
 	if !ok {
-		handler = NewHostHandler(name)
+		handler = NewHostHandler(name, s.log)
 		s.handlers[name] = handler
 		s.log.V(1).Info("adding new host", name, fmt.Sprintf("%v", handler))
 	} else {

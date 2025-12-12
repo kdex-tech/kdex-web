@@ -3,6 +3,7 @@ package host
 import (
 	"testing"
 
+	"github.com/go-logr/logr"
 	G "github.com/onsi/gomega"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -263,7 +264,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(tt.host.name)
+			th := NewHostHandler(tt.host.name, logr.Discard())
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translation)
 
@@ -377,7 +378,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(tt.host.name)
+			th := NewHostHandler(tt.host.name, logr.Discard())
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translation)
 
@@ -465,7 +466,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(tt.host.name)
+			th := NewHostHandler(tt.host.name, logr.Discard())
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translation)
 

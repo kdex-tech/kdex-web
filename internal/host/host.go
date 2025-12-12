@@ -15,7 +15,6 @@ import (
 	"kdex.dev/crds/render"
 	kdexhttp "kdex.dev/web/internal/http"
 	"kdex.dev/web/internal/page"
-	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -34,11 +33,11 @@ type HostHandler struct {
 	translationResources map[string]kdexv1alpha1.KDexTranslation
 }
 
-func NewHostHandler(name string) *HostHandler {
+func NewHostHandler(name string, log logr.Logger) *HostHandler {
 	th := &HostHandler{
 		Name:                 name,
 		defaultLanguage:      "en",
-		log:                  ctrl.Log.WithName("host").WithName(name),
+		log:                  log.WithName(name),
 		translationResources: map[string]kdexv1alpha1.KDexTranslation{},
 	}
 
