@@ -411,30 +411,35 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 	theme *kdexv1alpha1.KDexTheme,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) error {
-	log := logf.FromContext(ctx)
-
-	if err := r.createOrUpdatePackagesDeployment(ctx, hostController, hostPackageReferences); err != nil {
+	packagesDeploymentOp, err := r.createOrUpdatePackagesDeployment(ctx, hostController, hostPackageReferences)
+	if err != nil {
 		return err
 	}
 
-	if err := r.createOrUpdatePackagesService(ctx, hostController, hostPackageReferences); err != nil {
+	packagesServiceOp, err := r.createOrUpdatePackagesService(ctx, hostController, hostPackageReferences)
+	if err != nil {
 		return err
 	}
 
-	if err := r.createOrUpdateThemeDeployment(ctx, hostController, theme); err != nil {
+	themeDeploymentOp, err := r.createOrUpdateThemeDeployment(ctx, hostController, theme)
+	if err != nil {
 		return err
 	}
 
-	if err := r.createOrUpdateThemeService(ctx, hostController, theme); err != nil {
+	themeServiceOp, err := r.createOrUpdateThemeService(ctx, hostController, theme)
+	if err != nil {
 		return err
 	}
 
+	var ingressOrHTTPRouteOp controllerutil.OperationResult
 	if hostController.Spec.Host.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
-		if err := r.createOrUpdateHTTPRoute(ctx, hostController, theme, hostPackageReferences); err != nil {
+		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, hostController, theme, hostPackageReferences)
+		if err != nil {
 			return err
 		}
 	} else {
-		if err := r.createOrUpdateIngress(ctx, hostController, theme, hostPackageReferences); err != nil {
+		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, hostController, theme, hostPackageReferences)
+		if err != nil {
 			return err
 		}
 	}
@@ -450,7 +455,16 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 		"Reconciliation successful",
 	)
 
-	log.V(1).Info("reconciled")
+	log := logf.FromContext(ctx)
+
+	log.V(1).Info(
+		"reconciled",
+		"packagesDeploymentOp", packagesDeploymentOp,
+		"packagesServiceOp", packagesServiceOp,
+		"themeDeploymentOp", themeDeploymentOp,
+		"themeServiceOp", themeServiceOp,
+		"ingressOrHTTPRouteOp", ingressOrHTTPRouteOp,
+	)
 
 	return nil
 }
@@ -525,7 +539,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 	hostController *kdexv1alpha1.KDexHostController,
 	theme *kdexv1alpha1.KDexTheme,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
-) error {
+) (controllerutil.OperationResult, error) {
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      hostController.Name,
@@ -533,7 +547,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 		},
 	}
 
-	if _, err := ctrl.CreateOrUpdate(
+	op, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
 		ingress,
@@ -642,7 +656,9 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 
 			return ctrl.SetControllerReference(hostController, ingress, r.Scheme)
 		},
-	); err != nil {
+	)
+
+	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&hostController.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
@@ -654,10 +670,10 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 			err.Error(),
 		)
 
-		return err
+		return controllerutil.OperationResultNone, err
 	}
 
-	return nil
+	return op, nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdateHTTPRoute(
@@ -665,17 +681,17 @@ func (r *KDexHostControllerReconciler) createOrUpdateHTTPRoute(
 	hostController *kdexv1alpha1.KDexHostController,
 	theme *kdexv1alpha1.KDexTheme,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
-) error {
-	return nil
+) (controllerutil.OperationResult, error) {
+	return controllerutil.OperationResultNone, nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
-) error {
+) (controllerutil.OperationResult, error) {
 	if hostPackageReferences == nil {
-		return nil
+		return controllerutil.OperationResultNone, nil
 	}
 
 	deployment := &appsv1.Deployment{
@@ -685,7 +701,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 		},
 	}
 
-	if _, err := ctrl.CreateOrUpdate(
+	op, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
 		deployment,
@@ -739,7 +755,9 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 
 			return ctrl.SetControllerReference(hostController, deployment, r.Scheme)
 		},
-	); err != nil {
+	)
+
+	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&hostController.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
@@ -751,19 +769,19 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 			err.Error(),
 		)
 
-		return err
+		return controllerutil.OperationResultNone, err
 	}
 
-	return nil
+	return op, nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
-) error {
+) (controllerutil.OperationResult, error) {
 	if hostPackageReferences == nil {
-		return nil
+		return controllerutil.OperationResultNone, nil
 	}
 
 	service := &corev1.Service{
@@ -773,7 +791,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 		},
 	}
 
-	if _, err := ctrl.CreateOrUpdate(
+	op, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
 		service,
@@ -801,7 +819,9 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 
 			return ctrl.SetControllerReference(hostController, service, r.Scheme)
 		},
-	); err != nil {
+	)
+
+	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&hostController.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
@@ -813,19 +833,19 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 			err.Error(),
 		)
 
-		return err
+		return controllerutil.OperationResultNone, err
 	}
 
-	return nil
+	return op, nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
 	theme *kdexv1alpha1.KDexTheme,
-) error {
+) (controllerutil.OperationResult, error) {
 	if theme == nil {
-		return nil
+		return controllerutil.OperationResultNone, nil
 	}
 
 	deployment := &appsv1.Deployment{
@@ -835,7 +855,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 		},
 	}
 
-	if _, err := ctrl.CreateOrUpdate(
+	op, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
 		deployment,
@@ -900,7 +920,9 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 
 			return ctrl.SetControllerReference(hostController, deployment, r.Scheme)
 		},
-	); err != nil {
+	)
+
+	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&hostController.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
@@ -912,19 +934,19 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 			err.Error(),
 		)
 
-		return err
+		return controllerutil.OperationResultNone, err
 	}
 
-	return nil
+	return op, nil
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 	ctx context.Context,
 	hostController *kdexv1alpha1.KDexHostController,
 	theme *kdexv1alpha1.KDexTheme,
-) error {
+) (controllerutil.OperationResult, error) {
 	if theme == nil {
-		return nil
+		return controllerutil.OperationResultNone, nil
 	}
 
 	service := &corev1.Service{
@@ -934,7 +956,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 		},
 	}
 
-	if _, err := ctrl.CreateOrUpdate(
+	op, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
 		service,
@@ -970,7 +992,9 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 
 			return ctrl.SetControllerReference(hostController, service, r.Scheme)
 		},
-	); err != nil {
+	)
+
+	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&hostController.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
@@ -982,8 +1006,8 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 			err.Error(),
 		)
 
-		return err
+		return controllerutil.OperationResultNone, err
 	}
 
-	return nil
+	return op, nil
 }
