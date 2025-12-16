@@ -475,7 +475,9 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 	packageReferences []kdexv1alpha1.PackageReference,
 ) (bool, ctrl.Result, error) {
-	if _, err := ctrl.CreateOrUpdate(
+	log := logf.FromContext(ctx)
+
+	op, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
 		hostPackageReferences,
@@ -499,7 +501,18 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 
 			return ctrl.SetControllerReference(hostController, hostPackageReferences, r.Scheme)
 		},
-	); err != nil {
+	)
+
+	log.V(1).Info(
+		"createOrUpdatePackageReferences",
+		"op", op,
+		"attributes", hostPackageReferences.Status.Attributes,
+		"generation", hostPackageReferences.Generation,
+		"observedGeneration", hostPackageReferences.Status.ObservedGeneration,
+		"packageReferences", hostPackageReferences.Spec.PackageReferences,
+	)
+
+	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&hostController.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
