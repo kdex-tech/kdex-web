@@ -482,20 +482,18 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 		r.Client,
 		hostPackageReferences,
 		func() error {
-			if hostPackageReferences.Annotations == nil {
+			if hostPackageReferences.CreationTimestamp.IsZero() {
 				hostPackageReferences.Annotations = make(map[string]string)
-			}
-			for key, value := range hostController.Annotations {
-				hostPackageReferences.Annotations[key] = value
-			}
-			if hostPackageReferences.Labels == nil {
+				for key, value := range hostController.Annotations {
+					hostPackageReferences.Annotations[key] = value
+				}
 				hostPackageReferences.Labels = make(map[string]string)
-			}
-			for key, value := range hostController.Labels {
-				hostPackageReferences.Labels[key] = value
-			}
+				for key, value := range hostController.Labels {
+					hostPackageReferences.Labels[key] = value
+				}
 
-			hostPackageReferences.Labels["kdex.dev/packages"] = hostPackageReferences.Name
+				hostPackageReferences.Labels["kdex.dev/packages"] = hostPackageReferences.Name
+			}
 
 			hostPackageReferences.Spec.PackageReferences = packageReferences
 
@@ -565,6 +563,34 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 		r.Client,
 		ingress,
 		func() error {
+			if ingress.CreationTimestamp.IsZero() {
+				ingress.Annotations = make(map[string]string)
+				for key, value := range hostController.Annotations {
+					ingress.Annotations[key] = value
+				}
+				ingress.Labels = make(map[string]string)
+				for key, value := range hostController.Labels {
+					ingress.Labels[key] = value
+				}
+
+				ingress.Labels["kdex.dev/ingress"] = ingress.Name
+
+				ingress.Spec = *r.getMemoizedIngress().DeepCopy()
+
+				if ingress.Spec.DefaultBackend == nil {
+					ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{}
+				}
+
+				if ingress.Spec.DefaultBackend.Service == nil {
+					ingress.Spec.DefaultBackend.Service = &networkingv1.IngressServiceBackend{}
+				}
+
+				ingress.Spec.DefaultBackend.Service.Name = r.ServiceName
+
+				ingress.Spec.DefaultBackend.Service.Port.Name = hostController.Name
+				ingress.Spec.IngressClassName = hostController.Spec.Host.Routing.IngressClassName
+			}
+
 			pathType := networkingv1.PathTypePrefix
 			rules := make([]networkingv1.IngressRule, 0, len(hostController.Spec.Host.Routing.Domains))
 
@@ -630,34 +656,6 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 				}
 			}
 
-			if ingress.Annotations == nil {
-				ingress.Annotations = make(map[string]string)
-			}
-			for key, value := range hostController.Annotations {
-				ingress.Annotations[key] = value
-			}
-			if ingress.Labels == nil {
-				ingress.Labels = make(map[string]string)
-			}
-			for key, value := range hostController.Labels {
-				ingress.Labels[key] = value
-			}
-
-			ingress.Spec = *r.getMemoizedIngress().DeepCopy()
-
-			if ingress.Spec.DefaultBackend == nil {
-				ingress.Spec.DefaultBackend = &networkingv1.IngressBackend{}
-			}
-
-			if ingress.Spec.DefaultBackend.Service == nil {
-				ingress.Spec.DefaultBackend.Service = &networkingv1.IngressServiceBackend{}
-			}
-
-			ingress.Spec.DefaultBackend.Service.Name = r.ServiceName
-
-			ingress.Spec.DefaultBackend.Service.Port.Name = hostController.Name
-			ingress.Spec.IngressClassName = hostController.Spec.Host.Routing.IngressClassName
-
 			ingress.Spec.Rules = append(ingress.Spec.Rules, rules...)
 
 			if hostController.Spec.Host.Routing.TLS != nil {
@@ -719,26 +717,21 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 		r.Client,
 		deployment,
 		func() error {
-			if deployment.Annotations == nil {
+			if deployment.CreationTimestamp.IsZero() {
 				deployment.Annotations = make(map[string]string)
-			}
-			for key, value := range hostPackageReferences.Annotations {
-				deployment.Annotations[key] = value
-			}
-			if deployment.Labels == nil {
+				for key, value := range hostPackageReferences.Annotations {
+					deployment.Annotations[key] = value
+				}
 				deployment.Labels = make(map[string]string)
-			}
-			for key, value := range hostPackageReferences.Labels {
-				deployment.Labels[key] = value
-			}
+				for key, value := range hostPackageReferences.Labels {
+					deployment.Labels[key] = value
+				}
 
-			deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
+				deployment.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
-			if len(deployment.Spec.Selector.MatchLabels) == 0 {
+				deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
+
 				deployment.Spec.Selector.MatchLabels["kdex.dev/packages"] = hostPackageReferences.Name
-			}
-
-			if len(deployment.Spec.Template.Labels) == 0 {
 				deployment.Spec.Template.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 			}
 
@@ -809,26 +802,23 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 		r.Client,
 		service,
 		func() error {
-			if service.Annotations == nil {
+			if service.CreationTimestamp.IsZero() {
 				service.Annotations = make(map[string]string)
-			}
-			for key, value := range hostPackageReferences.Annotations {
-				service.Annotations[key] = value
-			}
-			if service.Labels == nil {
+				for key, value := range hostPackageReferences.Annotations {
+					service.Annotations[key] = value
+				}
 				service.Labels = make(map[string]string)
-			}
-			for key, value := range hostPackageReferences.Labels {
-				service.Labels[key] = value
-			}
+				for key, value := range hostPackageReferences.Labels {
+					service.Labels[key] = value
+				}
 
-			service.Spec = *r.getMemoizedService().DeepCopy()
+				service.Labels["kdex.dev/packages"] = hostPackageReferences.Name
 
-			if service.Spec.Selector == nil {
+				service.Spec = *r.getMemoizedService().DeepCopy()
+
 				service.Spec.Selector = make(map[string]string)
+				service.Spec.Selector["kdex.dev/packages"] = hostPackageReferences.Name
 			}
-
-			service.Spec.Selector["kdex.dev/packages"] = hostPackageReferences.Name
 
 			return ctrl.SetControllerReference(hostController, service, r.Scheme)
 		},
@@ -873,34 +863,27 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 		r.Client,
 		deployment,
 		func() error {
-			if deployment.Annotations == nil {
+			if deployment.CreationTimestamp.IsZero() {
 				deployment.Annotations = make(map[string]string)
-			}
-			for key, value := range theme.Annotations {
-				deployment.Annotations[key] = value
-			}
-			for key, value := range hostController.Annotations {
-				deployment.Annotations[key] = value
-			}
-			if deployment.Labels == nil {
+				for key, value := range theme.Annotations {
+					deployment.Annotations[key] = value
+				}
+				for key, value := range hostController.Annotations {
+					deployment.Annotations[key] = value
+				}
 				deployment.Labels = make(map[string]string)
-			}
-			for key, value := range theme.Labels {
-				deployment.Labels[key] = value
-			}
-			for key, value := range hostController.Labels {
-				deployment.Labels[key] = value
-			}
+				for key, value := range theme.Labels {
+					deployment.Labels[key] = value
+				}
+				for key, value := range hostController.Labels {
+					deployment.Labels[key] = value
+				}
 
-			deployment.Labels["kdex.dev/theme"] = theme.Name
+				deployment.Labels["kdex.dev/theme"] = theme.Name
 
-			deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
+				deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
 
-			if len(deployment.Spec.Selector.MatchLabels) == 0 {
 				deployment.Spec.Selector.MatchLabels["kdex.dev/theme"] = theme.Name
-			}
-
-			if len(deployment.Spec.Template.Labels) == 0 {
 				deployment.Spec.Template.Labels["kdex.dev/theme"] = theme.Name
 			}
 
@@ -974,34 +957,29 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 		r.Client,
 		service,
 		func() error {
-			if service.Annotations == nil {
+			if service.CreationTimestamp.IsZero() {
 				service.Annotations = make(map[string]string)
-			}
-			for key, value := range theme.Annotations {
-				service.Annotations[key] = value
-			}
-			for key, value := range hostController.Annotations {
-				service.Annotations[key] = value
-			}
-			if service.Labels == nil {
+				for key, value := range theme.Annotations {
+					service.Annotations[key] = value
+				}
+				for key, value := range hostController.Annotations {
+					service.Annotations[key] = value
+				}
 				service.Labels = make(map[string]string)
-			}
-			for key, value := range theme.Labels {
-				service.Labels[key] = value
-			}
-			for key, value := range hostController.Labels {
-				service.Labels[key] = value
-			}
+				for key, value := range theme.Labels {
+					service.Labels[key] = value
+				}
+				for key, value := range hostController.Labels {
+					service.Labels[key] = value
+				}
 
-			service.Labels["kdex.dev/theme"] = theme.Name
+				service.Labels["kdex.dev/theme"] = theme.Name
 
-			service.Spec = *r.getMemoizedService().DeepCopy()
+				service.Spec = *r.getMemoizedService().DeepCopy()
 
-			if service.Spec.Selector == nil {
 				service.Spec.Selector = make(map[string]string)
+				service.Spec.Selector["kdex.dev/theme"] = theme.Name
 			}
-
-			service.Spec.Selector["kdex.dev/theme"] = theme.Name
 
 			return ctrl.SetControllerReference(hostController, service, r.Scheme)
 		},
