@@ -1,9 +1,11 @@
 package host
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	"kdex.dev/web/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -29,7 +31,9 @@ func (s *HostStore) Delete(name string) {
 }
 
 func (s *HostStore) Get(name string) (*HostHandler, bool) {
-	s.log.V(1).Info("get", "host", name)
+	err := fmt.Errorf("get %s", name)
+	err = errors.Wrap(err, "host store")
+	s.log.Error(err, "get", "host", name)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	handler, ok := s.handlers[name]
