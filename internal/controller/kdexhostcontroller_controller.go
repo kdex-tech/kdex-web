@@ -230,7 +230,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	hostPackageReferences := &kdexv1alpha1.KDexHostPackageReferences{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      hostController.Name + "-packages",
+			Name:      fmt.Sprintf("%s-packages", hostController.Name),
 			Namespace: hostController.Namespace,
 		},
 	}
@@ -277,7 +277,7 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		case *kdexv1alpha1.KDexHostController:
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexHostPackageReferences:
-			return t.Name == r.FocalHost
+			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
 		case *kdexv1alpha1.KDexPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
 		case *kdexv1alpha1.KDexTranslation:

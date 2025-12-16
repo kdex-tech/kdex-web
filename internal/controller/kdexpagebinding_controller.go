@@ -140,7 +140,7 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		case *kdexv1alpha1.KDexHostController:
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexHostPackageReferences:
-			return t.Name == r.FocalHost
+			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
 		case *kdexv1alpha1.KDexPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
 		case *kdexv1alpha1.KDexTranslation:

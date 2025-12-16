@@ -72,7 +72,7 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if hostPackageReferences.Name != r.FocalHost {
+	if hostPackageReferences.Name != fmt.Sprintf("%s-packages", r.FocalHost) {
 		log.V(1).Info("skipping reconcile", "host", hostPackageReferences.Name, "focalHost", r.FocalHost)
 		return ctrl.Result{}, nil
 	}
@@ -113,7 +113,7 @@ func (r *KDexHostPackageReferencesReconciler) SetupWithManager(mgr ctrl.Manager)
 		case *kdexv1alpha1.KDexHostController:
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexHostPackageReferences:
-			return t.Name == r.FocalHost
+			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
 		case *kdexv1alpha1.KDexPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
 		case *kdexv1alpha1.KDexTranslation:
