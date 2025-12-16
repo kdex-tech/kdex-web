@@ -48,7 +48,10 @@ func (s *HostStore) GetOrCreate(name string) *HostHandler {
 		handler = NewHostHandler(name, s.log)
 		s.handlers[name] = handler
 	}
-	s.log.V(1).Info(utils.IfElse(ok, "getOrCreate.get", "getOrCreate.create"), "host", name)
+	msg := utils.IfElse(ok, "getOrCreate.get", "getOrCreate.create")
+	err := fmt.Errorf("%s %s", msg, name)
+	err = errors.Wrap(err, "host store")
+	s.log.Error(err, msg, "host", name)
 	return handler
 }
 
