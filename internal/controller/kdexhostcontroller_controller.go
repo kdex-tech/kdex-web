@@ -656,7 +656,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 				}
 			}
 
-			ingress.Spec.Rules = append(ingress.Spec.Rules, rules...)
+			ingress.Spec.Rules = append(r.getMemoizedIngress().Rules, rules...)
 
 			if hostController.Spec.Host.Routing.TLS != nil {
 				ingress.Spec.TLS = append(ingress.Spec.TLS, networkingv1.IngressTLS{
