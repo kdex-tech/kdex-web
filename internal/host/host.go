@@ -190,6 +190,76 @@ func (th *HostHandler) L10nRendersLocked(
 }
 
 const (
+	announcementPageTemplate = `<!DOCTYPE html>
+<html lang="{{.Language}}">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	{{.Meta}}
+	<title>{{l10n "announcement.title" .BrandName}}</title>
+	{{.HeadScript}}
+	{{.Theme}}
+</head>
+<body>
+	<main style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 90vh; padding: 2rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+		<div style="max-width: 600px; text-align: center;">
+			<h1 style="font-size: 2.5rem; margin-bottom: 1rem; color: #333;">{{l10n "announcement.title" .BrandName}}</h1>
+			<p style="font-size: 1.125rem; line-height: 1.6; color: #666; margin-bottom: 2rem;">{{l10n "announcement.message"}}</p>
+			<div style="padding: 1rem; background-color: #f5f5f5; border-radius: 8px; margin-top: 2rem;">
+				<p style="font-size: 0.875rem; color: #888; margin: 0;">{{l10n "announcement.organization" .Organization}}</p>
+			</div>
+		</div>
+	</main>
+	{{.FootScript}}
+</body>
+</html>`
+)
+
+func (th *HostHandler) renderAnnouncementPageLocked() map[string]string {
+	l10nRenders := make(map[string]string)
+
+	meta := ""
+	if th.host.BaseMeta != "" {
+		meta = th.host.BaseMeta
+	}
+
+	for _, l := range th.Translations.Languages() {
+		renderer := render.Renderer{
+			BasePath:        "/",
+			BrandName:       th.host.BrandName,
+			Contents:        map[string]string{},
+			DefaultLanguage: th.defaultLanguage,
+			Footer:          "",
+			FootScript:      th.FootScriptToHTML(page.PageHandler{}),
+			Header:          "",
+			HeadScript:      th.HeadScriptToHTML(page.PageHandler{}),
+			Language:        l.String(),
+			Languages:       th.availableLanguagesLocked(),
+			LastModified:    time.Now(),
+			MessagePrinter:  th.messagePrinterLocked(l),
+			Meta:            meta,
+			Navigations:     map[string]string{},
+			Organization:    th.host.Organization,
+			PageMap:         map[string]interface{}{},
+			PatternPath:     "",
+			TemplateContent: announcementPageTemplate,
+			TemplateName:    "announcement",
+			Theme:           th.ThemeToString(),
+			Title:           "",
+		}
+
+		rendered, err := renderer.RenderPage()
+		if err != nil {
+			th.log.Error(err, "failed to render announcement page for language", "language", l)
+			continue
+		}
+		l10nRenders[l.String()] = rendered
+	}
+
+	return l10nRenders
+}
+
+const (
 	kdexUIMetaTemplate = `<meta
   name="kdex-ui"
   data-page-basepath="%s"
@@ -243,11 +313,35 @@ func (th *HostHandler) RebuildMux() {
 	pageList := th.Pages.List()
 
 	if len(pageList) == 0 {
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			th.log.V(1).Info("no pages found")
+		// Render announcement page for all languages
+		l10nRenders := th.renderAnnouncementPageLocked()
 
-			http.NotFound(w, r)
-		})
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+
+			rendered, ok := l10nRenders[l.String()]
+			if !ok {
+				// Fallback to default language if translation not available
+				rendered, ok = l10nRenders[th.defaultLanguage]
+				if !ok {
+					http.Error(w, "internal error", http.StatusInternalServerError)
+					return
+				}
+			}
+
+			th.log.V(1).Info("serving announcement page", "language", l.String())
+
+			w.Header().Set("Content-Language", l.String())
+			w.Header().Set("Content-Type", "text/html")
+
+			_, err := w.Write([]byte(rendered))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		}
+
+		mux.HandleFunc("GET /", handler)
+		mux.HandleFunc("GET /{l10n}/", handler)
 
 		th.Mux = mux
 
@@ -472,6 +566,9 @@ func (th *HostHandler) rebuildTranslationsLocked() {
 		th.log.Error(err, "failed to add placeholder translation")
 	}
 
+	// Add default translations for announcement page
+	th.addDefaultAnnouncementTranslationsLocked(catalogBuilder)
+
 	for _, translation := range th.translationResources {
 		for _, tr := range translation.Spec.Translations {
 			for key, value := range tr.KeysAndValues {
@@ -483,4 +580,26 @@ func (th *HostHandler) rebuildTranslationsLocked() {
 	}
 
 	th.Translations = catalogBuilder
+}
+
+func (th *HostHandler) addDefaultAnnouncementTranslationsLocked(catalogBuilder *catalog.Builder) {
+	// English translations
+	_ = catalogBuilder.SetString(language.English, "announcement.title", "Welcome to %s")
+	_ = catalogBuilder.SetString(language.English, "announcement.message", "This host is ready to serve requests, but no pages have been deployed yet. Please deploy pages to start serving content.")
+	_ = catalogBuilder.SetString(language.English, "announcement.organization", "Organization: %s")
+
+	// Spanish translations
+	_ = catalogBuilder.SetString(language.Spanish, "announcement.title", "Bienvenido a %s")
+	_ = catalogBuilder.SetString(language.Spanish, "announcement.message", "Este host está listo para servir solicitudes, pero aún no se han desplegado páginas. Por favor, despliegue páginas para comenzar a servir contenido.")
+	_ = catalogBuilder.SetString(language.Spanish, "announcement.organization", "Organización: %s")
+
+	// French translations
+	_ = catalogBuilder.SetString(language.French, "announcement.title", "Bienvenue sur %s")
+	_ = catalogBuilder.SetString(language.French, "announcement.message", "Ce serveur est prêt à traiter les requêtes, mais aucune page n'a encore été déployée. Veuillez déployer des pages pour commencer à servir du contenu.")
+	_ = catalogBuilder.SetString(language.French, "announcement.organization", "Organisation : %s")
+
+	// German translations
+	_ = catalogBuilder.SetString(language.German, "announcement.title", "Willkommen bei %s")
+	_ = catalogBuilder.SetString(language.German, "announcement.message", "Dieser Host ist bereit, Anfragen zu bearbeiten, aber es wurden noch keine Seiten bereitgestellt. Bitte stellen Sie Seiten bereit, um mit der Bereitstellung von Inhalten zu beginnen.")
+	_ = catalogBuilder.SetString(language.German, "announcement.organization", "Organisation: %s")
 }
