@@ -238,6 +238,8 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	var importmap string
 
 	if len(finalPackageReferences) == 0 {
+		log.V(1).Info("deleting host package references", "hostPackageReferences", hostPackageReferences.Name)
+
 		if err := r.Delete(ctx, hostPackageReferences); err != nil {
 			if client.IgnoreNotFound(err) != nil {
 				kdexv1alpha1.SetConditions(
@@ -251,6 +253,8 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 					err.Error(),
 				)
 
+				log.V(1).Info("error deleting host package references", "err", err)
+
 				return ctrl.Result{}, err
 			}
 		}
@@ -259,6 +263,8 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	} else {
 		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &hostController, hostPackageReferences, finalPackageReferences)
 		if shouldReturn {
+			log.V(1).Info("error creating or updating package references", "err", err, "res", r1)
+
 			return r1, err
 		}
 
