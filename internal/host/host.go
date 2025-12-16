@@ -62,7 +62,6 @@ func (th *HostHandler) AddOrUpdateTranslation(translation *kdexv1alpha1.KDexTran
 	th.log.V(1).Info("add or update translation", "translation", translation.Name)
 	th.mu.Lock()
 	th.translationResources[translation.Name] = *translation
-	th.rebuildTranslationsLocked()
 	th.mu.Unlock()
 	th.RebuildMux() // Called after lock is released
 }
@@ -238,6 +237,7 @@ func (th *HostHandler) RebuildMux() {
 		return
 	}
 
+	th.rebuildTranslationsLocked()
 	mux := th.muxWithDefaultsLocked()
 
 	pageList := th.Pages.List()
@@ -301,7 +301,6 @@ func (th *HostHandler) RemoveTranslation(translation kdexv1alpha1.KDexTranslatio
 	th.log.V(1).Info("delete translation", "translation", translation.Name)
 	th.mu.Lock()
 	delete(th.translationResources, translation.Name)
-	th.rebuildTranslationsLocked()
 	th.mu.Unlock()
 
 	th.RebuildMux() // Called after lock is released
