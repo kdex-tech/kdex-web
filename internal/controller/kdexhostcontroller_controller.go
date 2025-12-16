@@ -85,9 +85,19 @@ type KDexHostControllerReconciler struct {
 func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 
+	if req.Namespace != r.ControllerNamespace {
+		log.V(1).Info("skipping reconcile", "namespace", req.Namespace, "controllerNamespace", r.ControllerNamespace)
+		return ctrl.Result{}, nil
+	}
+
 	var hostController kdexv1alpha1.KDexHostController
 	if err := r.Get(ctx, req.NamespacedName, &hostController); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if hostController.Name != r.FocalHost {
+		log.V(1).Info("skipping reconcile", "host", hostController.Name, "focalHost", r.FocalHost)
+		return ctrl.Result{}, nil
 	}
 
 	if hostController.Status.Attributes == nil {
@@ -294,7 +304,6 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexHostController{}).
-		WithEventFilter(enabledFilter).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&gatewayv1.HTTPRoute{}).
@@ -335,9 +344,12 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 
 				return requests
 			})).
-		WithOptions(controller.TypedOptions[reconcile.Request]{
-			LogConstructor: LogConstructor("kdexhostcontroller", mgr),
-		}).
+		WithEventFilter(enabledFilter).
+		WithOptions(
+			controller.TypedOptions[reconcile.Request]{
+				LogConstructor: LogConstructor("kdexhostcontroller", mgr),
+			},
+		).
 		Named("kdexhostcontroller").
 		Complete(r)
 }

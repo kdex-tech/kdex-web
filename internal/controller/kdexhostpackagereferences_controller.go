@@ -33,7 +33,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -60,9 +62,19 @@ type KDexHostPackageReferencesReconciler struct {
 func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 
+	if req.Namespace != r.ControllerNamespace {
+		log.V(1).Info("skipping reconcile", "namespace", req.Namespace, "controllerNamespace", r.ControllerNamespace)
+		return ctrl.Result{}, nil
+	}
+
 	var hostPackageReferences kdexv1alpha1.KDexHostPackageReferences
 	if err := r.Get(ctx, req.NamespacedName, &hostPackageReferences); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if hostPackageReferences.Name != r.FocalHost {
+		log.V(1).Info("skipping reconcile", "host", hostPackageReferences.Name, "focalHost", r.FocalHost)
+		return ctrl.Result{}, nil
 	}
 
 	if hostPackageReferences.Status.Attributes == nil {
@@ -96,14 +108,47 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *KDexHostPackageReferencesReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	hasFocalHost := func(o client.Object) bool {
+		switch t := o.(type) {
+		case *kdexv1alpha1.KDexHostController:
+			return t.Name == r.FocalHost
+		case *kdexv1alpha1.KDexHostPackageReferences:
+			return t.Name == r.FocalHost
+		case *kdexv1alpha1.KDexPageBinding:
+			return t.Spec.HostRef.Name == r.FocalHost
+		case *kdexv1alpha1.KDexTranslation:
+			return t.Spec.HostRef.Name == r.FocalHost
+		default:
+			return true
+		}
+	}
+
+	var enabledFilter = predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return hasFocalHost(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return hasFocalHost(e.ObjectNew)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return hasFocalHost(e.Object)
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return hasFocalHost(e.Object)
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexHostPackageReferences{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.Secret{}).
-		WithOptions(controller.TypedOptions[reconcile.Request]{
-			LogConstructor: LogConstructor("kdexhostpackagereferences", mgr),
-		}).
+		WithEventFilter(enabledFilter).
+		WithOptions(
+			controller.TypedOptions[reconcile.Request]{
+				LogConstructor: LogConstructor("kdexhostpackagereferences", mgr),
+			},
+		).
 		Named("kdexhostpackagereferences").
 		Complete(r)
 }

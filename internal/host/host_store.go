@@ -44,7 +44,7 @@ func (s *HostStore) GetOrCreate(name string) *HostHandler {
 		handler = NewHostHandler(name, s.log)
 		s.handlers[name] = handler
 	}
-	s.log.V(1).Info(utils.IfElse(ok, "get", "create"), "host", name)
+	s.log.V(1).Info(utils.IfElse(ok, "getOrCreate.get", "getOrCreate.create"), "host", name)
 	return handler
 }
 

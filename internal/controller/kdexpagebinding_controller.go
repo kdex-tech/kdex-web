@@ -30,7 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -65,9 +67,19 @@ type KDexPageBindingReconciler struct {
 func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 
+	if req.Namespace != r.ControllerNamespace {
+		log.V(1).Info("skipping reconcile", "namespace", req.Namespace, "controllerNamespace", r.ControllerNamespace)
+		return ctrl.Result{}, nil
+	}
+
 	var pageBinding kdexv1alpha1.KDexPageBinding
 	if err := r.Get(ctx, req.NamespacedName, &pageBinding); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if pageBinding.Spec.HostRef.Name != r.FocalHost {
+		log.V(1).Info("skipping reconcile", "host", pageBinding.Spec.HostRef.Name, "focalHost", r.FocalHost)
+		return ctrl.Result{}, nil
 	}
 
 	// Defer status update
@@ -120,6 +132,39 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	l := LogConstructor("kdexpagebinding", mgr)(nil)
+
+	hasFocalHost := func(o client.Object) bool {
+		l.V(1).Info("hasFocalHost", "object", o)
+		switch t := o.(type) {
+		case *kdexv1alpha1.KDexHostController:
+			return t.Name == r.FocalHost
+		case *kdexv1alpha1.KDexHostPackageReferences:
+			return t.Name == r.FocalHost
+		case *kdexv1alpha1.KDexPageBinding:
+			return t.Spec.HostRef.Name == r.FocalHost
+		case *kdexv1alpha1.KDexTranslation:
+			return t.Spec.HostRef.Name == r.FocalHost
+		default:
+			return true
+		}
+	}
+
+	var enabledFilter = predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return hasFocalHost(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return hasFocalHost(e.ObjectNew)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return hasFocalHost(e.Object)
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return hasFocalHost(e.Object)
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexPageBinding{}).
 		Watches(
@@ -161,9 +206,12 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ScriptLibraryRef}")).
-		WithOptions(controller.TypedOptions[reconcile.Request]{
-			LogConstructor: LogConstructor("kdexpagebinding", mgr),
-		}).
+		WithEventFilter(enabledFilter).
+		WithOptions(
+			controller.TypedOptions[reconcile.Request]{
+				LogConstructor: LogConstructor("kdexpagebinding", mgr),
+			},
+		).
 		Named("kdexpagebinding").
 		Complete(r)
 }
