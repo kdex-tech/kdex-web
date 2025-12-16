@@ -44,6 +44,8 @@ func MakeHandlerByReferencePath(
 
 	log := logf.Log.WithName(
 		strings.ToLower(watcherKind),
+	).WithName(
+		"watch",
 	).WithValues(
 		"referencePath", referencePath,
 	)
@@ -70,9 +72,12 @@ func MakeHandlerByReferencePath(
 		for _, i := range items {
 			item := i.(client.Object)
 
+			log.V(1).Info("processing item", "object", item.GetName(), "namespace", item.GetNamespace())
+
 			jsonPathReference, err := jpRef.FindResults(item)
 			if err != nil {
-				panic(err)
+				log.V(1).Info("skipping", "err", err, "object", item.GetName(), "namespace", item.GetNamespace())
+				continue
 			}
 			if len(jsonPathReference) == 0 || len(jsonPathReference[0]) == 0 {
 				continue
