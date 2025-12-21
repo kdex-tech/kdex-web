@@ -82,14 +82,14 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	for _, scriptLibrary := range th.ScriptLibraries {
 		for _, script := range scriptLibrary.Scripts {
 			buffer.WriteString(separator)
-			buffer.WriteString(script.ToScriptTag(true))
+			buffer.WriteString(script.ToFootTag())
 			separator = "\n"
 		}
 	}
 	for _, scriptLibrary := range handler.ScriptLibraries {
 		for _, script := range scriptLibrary.Scripts {
 			buffer.WriteString(separator)
-			buffer.WriteString(script.ToScriptTag(true))
+			buffer.WriteString(script.ToFootTag())
 			separator = "\n"
 		}
 	}
@@ -126,14 +126,14 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	for _, scriptLibrary := range th.ScriptLibraries {
 		for _, script := range scriptLibrary.Scripts {
 			buffer.WriteString(separator)
-			buffer.WriteString(script.ToScriptTag(false))
+			buffer.WriteString(script.ToHeadTag())
 			separator = "\n"
 		}
 	}
 	for _, scriptLibrary := range handler.ScriptLibraries {
 		for _, script := range scriptLibrary.Scripts {
 			buffer.WriteString(separator)
-			buffer.WriteString(script.ToScriptTag(false))
+			buffer.WriteString(script.ToHeadTag())
 			separator = "\n"
 		}
 	}
@@ -166,7 +166,7 @@ func (th *HostHandler) L10nRenderLocked(
 		PatternPath:     handler.Page.Spec.PatternPath,
 		TemplateContent: handler.Archetype.Content,
 		TemplateName:    handler.Page.Name,
-		Theme:           th.ThemeToString(),
+		Theme:           th.host.Assets.String(),
 		Title:           handler.Page.Spec.Label,
 	}
 
@@ -219,8 +219,8 @@ func (th *HostHandler) renderAnnouncementPageLocked() map[string]string {
 	l10nRenders := make(map[string]string)
 
 	meta := ""
-	if th.host.BaseMeta != "" {
-		meta = th.host.BaseMeta
+	if len(th.host.Assets) > 0 {
+		meta = th.host.Assets.String()
 	}
 
 	for _, l := range th.Translations.Languages() {
@@ -244,7 +244,7 @@ func (th *HostHandler) renderAnnouncementPageLocked() map[string]string {
 			PatternPath:     "",
 			TemplateContent: announcementPageTemplate,
 			TemplateName:    "announcement",
-			Theme:           th.ThemeToString(),
+			Theme:           th.host.Assets.String(),
 			Title:           "",
 		}
 
@@ -272,8 +272,8 @@ const (
 func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 
-	if th.host.BaseMeta != "" {
-		buffer.WriteString(th.host.BaseMeta)
+	if len(th.host.Assets) > 0 {
+		buffer.WriteString(th.host.Assets.String())
 		buffer.WriteRune('\n')
 	}
 
@@ -424,18 +424,6 @@ func (th *HostHandler) SetHost(
 	th.importmap = importmap
 	th.mu.Unlock()
 	th.RebuildMux()
-}
-
-func (th *HostHandler) ThemeToString() string {
-	var buffer bytes.Buffer
-	separator := ""
-	for _, asset := range th.assets {
-		buffer.WriteString(separator)
-		buffer.WriteString(asset.String())
-		separator = "\n"
-	}
-
-	return buffer.String()
 }
 
 func (th *HostHandler) availableLanguagesLocked() []string {

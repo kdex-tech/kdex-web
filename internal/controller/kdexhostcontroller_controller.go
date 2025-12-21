@@ -146,7 +146,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		"Reconciling",
 	)
 
-	themeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.Host.DefaultThemeRef, r.RequeueDelay)
+	themeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.ThemeRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
@@ -163,7 +163,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	var scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec
 
-	scriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.Host.ScriptLibraryRef, r.RequeueDelay)
+	scriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.ScriptLibraryRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
@@ -271,7 +271,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		importmap = hostPackageReferences.Status.Attributes["importmap"]
 	}
 
-	hostHandler.SetHost(&hostController.Spec.Host, themeAssets, scriptLibraries, importmap)
+	hostHandler.SetHost(&hostController.Spec, themeAssets, scriptLibraries, importmap)
 
 	return ctrl.Result{}, r.innerReconcile(ctx, &hostController, theme, hostPackageReferences)
 }
@@ -438,7 +438,7 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 	}
 
 	var ingressOrHTTPRouteOp controllerutil.OperationResult
-	if hostController.Spec.Host.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
+	if hostController.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
 		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, hostController, theme, hostPackageReferences)
 		if err != nil {
 			return err
@@ -594,13 +594,13 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 				ingress.Spec.DefaultBackend.Service.Name = r.ServiceName
 
 				ingress.Spec.DefaultBackend.Service.Port.Name = hostController.Name
-				ingress.Spec.IngressClassName = hostController.Spec.Host.Routing.IngressClassName
+				ingress.Spec.IngressClassName = hostController.Spec.Routing.IngressClassName
 			}
 
 			pathType := networkingv1.PathTypePrefix
-			rules := make([]networkingv1.IngressRule, 0, len(hostController.Spec.Host.Routing.Domains))
+			rules := make([]networkingv1.IngressRule, 0, len(hostController.Spec.Routing.Domains))
 
-			for _, domain := range hostController.Spec.Host.Routing.Domains {
+			for _, domain := range hostController.Spec.Routing.Domains {
 				rules = append(rules, networkingv1.IngressRule{
 					Host: domain,
 					IngressRuleValue: networkingv1.IngressRuleValue{
@@ -647,7 +647,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 				for _, rule := range rules {
 					rule.HTTP.Paths = append(rule.HTTP.Paths,
 						networkingv1.HTTPIngressPath{
-							Path:     theme.Spec.RoutePath,
+							Path:     theme.Spec.IngressPath,
 							PathType: &pathType,
 							Backend: networkingv1.IngressBackend{
 								Service: &networkingv1.IngressServiceBackend{
@@ -664,10 +664,9 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 
 			ingress.Spec.Rules = append(r.getMemoizedIngress().Rules, rules...)
 
-			if hostController.Spec.Host.Routing.TLS != nil {
+			if hostController.Spec.Routing.TLS != nil {
 				ingress.Spec.TLS = append(ingress.Spec.TLS, networkingv1.IngressTLS{
-					Hosts:      hostController.Spec.Host.Routing.Domains,
-					SecretName: hostController.Spec.Host.Routing.TLS.SecretName,
+					SecretName: hostController.Spec.Routing.TLS.SecretRef.Name,
 				})
 			}
 
@@ -744,7 +743,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 			foundCorsDomainsEnv := false
 			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
 				if value.Name == "CORS_DOMAINS" {
-					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(hostController.Spec.Host.Routing.Domains)
+					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(hostController.Spec.Routing.Domains)
 					foundCorsDomainsEnv = true
 				}
 			}
@@ -752,7 +751,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 			if !foundCorsDomainsEnv {
 				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 					Name:  "CORS_DOMAINS",
-					Value: utils.DomainsToMatcher(hostController.Spec.Host.Routing.Domains),
+					Value: utils.DomainsToMatcher(hostController.Spec.Routing.Domains),
 				})
 			}
 
@@ -893,31 +892,47 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 				deployment.Spec.Template.Labels["kdex.dev/theme"] = theme.Name
 			}
 
+			deployment.Spec.Template.Spec.Containers[0].Name = theme.Name
+
+			if len(theme.Spec.ImagePullSecrets) > 0 {
+				deployment.Spec.Template.Spec.ImagePullSecrets = append(r.getMemoizedDeployment().Template.Spec.ImagePullSecrets, theme.Spec.ImagePullSecrets...)
+			}
+
+			if theme.Spec.Replicas != nil {
+				deployment.Spec.Replicas = theme.Spec.Replicas
+			}
+
+			if theme.Spec.Resources.Size() > 0 {
+				deployment.Spec.Template.Spec.Containers[0].Resources = theme.Spec.Resources
+			}
+
+			if theme.Spec.ServerImage != "" {
+				deployment.Spec.Template.Spec.Containers[0].Image = theme.Spec.ServerImage
+				deployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = theme.Spec.ServerImagePullPolicy
+			}
+
+			for idx, value := range deployment.Spec.Template.Spec.Volumes {
+				if value.Name == "oci-image" {
+					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = theme.Spec.StaticImage
+					deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = theme.Spec.StaticImagePullPolicy
+					break
+				}
+			}
+
 			foundCorsDomainsEnv := false
 			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
 				if value.Name == "CORS_DOMAINS" {
-					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(hostController.Spec.Host.Routing.Domains)
+					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(hostController.Spec.Routing.Domains)
 					foundCorsDomainsEnv = true
+					break
 				}
 			}
 
 			if !foundCorsDomainsEnv {
 				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 					Name:  "CORS_DOMAINS",
-					Value: utils.DomainsToMatcher(hostController.Spec.Host.Routing.Domains),
+					Value: utils.DomainsToMatcher(hostController.Spec.Routing.Domains),
 				})
-			}
-
-			deployment.Spec.Template.Spec.Containers[0].Name = theme.Name
-
-			for idx, value := range deployment.Spec.Template.Spec.Volumes {
-				if value.Name == "oci-image" {
-					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = theme.Spec.Image
-
-					if theme.Spec.PullPolicy != "" {
-						deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = theme.Spec.PullPolicy
-					}
-				}
 			}
 
 			return ctrl.SetControllerReference(hostController, deployment, r.Scheme)

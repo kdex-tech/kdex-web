@@ -21,8 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("KDexHostController Controller", func() {
@@ -32,32 +32,30 @@ var _ = Describe("KDexHostController Controller", func() {
 		ctx := context.Background()
 
 		AfterEach(func() {
-			By("Cleanup all the test resource instances")
-			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexHostController{}, client.InNamespace(namespace))).To(Succeed())
-			Expect(k8sClient.DeleteAllOf(ctx, &kdexv1alpha1.KDexHost{}, client.InNamespace(namespace))).To(Succeed())
+			cleanupResources(namespace)
 		})
 
 		It("should successfully reconcile the resource", func() {
-			// resource := &kdexv1alpha1.KDexHost{
-			// 	ObjectMeta: metav1.ObjectMeta{
-			// 		Name:      focalHost,
-			// 		Namespace: namespace,
-			// 	},
-			// 	Spec: kdexv1alpha1.KDexHostSpec{
-			// 		AppPolicy: kdexv1alpha1.NonStrictAppPolicy,
-			// 		Routing: kdexv1alpha1.Routing{
-			// 			Domains:  []string{"foo.bar"},
-			// 			Strategy: kdexv1alpha1.IngressRoutingStrategy,
-			// 		},
-			// 		Organization: "KDex Tech Inc.",
-			// 	},
-			// }
+			resource := &kdexv1alpha1.KDexHostController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      focalHost,
+					Namespace: namespace,
+				},
+				Spec: kdexv1alpha1.KDexHostSpec{
+					BrandName:    "KDex Tech",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
+					},
+				},
+			}
 
-			// Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
-			// assertResourceReady(
-			// 	ctx, k8sClient, focalHost, namespace,
-			// 	&kdexv1alpha1.KDexHost{}, true)
+			assertResourceReady(
+				ctx, k8sClient, focalHost, namespace,
+				&kdexv1alpha1.KDexHostController{}, true)
 		})
 	})
 })

@@ -71,8 +71,10 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				Spec: kdexv1alpha1.KDexPageBindingSpec{
 					ContentEntries: []kdexv1alpha1.ContentEntry{
 						{
-							RawHTML: "<h1>Hello, World!</h1>",
-							Slot:    "main",
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
+							},
+							Slot: "main",
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
@@ -101,8 +103,10 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				Spec: kdexv1alpha1.KDexPageBindingSpec{
 					ContentEntries: []kdexv1alpha1.ContentEntry{
 						{
-							RawHTML: "<h1>Hello, World!</h1>",
-							Slot:    "main",
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
+							},
+							Slot: "main",
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
@@ -143,16 +147,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: kdexv1alpha1.KDexHostSpec{
-							BrandName:    "KDex Tech",
-							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-							Organization: "KDex Tech Inc.",
-							Routing: kdexv1alpha1.Routing{
-								Domains: []string{
-									"example.com",
-								},
-								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+					Spec: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{
+								"example.com",
 							},
 						},
 					},
@@ -173,8 +174,10 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				Spec: kdexv1alpha1.KDexPageBindingSpec{
 					ContentEntries: []kdexv1alpha1.ContentEntry{
 						{
-							RawHTML: "<h1>Hello, World!</h1>",
-							Slot:    "main",
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
+							},
+							Slot: "main",
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
@@ -227,17 +230,15 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: kdexv1alpha1.KDexHostSpec{
-							BrandName:    "KDex Tech",
-							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-							Organization: "KDex Tech Inc.",
-							Routing: kdexv1alpha1.Routing{
-								Domains: []string{
-									"example.com",
-								},
-								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+					Spec: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{
+								"example.com",
 							},
+							Strategy: kdexv1alpha1.IngressRoutingStrategy,
 						},
 					},
 				},
@@ -291,8 +292,10 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				Spec: kdexv1alpha1.KDexPageBindingSpec{
 					ContentEntries: []kdexv1alpha1.ContentEntry{
 						{
-							RawHTML: "<h1>Hello, World!</h1>",
-							Slot:    "main",
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
+							},
+							Slot: "main",
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
@@ -332,16 +335,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: kdexv1alpha1.KDexHostSpec{
-							BrandName:    "KDex Tech",
-							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-							Organization: "KDex Tech Inc.",
-							Routing: kdexv1alpha1.Routing{
-								Domains: []string{
-									"example.com",
-								},
-								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+					Spec: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{
+								"example.com",
 							},
 						},
 					},
@@ -360,8 +360,10 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				Spec: kdexv1alpha1.KDexPageBindingSpec{
 					ContentEntries: []kdexv1alpha1.ContentEntry{
 						{
-							RawHTML: "<h1>Hello, World!</h1>",
-							Slot:    "main",
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
+							},
+							Slot: "main",
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
@@ -394,8 +396,10 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				Spec: kdexv1alpha1.KDexPageBindingSpec{
 					ContentEntries: []kdexv1alpha1.ContentEntry{
 						{
-							RawHTML: "<h1>Hello, World!</h1>",
-							Slot:    "main",
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
+							},
+							Slot: "main",
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
@@ -440,16 +444,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: kdexv1alpha1.KDexHostSpec{
-							BrandName:    "KDex Tech",
-							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-							Organization: "KDex Tech Inc.",
-							Routing: kdexv1alpha1.Routing{
-								Domains: []string{
-									"example.com",
-								},
-								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+					Spec: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{
+								"example.com",
 							},
 						},
 					},
@@ -515,8 +516,10 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				Spec: kdexv1alpha1.KDexPageBindingSpec{
 					ContentEntries: []kdexv1alpha1.ContentEntry{
 						{
-							RawHTML: "<h1>Hello, World!</h1>",
-							Slot:    "main",
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
+							},
+							Slot: "main",
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
@@ -583,16 +586,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: kdexv1alpha1.KDexHostSpec{
-							BrandName:    "KDex Tech",
-							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-							Organization: "KDex Tech Inc.",
-							Routing: kdexv1alpha1.Routing{
-								Domains: []string{
-									"example.com",
-								},
-								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+					Spec: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{
+								"example.com",
 							},
 						},
 					},
@@ -654,8 +654,10 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				Spec: kdexv1alpha1.KDexPageBindingSpec{
 					ContentEntries: []kdexv1alpha1.ContentEntry{
 						{
-							RawHTML: "<h1>Hello, World!</h1>",
-							Slot:    "main",
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
+							},
+							Slot: "main",
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
@@ -685,16 +687,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: kdexv1alpha1.KDexHostSpec{
-							BrandName:    "KDex Tech",
-							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-							Organization: "KDex Tech Inc.",
-							Routing: kdexv1alpha1.Routing{
-								Domains: []string{
-									"example.com",
-								},
-								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+					Spec: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{
+								"example.com",
 							},
 						},
 					},
@@ -736,8 +735,10 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				Spec: kdexv1alpha1.KDexPageBindingSpec{
 					ContentEntries: []kdexv1alpha1.ContentEntry{
 						{
-							RawHTML: "<h1>Hello, World!</h1>",
-							Slot:    "main",
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
+							},
+							Slot: "main",
 						},
 					},
 					HostRef: corev1.LocalObjectReference{
@@ -766,16 +767,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostControllerSpec{
-						Host: kdexv1alpha1.KDexHostSpec{
-							BrandName:    "KDex Tech",
-							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-							Organization: "KDex Tech Inc.",
-							Routing: kdexv1alpha1.Routing{
-								Domains: []string{
-									"example.com",
-								},
-								Strategy: kdexv1alpha1.IngressRoutingStrategy,
+					Spec: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{
+								"example.com",
 							},
 						},
 					},
