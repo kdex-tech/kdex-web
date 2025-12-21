@@ -82,6 +82,7 @@ type KDexHostControllerReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,                    verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterthemes,             verbs=get;list;watch
 
+// nolint:gocyclo
 func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 
@@ -693,10 +694,10 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 }
 
 func (r *KDexHostControllerReconciler) createOrUpdateHTTPRoute(
-	ctx context.Context,
-	hostController *kdexv1alpha1.KDexHostController,
-	theme *kdexv1alpha1.KDexTheme,
-	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
+	_ context.Context,
+	_ *kdexv1alpha1.KDexHostController,
+	_ *kdexv1alpha1.KDexTheme,
+	_ *kdexv1alpha1.KDexHostPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	return controllerutil.OperationResultNone, nil
 }
