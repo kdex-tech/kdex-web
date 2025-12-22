@@ -46,12 +46,13 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		host        THost
-		lang        string
-		pageHandler page.PageHandler
-		translation *kdexv1alpha1.KDexTranslation
-		want        []string
+		name            string
+		host            THost
+		lang            string
+		pageHandler     page.PageHandler
+		translationName string
+		translation     *kdexv1alpha1.KDexTranslationSpec
+		want            []string
 	}{
 		{
 			name: "english translation",
@@ -104,25 +105,20 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			lang: "en",
-			translation: &kdexv1alpha1.KDexTranslation{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "test-translation",
-					Namespace: "foo",
-				},
-				Spec: kdexv1alpha1.KDexTranslationSpec{
-					Translations: []kdexv1alpha1.Translation{
-						{
-							Lang: "en",
-							KeysAndValues: map[string]string{
-								"key": "ENGLISH_TRANSLATION",
-							},
+			lang:            "en",
+			translationName: "test-translation",
+			translation: &kdexv1alpha1.KDexTranslationSpec{
+				Translations: []kdexv1alpha1.Translation{
+					{
+						Lang: "en",
+						KeysAndValues: map[string]string{
+							"key": "ENGLISH_TRANSLATION",
 						},
-						{
-							Lang: "fr",
-							KeysAndValues: map[string]string{
-								"key": "FRENCH_TRANSLATION",
-							},
+					},
+					{
+						Lang: "fr",
+						KeysAndValues: map[string]string{
+							"key": "FRENCH_TRANSLATION",
 						},
 					},
 				},
@@ -180,25 +176,20 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 					},
 				},
 			},
-			lang: "fr",
-			translation: &kdexv1alpha1.KDexTranslation{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "test-translation",
-					Namespace: "foo",
-				},
-				Spec: kdexv1alpha1.KDexTranslationSpec{
-					Translations: []kdexv1alpha1.Translation{
-						{
-							Lang: "en",
-							KeysAndValues: map[string]string{
-								"key": "ENGLISH_TRANSLATION",
-							},
+			lang:            "fr",
+			translationName: "test-translation",
+			translation: &kdexv1alpha1.KDexTranslationSpec{
+				Translations: []kdexv1alpha1.Translation{
+					{
+						Lang: "en",
+						KeysAndValues: map[string]string{
+							"key": "ENGLISH_TRANSLATION",
 						},
-						{
-							Lang: "fr",
-							KeysAndValues: map[string]string{
-								"key": "FRENCH_TRANSLATION",
-							},
+					},
+					{
+						Lang: "fr",
+						KeysAndValues: map[string]string{
+							"key": "FRENCH_TRANSLATION",
 						},
 					},
 				},
@@ -266,7 +257,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 
 			th := NewHostHandler(tt.host.name, logr.Discard())
 			th.SetHost(&tt.host.host, nil, nil, "")
-			th.AddOrUpdateTranslation(tt.translation)
+			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
 			got, gotErr := th.L10nRenderLocked(tt.pageHandler, map[string]interface{}{}, language.Make(tt.lang))
 
@@ -286,11 +277,12 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		host        THost
-		pageHandler page.PageHandler
-		translation *kdexv1alpha1.KDexTranslation
-		want        map[string][]string
+		name            string
+		host            THost
+		pageHandler     page.PageHandler
+		translationName string
+		translation     *kdexv1alpha1.KDexTranslationSpec
+		want            map[string][]string
 	}{
 		{
 			name: "translations",
@@ -342,24 +334,19 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 					},
 				},
 			},
-			translation: &kdexv1alpha1.KDexTranslation{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "test-translation",
-					Namespace: "foo",
-				},
-				Spec: kdexv1alpha1.KDexTranslationSpec{
-					Translations: []kdexv1alpha1.Translation{
-						{
-							Lang: "en",
-							KeysAndValues: map[string]string{
-								"key": "ENGLISH_TRANSLATION",
-							},
+			translationName: "test-translation",
+			translation: &kdexv1alpha1.KDexTranslationSpec{
+				Translations: []kdexv1alpha1.Translation{
+					{
+						Lang: "en",
+						KeysAndValues: map[string]string{
+							"key": "ENGLISH_TRANSLATION",
 						},
-						{
-							Lang: "fr",
-							KeysAndValues: map[string]string{
-								"key": "FRENCH_TRANSLATION",
-							},
+					},
+					{
+						Lang: "fr",
+						KeysAndValues: map[string]string{
+							"key": "FRENCH_TRANSLATION",
 						},
 					},
 				},
@@ -380,7 +367,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 
 			th := NewHostHandler(tt.host.name, logr.Discard())
 			th.SetHost(&tt.host.host, nil, nil, "")
-			th.AddOrUpdateTranslation(tt.translation)
+			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
 			got := th.L10nRendersLocked(tt.pageHandler, map[language.Tag]map[string]interface{}{})
 
@@ -405,10 +392,11 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		host        THost
-		translation *kdexv1alpha1.KDexTranslation
-		langTests   map[string]KeyAndExpected
+		name            string
+		host            THost
+		translationName string
+		translation     *kdexv1alpha1.KDexTranslationSpec
+		langTests       map[string]KeyAndExpected
 	}{
 		{
 			name: "add translation",
@@ -423,29 +411,25 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 					},
 				},
 			},
-			translation: &kdexv1alpha1.KDexTranslation{
-				ObjectMeta: v1.ObjectMeta{
-					Name: "sample-translation",
-				},
-				Spec: kdexv1alpha1.KDexTranslationSpec{
-					Translations: []kdexv1alpha1.Translation{
-						{
-							Lang: "en",
-							KeysAndValues: map[string]string{
-								"key": "ENGLISH_TRANSLATION",
-							},
+			// translationName: "test-translation",
+			translation: &kdexv1alpha1.KDexTranslationSpec{
+				Translations: []kdexv1alpha1.Translation{
+					{
+						Lang: "en",
+						KeysAndValues: map[string]string{
+							"key": "ENGLISH_TRANSLATION",
 						},
-						{
-							Lang: "fr",
-							KeysAndValues: map[string]string{
-								"key": "FRENCH_TRANSLATION",
-							},
+					},
+					{
+						Lang: "fr",
+						KeysAndValues: map[string]string{
+							"key": "FRENCH_TRANSLATION",
 						},
-						{
-							Lang: "fr",
-							KeysAndValues: map[string]string{
-								"key": "LAST_ONE_WINS",
-							},
+					},
+					{
+						Lang: "fr",
+						KeysAndValues: map[string]string{
+							"key": "LAST_ONE_WINS",
 						},
 					},
 				},
@@ -468,7 +452,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 
 			th := NewHostHandler(tt.host.name, logr.Discard())
 			th.SetHost(&tt.host.host, nil, nil, "")
-			th.AddOrUpdateTranslation(tt.translation)
+			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
 			for lang, expected := range tt.langTests {
 				messagePrinter := message.NewPrinter(

@@ -238,7 +238,7 @@ var _ = BeforeSuite(func() {
 	err = pageBindingControllerReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
-	translationReconciler := &KDexTranslationReconciler{
+	translationReconciler := &KDexInternalTranslationReconciler{
 		Client:              k8sClient,
 		ControllerNamespace: namespace,
 		FocalHost:           focalHost,

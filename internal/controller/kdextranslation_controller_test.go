@@ -28,7 +28,7 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
-var _ = Describe("KDexTranslation Controller", func() {
+var _ = Describe("KDexInternalTranslation Controller", func() {
 	Context("When reconciling a resource", func() {
 		const namespace = "default"
 		const resourceName = "test-resource"
@@ -41,7 +41,7 @@ var _ = Describe("KDexTranslation Controller", func() {
 		})
 
 		It("should successfully reconcile the resource", func() {
-			resource := &kdexv1alpha1.KDexTranslation{
+			resource := &kdexv1alpha1.KDexInternalTranslation{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
@@ -73,7 +73,7 @@ var _ = Describe("KDexTranslation Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexTranslation{}, false)
+				&kdexv1alpha1.KDexInternalTranslation{}, false)
 
 			addOrUpdatePageArchetype(
 				ctx, k8sClient, kdexv1alpha1.KDexPageArchetype{
@@ -136,7 +136,7 @@ var _ = Describe("KDexTranslation Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexTranslation{}, true)
+				&kdexv1alpha1.KDexInternalTranslation{}, true)
 
 			host, ok := hostStore.Get(focalHost)
 			Expect(ok).To(BeTrue())

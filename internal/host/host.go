@@ -29,7 +29,7 @@ type HostHandler struct {
 	importmap            string
 	log                  logr.Logger
 	mu                   sync.RWMutex
-	translationResources map[string]kdexv1alpha1.KDexTranslation
+	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
 }
 
 func NewHostHandler(name string, log logr.Logger) *HostHandler {
@@ -37,7 +37,7 @@ func NewHostHandler(name string, log logr.Logger) *HostHandler {
 		Name:                 name,
 		defaultLanguage:      "en",
 		log:                  log.WithValues("host", name),
-		translationResources: map[string]kdexv1alpha1.KDexTranslation{},
+		translationResources: map[string]kdexv1alpha1.KDexTranslationSpec{},
 	}
 
 	catalogBuilder := catalog.NewBuilder()
@@ -55,13 +55,13 @@ func NewHostHandler(name string, log logr.Logger) *HostHandler {
 	return th
 }
 
-func (th *HostHandler) AddOrUpdateTranslation(translation *kdexv1alpha1.KDexTranslation) {
+func (th *HostHandler) AddOrUpdateTranslation(name string, translation *kdexv1alpha1.KDexTranslationSpec) {
 	if translation == nil {
 		return
 	}
-	th.log.V(1).Info("add or update translation", "translation", translation.Name)
+	th.log.V(1).Info("add or update translation", "translation", name)
 	th.mu.Lock()
-	th.translationResources[translation.Name] = *translation
+	th.translationResources[name] = *translation
 	th.mu.Unlock()
 	th.RebuildMux() // Called after lock is released
 }
@@ -391,10 +391,10 @@ func (th *HostHandler) RebuildMux() {
 	th.Mux = mux
 }
 
-func (th *HostHandler) RemoveTranslation(translation kdexv1alpha1.KDexTranslation) {
-	th.log.V(1).Info("delete translation", "translation", translation.Name)
+func (th *HostHandler) RemoveTranslation(name string) {
+	th.log.V(1).Info("delete translation", "translation", name)
 	th.mu.Lock()
-	delete(th.translationResources, translation.Name)
+	delete(th.translationResources, name)
 	th.mu.Unlock()
 
 	th.RebuildMux() // Called after lock is released
@@ -558,10 +558,10 @@ func (th *HostHandler) rebuildTranslationsLocked() {
 	th.addDefaultAnnouncementTranslationsLocked(catalogBuilder)
 
 	for _, translation := range th.translationResources {
-		for _, tr := range translation.Spec.Translations {
+		for name, tr := range translation.Translations {
 			for key, value := range tr.KeysAndValues {
 				if err := catalogBuilder.SetString(language.Make(tr.Lang), key, value); err != nil {
-					th.log.Error(err, "failed to set translation", "translation", translation.Name, "lang", tr.Lang, "key", key, "value", value)
+					th.log.Error(err, "failed to set translation", "translation", name, "lang", tr.Lang, "key", key, "value", value)
 				}
 			}
 		}

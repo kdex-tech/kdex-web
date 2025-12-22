@@ -287,7 +287,7 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
 		case *kdexv1alpha1.KDexPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
-		case *kdexv1alpha1.KDexTranslation:
+		case *kdexv1alpha1.KDexInternalTranslation:
 			return t.Spec.HostRef.Name == r.FocalHost
 		default:
 			return true
@@ -332,10 +332,10 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 			&kdexv1alpha1.KDexClusterTheme{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}, "{.Spec.Host.DefaultThemeRef}")).
 		Watches(
-			&kdexv1alpha1.KDexTranslation{},
+			&kdexv1alpha1.KDexInternalTranslation{},
 			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 				var requests []reconcile.Request
-				translation, ok := o.(*kdexv1alpha1.KDexTranslation)
+				translation, ok := o.(*kdexv1alpha1.KDexInternalTranslation)
 				if !ok {
 					return requests
 				}
