@@ -91,14 +91,14 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, nil
 	}
 
+	if req.Name != r.FocalHost {
+		log.V(1).Info("skipping reconcile", "name", req.Name, "focalHost", r.FocalHost)
+		return ctrl.Result{}, nil
+	}
+
 	var hostController kdexv1alpha1.KDexHostController
 	if err := r.Get(ctx, req.NamespacedName, &hostController); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	if hostController.Name != r.FocalHost {
-		log.V(1).Info("skipping reconcile", "host", hostController.Name, "focalHost", r.FocalHost)
-		return ctrl.Result{}, nil
 	}
 
 	if hostController.Status.Attributes == nil {
@@ -239,7 +239,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	var importmap string
 
 	if len(finalPackageReferences) == 0 {
-		log.V(1).Info("deleting host package references", "hostPackageReferences", hostPackageReferences.Name)
+		log.V(2).Info("deleting host package references", "packageReferences", hostPackageReferences.Name)
 
 		if err := r.Delete(ctx, hostPackageReferences); err != nil {
 			if client.IgnoreNotFound(err) != nil {
@@ -254,7 +254,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 					err.Error(),
 				)
 
-				log.V(1).Info("error deleting host package references", "err", err)
+				log.V(2).Info("error deleting package references", "packageReferences", hostPackageReferences.Name, "err", err)
 
 				return ctrl.Result{}, err
 			}
@@ -264,7 +264,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	} else {
 		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &hostController, hostPackageReferences, finalPackageReferences)
 		if shouldReturn {
-			log.V(1).Info("error creating or updating package references", "err", err, "res", r1)
+			log.V(2).Info("package references shouldReturn", "packageReferences", hostPackageReferences.Name, "result", r1, "err", err)
 
 			return r1, err
 		}
@@ -508,7 +508,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 		},
 	)
 
-	log.V(1).Info(
+	log.V(2).Info(
 		"createOrUpdatePackageReferences",
 		"op", op,
 		"attributes", hostPackageReferences.Status.Attributes,
