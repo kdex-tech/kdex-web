@@ -9,22 +9,26 @@ type PageHandler struct {
 	Page *kdexv1alpha1.KDexPageBinding
 
 	// dereferenced resources
-	Archetype         *kdexv1alpha1.KDexPageArchetypeSpec
-	Content           map[string]ResolvedContentEntry
-	Footer            *kdexv1alpha1.KDexPageFooterSpec
-	Header            *kdexv1alpha1.KDexPageHeaderSpec
-	Navigations       map[string]ResolvedNavigation
+	Content           map[string]PackedContent
+	Footer            string
+	Header            string
+	MainTemplate      string
+	Navigations       map[string]string
 	PackageReferences []kdexv1alpha1.PackageReference
-	ScriptLibraries   []kdexv1alpha1.KDexScriptLibrarySpec
+	Scripts           []kdexv1alpha1.ScriptDef
 }
 
-type ResolvedContentEntry struct {
-	App               *kdexv1alpha1.KDexAppSpec
+type PackedContent struct {
 	AppName           string
 	AppGeneration     string
 	Content           string
 	CustomElementName string
 	Slot              string
+}
+
+type ResolvedContentEntry struct {
+	App     *kdexv1alpha1.KDexAppSpec
+	Content PackedContent
 }
 
 type ResolvedNavigation struct {

@@ -32,8 +32,10 @@ func ResolveContents(
 		appRef := contentEntry.AppRef
 		if appRef == nil {
 			contents[contentEntry.Slot] = page.ResolvedContentEntry{
-				Content: contentEntry.RawHTML,
-				Slot:    contentEntry.Slot,
+				Content: page.PackedContent{
+					Content: contentEntry.RawHTML,
+					Slot:    contentEntry.Slot,
+				},
 			}
 
 			continue
@@ -54,11 +56,14 @@ func ResolveContents(
 		}
 
 		contents[contentEntry.Slot] = page.ResolvedContentEntry{
-			App:               appSpec,
-			AppName:           app.GetName(),
-			AppGeneration:     fmt.Sprintf("%d", app.GetGeneration()),
-			CustomElementName: contentEntry.CustomElementName,
-			Slot:              contentEntry.Slot,
+			App: appSpec,
+			Content: page.PackedContent{
+				AppName:           app.GetName(),
+				AppGeneration:     fmt.Sprintf("%d", app.GetGeneration()),
+				Content:           contentEntry.RawHTML,
+				CustomElementName: contentEntry.CustomElementName,
+				Slot:              contentEntry.Slot,
+			},
 		}
 	}
 

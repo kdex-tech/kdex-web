@@ -68,14 +68,14 @@ func (r *KDexInternalTranslationReconciler) Reconcile(ctx context.Context, req c
 		return ctrl.Result{}, nil
 	}
 
+	if req.Name != r.FocalHost {
+		log.V(1).Info("skipping reconcile", "host", req.Name, "focalHost", r.FocalHost)
+		return ctrl.Result{}, nil
+	}
+
 	var translation kdexv1alpha1.KDexInternalTranslation
 	if err := r.Get(ctx, req.NamespacedName, &translation); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	if translation.Spec.HostRef.Name != r.FocalHost {
-		log.V(1).Info("skipping reconcile", "host", translation.Spec.HostRef.Name, "focalHost", r.FocalHost)
-		return ctrl.Result{}, nil
 	}
 
 	// Defer status update

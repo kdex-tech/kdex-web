@@ -271,7 +271,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 
 	for k, content := range contents {
 		if content.App != nil {
-			pageBinding.Status.Attributes[k+".content.generation"] = content.AppGeneration
+			pageBinding.Status.Attributes[k+".content.generation"] = content.Content.AppGeneration
 		}
 	}
 
@@ -439,12 +439,15 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 	}
 
 	packageReferences := []kdexv1alpha1.PackageReference{}
+	scripts := []kdexv1alpha1.ScriptDef{}
 	for _, content := range contents {
 		if content.App != nil {
+			scripts = append(scripts, content.App.Scripts...)
 			packageReferences = append(packageReferences, content.App.PackageReference)
 		}
 	}
 	for _, scriptLibrary := range scriptLibraries {
+		scripts = append(scripts, scriptLibrary.Scripts...)
 		if scriptLibrary.PackageReference != nil {
 			packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
 		}
@@ -467,15 +470,25 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
+	contentsMap := map[string]page.PackedContent{}
+	for slot, content := range contents {
+		contentsMap[slot] = content.Content
+	}
+
+	navigationsMap := map[string]string{}
+	for _, navigation := range navigations {
+		navigationsMap[navigation.Name] = navigation.Spec.Content
+	}
+
 	hostHandler.Pages.Set(page.PageHandler{
-		Archetype:         &pageArchetypeSpec,
-		Content:           contents,
-		Footer:            footer,
-		Header:            header,
-		Navigations:       navigations,
+		Content:           contentsMap,
+		Footer:            footer.Content,
+		Header:            header.Content,
+		MainTemplate:      pageArchetypeSpec.Content,
+		Navigations:       navigationsMap,
 		PackageReferences: packageReferences,
 		Page:              pageBinding,
-		ScriptLibraries:   scriptLibraries,
+		Scripts:           scripts,
 	})
 
 	kdexv1alpha1.SetConditions(

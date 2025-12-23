@@ -86,12 +86,10 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 			separator = "\n"
 		}
 	}
-	for _, scriptLibrary := range handler.ScriptLibraries {
-		for _, script := range scriptLibrary.Scripts {
-			buffer.WriteString(separator)
-			buffer.WriteString(script.ToFootTag())
-			separator = "\n"
-		}
+	for _, script := range handler.Scripts {
+		buffer.WriteString(separator)
+		buffer.WriteString(script.ToFootTag())
+		separator = "\n"
 	}
 
 	return buffer.String()
@@ -130,12 +128,10 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 			separator = "\n"
 		}
 	}
-	for _, scriptLibrary := range handler.ScriptLibraries {
-		for _, script := range scriptLibrary.Scripts {
-			buffer.WriteString(separator)
-			buffer.WriteString(script.ToHeadTag())
-			separator = "\n"
-		}
+	for _, script := range handler.Scripts {
+		buffer.WriteString(separator)
+		buffer.WriteString(script.ToHeadTag())
+		separator = "\n"
 	}
 
 	return buffer.String()
@@ -151,9 +147,9 @@ func (th *HostHandler) L10nRenderLocked(
 		BrandName:       th.host.BrandName,
 		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: th.defaultLanguage,
-		Footer:          handler.FooterToHTML(),
+		Footer:          handler.Footer,
 		FootScript:      th.FootScriptToHTML(handler),
-		Header:          handler.HeaderToHTML(),
+		Header:          handler.Header,
 		HeadScript:      th.HeadScriptToHTML(handler),
 		Language:        l.String(),
 		Languages:       th.availableLanguagesLocked(),
@@ -164,7 +160,7 @@ func (th *HostHandler) L10nRenderLocked(
 		Organization:    th.host.Organization,
 		PageMap:         pageMap,
 		PatternPath:     handler.Page.Spec.PatternPath,
-		TemplateContent: handler.Archetype.Content,
+		TemplateContent: handler.MainTemplate,
 		TemplateName:    handler.Page.Name,
 		Theme:           th.host.Assets.String(),
 		Title:           handler.Page.Spec.Label,
@@ -310,9 +306,9 @@ func (th *HostHandler) RebuildMux() {
 	th.rebuildTranslationsLocked()
 	mux := th.muxWithDefaultsLocked()
 
-	pageList := th.Pages.List()
+	pageHandlers := th.Pages.List()
 
-	if len(pageList) == 0 {
+	if len(pageHandlers) == 0 {
 		// Render announcement page for all languages
 		l10nRenders := th.renderAnnouncementPageLocked()
 
@@ -348,17 +344,24 @@ func (th *HostHandler) RebuildMux() {
 		return
 	}
 
-	for _, handler := range pageList {
-		p := handler.Page
+	for _, ph := range pageHandlers {
+		basePath := ph.Page.Spec.BasePath
+		name := ph.Page.Name
 
-		if p.Spec.BasePath == "" {
-			th.log.V(1).Info("somehow page has empty basePath, skipping", "page", p)
+		if basePath == "" {
+			th.log.V(1).Info("somehow page has empty basePath, skipping", "page", name)
 			continue
 		}
 
-		l10nRenders := th.L10nRendersLocked(handler, nil)
+		l10nRenders := th.L10nRendersLocked(ph, nil)
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
+			// variables captured in scope of handler
+			name := name
+			basePath := basePath
+			l10nRenders := l10nRenders
+			th := th
+
 			l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 
 			rendered, ok := l10nRenders[l.String()]
@@ -368,7 +371,7 @@ func (th *HostHandler) RebuildMux() {
 				return
 			}
 
-			th.log.V(1).Info("serving", "page", p.Spec.BasePath, "language", l.String())
+			th.log.V(1).Info("serving", "page", name, "basePath", basePath, "language", l.String())
 
 			w.Header().Set("Content-Language", l.String())
 			w.Header().Set("Content-Type", "text/html")
@@ -379,12 +382,13 @@ func (th *HostHandler) RebuildMux() {
 			}
 		}
 
-		mux.HandleFunc("GET "+p.Spec.BasePath, handler)
-		mux.HandleFunc("GET /{l10n}"+p.Spec.BasePath, handler)
+		mux.HandleFunc("GET "+basePath, handler)
+		mux.HandleFunc("GET /{l10n}"+basePath, handler)
 
-		if p.Spec.PatternPath != "" {
-			mux.HandleFunc("GET "+p.Spec.PatternPath, handler)
-			mux.HandleFunc("GET /{l10n}"+p.Spec.PatternPath, handler)
+		patternPath := ph.Page.Spec.PatternPath
+		if patternPath != "" {
+			mux.HandleFunc("GET "+patternPath, handler)
+			mux.HandleFunc("GET /{l10n}"+patternPath, handler)
 		}
 	}
 
@@ -472,16 +476,16 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 			return
 		}
 
-		var nav *kdexv1alpha1.KDexPageNavigationSpec
+		var nav string
 
 		for key, n := range pageHandler.Navigations {
 			if key == navKey {
-				nav = n.Spec
+				nav = n
 				break
 			}
 		}
 
-		if nav == nil {
+		if nav == "" {
 			http.NotFound(w, r)
 			return
 		}
@@ -515,7 +519,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 			return
 		}
 
-		rendered, err := renderer.RenderOne(navKey, nav.Content, templateData)
+		rendered, err := renderer.RenderOne(navKey, nav, templateData)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

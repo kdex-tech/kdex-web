@@ -80,29 +80,17 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						},
 					},
 				},
-				Archetype: &kdexv1alpha1.KDexPageArchetypeSpec{
-					Content: primaryTemplate,
-				},
-				Content: map[string]page.ResolvedContentEntry{
+				MainTemplate: primaryTemplate,
+				Content: map[string]page.PackedContent{
 					"main": {
 						Content: "MAIN",
 						Slot:    "main",
 					},
 				},
-				Footer: &kdexv1alpha1.KDexPageFooterSpec{
-					Content: "FOOTER",
-				},
-				Header: &kdexv1alpha1.KDexPageHeaderSpec{
-					Content: `{{ l10n "key" }}`,
-				},
-				Navigations: map[string]page.ResolvedNavigation{
-					"main": {
-						Name:       "main",
-						Generation: 1,
-						Spec: &kdexv1alpha1.KDexPageNavigationSpec{
-							Content: "NAV",
-						},
-					},
+				Footer: "FOOTER",
+				Header: `{{ l10n "key" }}`,
+				Navigations: map[string]string{
+					"main": "NAV",
 				},
 			},
 			lang:            "en",
@@ -151,29 +139,17 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						},
 					},
 				},
-				Archetype: &kdexv1alpha1.KDexPageArchetypeSpec{
-					Content: primaryTemplate,
-				},
-				Content: map[string]page.ResolvedContentEntry{
+				MainTemplate: primaryTemplate,
+				Content: map[string]page.PackedContent{
 					"main": {
 						Content: "MAIN",
 						Slot:    "main",
 					},
 				},
-				Footer: &kdexv1alpha1.KDexPageFooterSpec{
-					Content: "FOOTER",
-				},
-				Header: &kdexv1alpha1.KDexPageHeaderSpec{
-					Content: `{{ l10n "key" }}`,
-				},
-				Navigations: map[string]page.ResolvedNavigation{
-					"main": {
-						Name:       "main",
-						Generation: 1,
-						Spec: &kdexv1alpha1.KDexPageNavigationSpec{
-							Content: "NAV",
-						},
-					},
+				Footer: "FOOTER",
+				Header: `{{ l10n "key" }}`,
+				Navigations: map[string]string{
+					"main": "NAV",
 				},
 			},
 			lang:            "fr",
@@ -222,29 +198,17 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 						},
 					},
 				},
-				Archetype: &kdexv1alpha1.KDexPageArchetypeSpec{
-					Content: primaryTemplate,
-				},
-				Content: map[string]page.ResolvedContentEntry{
+				MainTemplate: primaryTemplate,
+				Content: map[string]page.PackedContent{
 					"main": {
 						Content: "MAIN",
 						Slot:    "main",
 					},
 				},
-				Footer: &kdexv1alpha1.KDexPageFooterSpec{
-					Content: "FOOTER",
-				},
-				Header: &kdexv1alpha1.KDexPageHeaderSpec{
-					Content: `{{ l10n "key" }}`,
-				},
-				Navigations: map[string]page.ResolvedNavigation{
-					"main": {
-						Name:       "main",
-						Generation: 1,
-						Spec: &kdexv1alpha1.KDexPageNavigationSpec{
-							Content: "NAV",
-						},
-					},
+				Footer: "FOOTER",
+				Header: `{{ l10n "key" }}`,
+				Navigations: map[string]string{
+					"main": "NAV",
 				},
 			},
 			lang: "en",
@@ -309,29 +273,17 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 						},
 					},
 				},
-				Archetype: &kdexv1alpha1.KDexPageArchetypeSpec{
-					Content: primaryTemplate,
-				},
-				Content: map[string]page.ResolvedContentEntry{
+				MainTemplate: primaryTemplate,
+				Content: map[string]page.PackedContent{
 					"main": {
 						Content: "MAIN",
 						Slot:    "main",
 					},
 				},
-				Footer: &kdexv1alpha1.KDexPageFooterSpec{
-					Content: "FOOTER",
-				},
-				Header: &kdexv1alpha1.KDexPageHeaderSpec{
-					Content: `{{ l10n "key" }}`,
-				},
-				Navigations: map[string]page.ResolvedNavigation{
-					"main": {
-						Name:       "main",
-						Generation: 1,
-						Spec: &kdexv1alpha1.KDexPageNavigationSpec{
-							Content: "NAV",
-						},
-					},
+				Footer: "FOOTER",
+				Header: `{{ l10n "key" }}`,
+				Navigations: map[string]string{
+					"main": "NAV",
 				},
 			},
 			translationName: "test-translation",
