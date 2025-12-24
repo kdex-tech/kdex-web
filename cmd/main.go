@@ -228,7 +228,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalHost")
 		os.Exit(1)
 	}
-	if err := (&controller.KDexPageBindingReconciler{
+	if err := (&controller.KDexInternalPageBindingReconciler{
 		Client:              mgr.GetClient(),
 		ControllerNamespace: controllerNamespace,
 		FocalHost:           focalHost,
@@ -236,7 +236,7 @@ func main() {
 		RequeueDelay:        requeueDelay,
 		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "KDexPageBinding")
+		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalPageBinding")
 		os.Exit(1)
 	}
 	if err := (&controller.KDexInternalTranslationReconciler{

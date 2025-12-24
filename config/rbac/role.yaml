@@ -88,8 +88,8 @@ rules:
   resources:
   - kdexhostpackagereferences
   - kdexinternalhosts
+  - kdexinternalpagebindings
   - kdexinternaltranslations
-  - kdexpagebindings
   verbs:
   - create
   - delete
@@ -103,8 +103,8 @@ rules:
   resources:
   - kdexhostpackagereferences/finalizers
   - kdexinternalhosts/finalizers
+  - kdexinternalpagebindings/finalizers
   - kdexinternaltranslations/finalizers
-  - kdexpagebindings/finalizers
   verbs:
   - update
 - apiGroups:
@@ -112,8 +112,8 @@ rules:
   resources:
   - kdexhostpackagereferences/status
   - kdexinternalhosts/status
+  - kdexinternalpagebindings/status
   - kdexinternaltranslations/status
-  - kdexpagebindings/status
   verbs:
   - get
   - patch

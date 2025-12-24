@@ -75,7 +75,7 @@ type KDexInternalHostReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/status,    verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/finalizers,verbs=update
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostpackagereferences,     verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings,              verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings,              verbs=get;list;watch
 
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,           verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterscriptlibraries,    verbs=get;list;watch
@@ -285,7 +285,7 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexHostPackageReferences:
 			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
-		case *kdexv1alpha1.KDexPageBinding:
+		case *kdexv1alpha1.KDexInternalPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
 		case *kdexv1alpha1.KDexInternalTranslation:
 			return t.Spec.HostRef.Name == r.FocalHost
@@ -317,7 +317,7 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&kdexv1alpha1.KDexHostPackageReferences{}).
 		Owns(&networkingv1.Ingress{}).
 		Watches(
-			&kdexv1alpha1.KDexPageBinding{},
+			&kdexv1alpha1.KDexInternalPageBinding{},
 			cr_handler.EnqueueRequestsFromMapFunc(r.findInternalHostsForPageBinding)).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},

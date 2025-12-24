@@ -13,7 +13,7 @@ func (r *KDexInternalHostReconciler) findInternalHostsForPageBinding(
 	ctx context.Context,
 	obj client.Object,
 ) []reconcile.Request {
-	pageBinding, ok := obj.(*kdexv1alpha1.KDexPageBinding)
+	pageBinding, ok := obj.(*kdexv1alpha1.KDexInternalPageBinding)
 	if !ok {
 		return nil
 	}

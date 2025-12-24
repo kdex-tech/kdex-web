@@ -75,7 +75,7 @@ func (s *PageStore) BuildMenuEntries(
 	entry *render.PageEntry,
 	l *language.Tag,
 	isDefaultLanguage bool,
-	parent *kdexv1alpha1.KDexPageBinding,
+	parent *kdexv1alpha1.KDexInternalPageBinding,
 ) {
 	for _, handler := range s.List() {
 		page := handler.Page

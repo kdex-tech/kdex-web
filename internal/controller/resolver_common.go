@@ -23,7 +23,7 @@ import (
 func ResolveContents(
 	ctx context.Context,
 	c client.Client,
-	pageBinding *kdexv1alpha1.KDexPageBinding,
+	pageBinding *kdexv1alpha1.KDexInternalPageBinding,
 	requeueDelay time.Duration,
 ) (map[string]page.ResolvedContentEntry, bool, ctrl.Result, error) {
 	contents := make(map[string]page.ResolvedContentEntry)
@@ -188,12 +188,12 @@ func ResolvePageBinding(
 	objectConditions *[]metav1.Condition,
 	pageBindingRef *corev1.LocalObjectReference,
 	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexPageBinding, bool, ctrl.Result, error) {
+) (*kdexv1alpha1.KDexInternalPageBinding, bool, ctrl.Result, error) {
 	if pageBindingRef == nil {
 		return nil, false, ctrl.Result{}, nil
 	}
 
-	var pageBinding kdexv1alpha1.KDexPageBinding
+	var pageBinding kdexv1alpha1.KDexInternalPageBinding
 	pageBindingName := types.NamespacedName{
 		Name:      pageBindingRef.Name,
 		Namespace: object.GetNamespace(),

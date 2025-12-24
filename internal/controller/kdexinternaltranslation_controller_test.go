@@ -104,31 +104,33 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 					},
 				},
 			)
-			addOrUpdatePageBinding(
-				ctx, k8sClient, kdexv1alpha1.KDexPageBinding{
+			addOrUpdateInternalPageBinding(
+				ctx, k8sClient, kdexv1alpha1.KDexInternalPageBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "default",
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: `<p>Hello</p>`,
+					Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
+						KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
+							ContentEntries: []kdexv1alpha1.ContentEntry{
+								{
+									ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+										RawHTML: `<p>Hello</p>`,
+									},
+									Slot: "main",
 								},
-								Slot: "main",
 							},
-						},
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
-						Label: "test",
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageArchetype",
-							Name: "default",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/",
+							HostRef: corev1.LocalObjectReference{
+								Name: focalHost,
+							},
+							Label: "test",
+							PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+								Kind: "KDexPageArchetype",
+								Name: "default",
+							},
+							Paths: kdexv1alpha1.Paths{
+								BasePath: "/",
+							},
 						},
 					},
 				},

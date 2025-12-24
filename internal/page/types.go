@@ -6,7 +6,7 @@ import (
 
 type PageHandler struct {
 	// root object
-	Page *kdexv1alpha1.KDexPageBinding
+	Page *kdexv1alpha1.KDexInternalPageBinding
 
 	// dereferenced resources
 	Content           map[string]PackedContent

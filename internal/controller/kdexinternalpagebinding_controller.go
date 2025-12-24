@@ -38,8 +38,8 @@ import (
 
 const pageBindingFinalizerName = "kdex.dev/kdex-nexus-page-binding-finalizer"
 
-// KDexPageBindingReconciler reconciles a KDexPageBinding object
-type KDexPageBindingReconciler struct {
+// KDexInternalPageBindingReconciler reconciles a KDexInternalPageBinding object
+type KDexInternalPageBindingReconciler struct {
 	client.Client
 	ControllerNamespace string
 	FocalHost           string
@@ -52,9 +52,9 @@ type KDexPageBindingReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterapps,            verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagearchetypes,         verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpagearchetypes,  verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings,           verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings/status,    verbs=get;update;patch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings,           verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings/status,    verbs=get;update;patch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings/finalizers,verbs=update
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagefooters,            verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpagefooters,     verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpageheaders,            verbs=get;list;watch
@@ -64,7 +64,7 @@ type KDexPageBindingReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,        verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterscriptlibraries, verbs=get;list;watch
 
-func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+func (r *KDexInternalPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 
 	if req.Namespace != r.ControllerNamespace {
@@ -72,7 +72,7 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	var pageBinding kdexv1alpha1.KDexPageBinding
+	var pageBinding kdexv1alpha1.KDexInternalPageBinding
 	if err := r.Get(ctx, req.NamespacedName, &pageBinding); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -131,8 +131,8 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	l := LogConstructor("kdexpagebinding", mgr)(nil)
+func (r *KDexInternalPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	l := LogConstructor("kdexinternalpagebinding", mgr)(nil)
 
 	hasFocalHost := func(o client.Object) bool {
 		l.V(3).Info("hasFocalHost", "object", o)
@@ -141,7 +141,7 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexHostPackageReferences:
 			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
-		case *kdexv1alpha1.KDexPageBinding:
+		case *kdexv1alpha1.KDexInternalPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
 		case *kdexv1alpha1.KDexInternalTranslation:
 			return t.Spec.HostRef.Name == r.FocalHost
@@ -166,59 +166,59 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kdexv1alpha1.KDexPageBinding{}).
+		For(&kdexv1alpha1.KDexInternalPageBinding{}).
 		Watches(
 			&kdexv1alpha1.KDexApp{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ContentEntries[*].AppRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.ContentEntries[*].AppRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterApp{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ContentEntries[*].AppRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.ContentEntries[*].AppRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageArchetype{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.PageArchetypeRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.PageArchetypeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageArchetype{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.PageArchetypeRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.PageArchetypeRef}")).
 		Watches(
-			&kdexv1alpha1.KDexPageBinding{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ParentPageRef}")).
+			&kdexv1alpha1.KDexInternalPageBinding{},
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.ParentPageRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageFooter{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideFooterRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideFooterRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageFooter{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideFooterRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideFooterRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageHeader{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideHeaderRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideHeaderRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageHeader{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideHeaderRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideHeaderRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageNavigation{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideMainNavigationRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideMainNavigationRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageNavigation{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.OverrideMainNavigationRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideMainNavigationRef}")).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ScriptLibraryRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}, "{.Spec.ScriptLibraryRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.ScriptLibraryRef}")).
 		WithEventFilter(enabledFilter).
 		WithOptions(
 			controller.TypedOptions[reconcile.Request]{
-				LogConstructor: LogConstructor("kdexpagebinding", mgr),
+				LogConstructor: LogConstructor("kdexinternalpagebinding", mgr),
 			},
 		).
-		Named("kdexpagebinding").
+		Named("kdexinternalpagebinding").
 		Complete(r)
 }
 
 //nolint:gocyclo
-func (r *KDexPageBindingReconciler) innerReconcile(
-	ctx context.Context, pageBinding *kdexv1alpha1.KDexPageBinding,
+func (r *KDexInternalPageBindingReconciler) innerReconcile(
+	ctx context.Context, pageBinding *kdexv1alpha1.KDexInternalPageBinding,
 ) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
