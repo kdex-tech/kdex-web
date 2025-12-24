@@ -46,6 +46,7 @@ import (
 
 const (
 	internalHostFinalizerName = "kdex.dev/kdex-web-internal-host-finalizer"
+	hostIndexKey              = "spec.hostRef.name"
 )
 
 // KDexInternalHostReconciler reconciles a KDexInternalHost object
@@ -294,6 +295,26 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 	}
 
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexInternalPageBinding{}, hostIndexKey, func(rawObj client.Object) []string {
+		pageBinding := rawObj.(*kdexv1alpha1.KDexInternalPageBinding)
+		if pageBinding.Spec.HostRef.Name == "" {
+			return nil
+		}
+		return []string{pageBinding.Spec.HostRef.Name}
+	}); err != nil {
+		return err
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexInternalTranslation{}, hostIndexKey, func(rawObj client.Object) []string {
+		translation := rawObj.(*kdexv1alpha1.KDexInternalTranslation)
+		if translation.Spec.HostRef.Name == "" {
+			return nil
+		}
+		return []string{translation.Spec.HostRef.Name}
+	}); err != nil {
+		return err
+	}
+
 	var enabledFilter = predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return hasFocalHost(e.Object)
@@ -330,26 +351,37 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.DefaultThemeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexInternalPageBinding{},
-			cr_handler.EnqueueRequestsFromMapFunc(r.findInternalHostsForPageBinding)).
+			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				pageBinding, ok := obj.(*kdexv1alpha1.KDexInternalPageBinding)
+				if !ok || pageBinding.Spec.HostRef.Name != r.FocalHost {
+					return nil
+				}
+
+				return []reconcile.Request{
+					{
+						NamespacedName: types.NamespacedName{
+							Name:      pageBinding.Spec.HostRef.Name,
+							Namespace: pageBinding.Namespace,
+						},
+					},
+				}
+			})).
 		Watches(
 			&kdexv1alpha1.KDexInternalTranslation{},
 			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-				var requests []reconcile.Request
 				translation, ok := o.(*kdexv1alpha1.KDexInternalTranslation)
-				if !ok {
-					return requests
+				if !ok || translation.Spec.HostRef.Name != r.FocalHost {
+					return nil
 				}
 
-				if translation.Spec.HostRef.Name != r.FocalHost {
-					requests = append(requests, reconcile.Request{
+				return []reconcile.Request{
+					{
 						NamespacedName: types.NamespacedName{
 							Name:      translation.Spec.HostRef.Name,
 							Namespace: translation.Namespace,
 						},
-					})
+					},
 				}
-
-				return requests
 			})).
 		WithEventFilter(enabledFilter).
 		WithOptions(
