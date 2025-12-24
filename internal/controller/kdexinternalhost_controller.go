@@ -317,9 +317,6 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&kdexv1alpha1.KDexHostPackageReferences{}).
 		Owns(&networkingv1.Ingress{}).
 		Watches(
-			&kdexv1alpha1.KDexInternalPageBinding{},
-			cr_handler.EnqueueRequestsFromMapFunc(r.findInternalHostsForPageBinding)).
-		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.ScriptLibraryRef}")).
 		Watches(
@@ -331,6 +328,9 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&kdexv1alpha1.KDexClusterTheme{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.DefaultThemeRef}")).
+		Watches(
+			&kdexv1alpha1.KDexInternalPageBinding{},
+			cr_handler.EnqueueRequestsFromMapFunc(r.findInternalHostsForPageBinding)).
 		Watches(
 			&kdexv1alpha1.KDexInternalTranslation{},
 			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
