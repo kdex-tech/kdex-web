@@ -141,8 +141,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+			addOrUpdateInternalHost(
+				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      focalHost,
 						Namespace: namespace,
@@ -224,8 +224,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+			addOrUpdateInternalHost(
+				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      focalHost,
 						Namespace: namespace,
@@ -329,8 +329,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+			addOrUpdateInternalHost(
+				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      focalHost,
 						Namespace: namespace,
@@ -438,8 +438,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					},
 				},
 			)
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+			addOrUpdateInternalHost(
+				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      focalHost,
 						Namespace: namespace,
@@ -580,8 +580,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, "non-existent-page-archetype", namespace,
 				&kdexv1alpha1.KDexPageArchetype{}, true)
 
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+			addOrUpdateInternalHost(
+				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      focalHost,
 						Namespace: namespace,
@@ -601,7 +601,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, focalHost, namespace,
-				&kdexv1alpha1.KDexHostController{}, true)
+				&kdexv1alpha1.KDexInternalHost{}, true)
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
@@ -681,8 +681,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, false)
 
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+			addOrUpdateInternalHost(
+				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      focalHost,
 						Namespace: namespace,
@@ -702,7 +702,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, focalHost, namespace,
-				&kdexv1alpha1.KDexHostController{}, true)
+				&kdexv1alpha1.KDexInternalHost{}, true)
 
 			addOrUpdatePageArchetype(
 				ctx, k8sClient,
@@ -761,8 +761,8 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, false)
 
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+			addOrUpdateInternalHost(
+				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      focalHost,
 						Namespace: namespace,
@@ -782,7 +782,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, focalHost, namespace,
-				&kdexv1alpha1.KDexHostController{}, true)
+				&kdexv1alpha1.KDexInternalHost{}, true)
 
 			addOrUpdateClusterPageArchetype(
 				ctx, k8sClient,

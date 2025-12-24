@@ -25,7 +25,7 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
-var _ = Describe("KDexHostController Controller", func() {
+var _ = Describe("KDexInternalHost Controller", func() {
 	Context("When reconciling a resource", func() {
 		const namespace = "default"
 
@@ -36,7 +36,7 @@ var _ = Describe("KDexHostController Controller", func() {
 		})
 
 		It("should successfully reconcile the resource", func() {
-			resource := &kdexv1alpha1.KDexHostController{
+			resource := &kdexv1alpha1.KDexInternalHost{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      focalHost,
 					Namespace: namespace,
@@ -55,7 +55,7 @@ var _ = Describe("KDexHostController Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, focalHost, namespace,
-				&kdexv1alpha1.KDexHostController{}, true)
+				&kdexv1alpha1.KDexInternalHost{}, true)
 		})
 	})
 })

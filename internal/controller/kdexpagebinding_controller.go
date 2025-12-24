@@ -135,9 +135,9 @@ func (r *KDexPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	l := LogConstructor("kdexpagebinding", mgr)(nil)
 
 	hasFocalHost := func(o client.Object) bool {
-		l.V(1).Info("hasFocalHost", "object", o)
+		l.V(3).Info("hasFocalHost", "object", o)
 		switch t := o.(type) {
-		case *kdexv1alpha1.KDexHostController:
+		case *kdexv1alpha1.KDexInternalHost:
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexHostPackageReferences:
 			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
@@ -475,6 +475,16 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		contentsMap[slot] = content.Content
 	}
 
+	footerContent := ""
+	if footer != nil {
+		footerContent = footer.Content
+	}
+
+	headerContent := ""
+	if header != nil {
+		headerContent = header.Content
+	}
+
 	navigationsMap := map[string]string{}
 	for _, navigation := range navigations {
 		navigationsMap[navigation.Name] = navigation.Spec.Content
@@ -482,8 +492,8 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 
 	hostHandler.Pages.Set(page.PageHandler{
 		Content:           contentsMap,
-		Footer:            footer.Content,
-		Header:            header.Content,
+		Footer:            footerContent,
+		Header:            headerContent,
 		MainTemplate:      pageArchetypeSpec.Content,
 		Navigations:       navigationsMap,
 		PackageReferences: packageReferences,

@@ -11,7 +11,7 @@ repo: kdex.dev/web
 resources:
   - controller: true
     domain: kdex.dev
-    kind: KDexHostController
+    kind: KDexInternalHost
     version: v1alpha1
   - controller: true
     domain: kdex.dev

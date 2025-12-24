@@ -214,7 +214,7 @@ func main() {
 	hostStore := host.NewHostStore()
 	requeueDelay := time.Duration(requeueDelaySeconds) * time.Second
 
-	if err := (&controller.KDexHostControllerReconciler{
+	if err := (&controller.KDexInternalHostReconciler{
 		Client:              mgr.GetClient(),
 		ControllerNamespace: controllerNamespace,
 		Configuration:       conf,
@@ -225,7 +225,7 @@ func main() {
 		Scheme:              mgr.GetScheme(),
 		ServiceName:         serviceName,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "KDexHostController")
+		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalHost")
 		os.Exit(1)
 	}
 	if err := (&controller.KDexPageBindingReconciler{

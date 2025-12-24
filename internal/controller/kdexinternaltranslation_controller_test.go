@@ -86,8 +86,8 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 					},
 				},
 			)
-			addOrUpdateHostController(
-				ctx, k8sClient, kdexv1alpha1.KDexHostController{
+			addOrUpdateInternalHost(
+				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      focalHost,
 						Namespace: namespace,

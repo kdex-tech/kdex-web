@@ -45,11 +45,11 @@ import (
 )
 
 const (
-	hostControllerFinalizerName = "kdex.dev/kdex-web-host-controller-finalizer"
+	internalHostFinalizerName = "kdex.dev/kdex-web-internal-host-finalizer"
 )
 
-// KDexHostControllerReconciler reconciles a KDexHostController object
-type KDexHostControllerReconciler struct {
+// KDexInternalHostReconciler reconciles a KDexInternalHost object
+type KDexInternalHostReconciler struct {
 	client.Client
 	Configuration       configuration.NexusConfiguration
 	ControllerNamespace string
@@ -71,9 +71,9 @@ type KDexHostControllerReconciler struct {
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,   verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,            verbs=get;list;watch;create;update;patch;delete
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers,           verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers/status,    verbs=get;update;patch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostcontrollers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts,           verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/status,    verbs=get;update;patch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/finalizers,verbs=update
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostpackagereferences,     verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings,              verbs=get;list;watch
 
@@ -83,7 +83,7 @@ type KDexHostControllerReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterthemes,             verbs=get;list;watch
 
 // nolint:gocyclo
-func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
+func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 
 	if req.Namespace != r.ControllerNamespace {
@@ -96,40 +96,40 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	var hostController kdexv1alpha1.KDexHostController
-	if err := r.Get(ctx, req.NamespacedName, &hostController); err != nil {
+	var internalHost kdexv1alpha1.KDexInternalHost
+	if err := r.Get(ctx, req.NamespacedName, &internalHost); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	if hostController.Status.Attributes == nil {
-		hostController.Status.Attributes = make(map[string]string)
+	if internalHost.Status.Attributes == nil {
+		internalHost.Status.Attributes = make(map[string]string)
 	}
 
 	// Defer status update
 	defer func() {
-		hostController.Status.ObservedGeneration = hostController.Generation
-		if updateErr := r.Status().Update(ctx, &hostController); updateErr != nil {
+		internalHost.Status.ObservedGeneration = internalHost.Generation
+		if updateErr := r.Status().Update(ctx, &internalHost); updateErr != nil {
 			err = updateErr
 			res = ctrl.Result{}
 		}
 
-		log.V(1).Info("status", "status", hostController.Status, "err", err, "res", res)
+		log.V(1).Info("status", "status", internalHost.Status, "err", err, "res", res)
 	}()
 
-	if hostController.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&hostController, hostControllerFinalizerName) {
-			controllerutil.AddFinalizer(&hostController, hostControllerFinalizerName)
-			if err := r.Update(ctx, &hostController); err != nil {
+	if internalHost.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&internalHost, internalHostFinalizerName) {
+			controllerutil.AddFinalizer(&internalHost, internalHostFinalizerName)
+			if err := r.Update(ctx, &internalHost); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{Requeue: true}, nil
 		}
 	} else {
-		if controllerutil.ContainsFinalizer(&hostController, hostControllerFinalizerName) {
-			r.HostStore.Delete(hostController.Name)
+		if controllerutil.ContainsFinalizer(&internalHost, internalHostFinalizerName) {
+			r.HostStore.Delete(internalHost.Name)
 
-			controllerutil.RemoveFinalizer(&hostController, hostControllerFinalizerName)
-			if err := r.Update(ctx, &hostController); err != nil {
+			controllerutil.RemoveFinalizer(&internalHost, internalHostFinalizerName)
+			if err := r.Update(ctx, &internalHost); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -137,7 +137,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	kdexv1alpha1.SetConditions(
-		&hostController.Status.Conditions,
+		&internalHost.Status.Conditions,
 		kdexv1alpha1.ConditionStatuses{
 			Degraded:    metav1.ConditionFalse,
 			Progressing: metav1.ConditionTrue,
@@ -147,7 +147,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		"Reconciling",
 	)
 
-	themeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.ThemeRef, r.RequeueDelay)
+	themeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, internalHost.Spec.ThemeRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
@@ -156,7 +156,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	var themeAssets []kdexv1alpha1.Asset
 
 	if themeObj != nil {
-		hostController.Status.Attributes["theme.generation"] = fmt.Sprintf("%d", themeObj.GetGeneration())
+		internalHost.Status.Attributes["theme.generation"] = fmt.Sprintf("%d", themeObj.GetGeneration())
 
 		theme = themeObj.(*kdexv1alpha1.KDexTheme)
 		themeAssets = theme.Spec.Assets
@@ -164,13 +164,13 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	var scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec
 
-	scriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, hostController.Spec.ScriptLibraryRef, r.RequeueDelay)
+	scriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, internalHost.Spec.ScriptLibraryRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
 
 	if scriptLibraryObj != nil {
-		hostController.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
+		internalHost.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
 
 		var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
 
@@ -185,13 +185,13 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	if theme != nil {
-		themeScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &hostController, &hostController.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
+		themeScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
 		if shouldReturn {
 			return r1, err
 		}
 
 		if themeScriptLibraryObj != nil {
-			hostController.Status.Attributes["theme.scriptLibrary.generation"] = fmt.Sprintf("%d", themeScriptLibraryObj.GetGeneration())
+			internalHost.Status.Attributes["theme.scriptLibrary.generation"] = fmt.Sprintf("%d", themeScriptLibraryObj.GetGeneration())
 
 			var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
 
@@ -206,7 +206,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}
 	}
 
-	hostHandler := r.HostStore.GetOrCreate(hostController.Name)
+	hostHandler := r.HostStore.GetOrCreate(internalHost.Name)
 
 	allPackageReferences := []kdexv1alpha1.PackageReference{}
 	for _, scriptLibrary := range scriptLibraries {
@@ -231,8 +231,8 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	hostPackageReferences := &kdexv1alpha1.KDexHostPackageReferences{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-packages", hostController.Name),
-			Namespace: hostController.Namespace,
+			Name:      fmt.Sprintf("%s-packages", internalHost.Name),
+			Namespace: internalHost.Namespace,
 		},
 	}
 
@@ -244,7 +244,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		if err := r.Delete(ctx, hostPackageReferences); err != nil {
 			if client.IgnoreNotFound(err) != nil {
 				kdexv1alpha1.SetConditions(
-					&hostController.Status.Conditions,
+					&internalHost.Status.Conditions,
 					kdexv1alpha1.ConditionStatuses{
 						Degraded:    metav1.ConditionTrue,
 						Progressing: metav1.ConditionFalse,
@@ -262,7 +262,7 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 		hostPackageReferences = nil
 	} else {
-		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &hostController, hostPackageReferences, finalPackageReferences)
+		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &internalHost, hostPackageReferences, finalPackageReferences)
 		if shouldReturn {
 			log.V(2).Info("package references shouldReturn", "packageReferences", hostPackageReferences.Name, "result", r1, "err", err)
 
@@ -272,16 +272,16 @@ func (r *KDexHostControllerReconciler) Reconcile(ctx context.Context, req ctrl.R
 		importmap = hostPackageReferences.Status.Attributes["importmap"]
 	}
 
-	hostHandler.SetHost(&hostController.Spec, themeAssets, scriptLibraries, importmap)
+	hostHandler.SetHost(&internalHost.Spec, themeAssets, scriptLibraries, importmap)
 
-	return ctrl.Result{}, r.innerReconcile(ctx, &hostController, theme, hostPackageReferences)
+	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, theme, hostPackageReferences)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	hasFocalHost := func(o client.Object) bool {
 		switch t := o.(type) {
-		case *kdexv1alpha1.KDexHostController:
+		case *kdexv1alpha1.KDexInternalHost:
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexHostPackageReferences:
 			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
@@ -310,7 +310,7 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kdexv1alpha1.KDexHostController{}).
+		For(&kdexv1alpha1.KDexInternalHost{}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&gatewayv1.HTTPRoute{}).
@@ -318,19 +318,19 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Owns(&networkingv1.Ingress{}).
 		Watches(
 			&kdexv1alpha1.KDexPageBinding{},
-			cr_handler.EnqueueRequestsFromMapFunc(r.findHostControllersForPageBinding)).
+			cr_handler.EnqueueRequestsFromMapFunc(r.findInternalHostsForPageBinding)).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}, "{.Spec.Host.ScriptLibraryRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}, "{.Spec.Host.ScriptLibraryRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexTheme{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}, "{.Spec.Host.DefaultThemeRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.DefaultThemeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterTheme{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexHostController{}, &kdexv1alpha1.KDexHostControllerList{}, "{.Spec.Host.DefaultThemeRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.DefaultThemeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexInternalTranslation{},
 			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
@@ -354,14 +354,14 @@ func (r *KDexHostControllerReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		WithEventFilter(enabledFilter).
 		WithOptions(
 			controller.TypedOptions[reconcile.Request]{
-				LogConstructor: LogConstructor("kdexhostcontroller", mgr),
+				LogConstructor: LogConstructor("kdexinternalhost", mgr),
 			},
 		).
-		Named("kdexhostcontroller").
+		Named("kdexinternalhost").
 		Complete(r)
 }
 
-func (r *KDexHostControllerReconciler) getMemoizedDeployment() *appsv1.DeploymentSpec {
+func (r *KDexInternalHostReconciler) getMemoizedDeployment() *appsv1.DeploymentSpec {
 	r.mu.RLock()
 
 	if r.memoizedDeployment != nil {
@@ -378,7 +378,7 @@ func (r *KDexHostControllerReconciler) getMemoizedDeployment() *appsv1.Deploymen
 	return r.memoizedDeployment
 }
 
-func (r *KDexHostControllerReconciler) getMemoizedIngress() *networkingv1.IngressSpec {
+func (r *KDexInternalHostReconciler) getMemoizedIngress() *networkingv1.IngressSpec {
 	r.mu.RLock()
 
 	if r.memoizedIngress != nil {
@@ -395,7 +395,7 @@ func (r *KDexHostControllerReconciler) getMemoizedIngress() *networkingv1.Ingres
 	return r.memoizedIngress
 }
 
-func (r *KDexHostControllerReconciler) getMemoizedService() *corev1.ServiceSpec {
+func (r *KDexInternalHostReconciler) getMemoizedService() *corev1.ServiceSpec {
 	r.mu.RLock()
 
 	if r.memoizedService != nil {
@@ -412,47 +412,47 @@ func (r *KDexHostControllerReconciler) getMemoizedService() *corev1.ServiceSpec 
 	return r.memoizedService
 }
 
-func (r *KDexHostControllerReconciler) innerReconcile(
+func (r *KDexInternalHostReconciler) innerReconcile(
 	ctx context.Context,
-	hostController *kdexv1alpha1.KDexHostController,
+	internalHost *kdexv1alpha1.KDexInternalHost,
 	theme *kdexv1alpha1.KDexTheme,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) error {
-	packagesDeploymentOp, err := r.createOrUpdatePackagesDeployment(ctx, hostController, hostPackageReferences)
+	packagesDeploymentOp, err := r.createOrUpdatePackagesDeployment(ctx, internalHost, hostPackageReferences)
 	if err != nil {
 		return err
 	}
 
-	packagesServiceOp, err := r.createOrUpdatePackagesService(ctx, hostController, hostPackageReferences)
+	packagesServiceOp, err := r.createOrUpdatePackagesService(ctx, internalHost, hostPackageReferences)
 	if err != nil {
 		return err
 	}
 
-	themeDeploymentOp, err := r.createOrUpdateThemeDeployment(ctx, hostController, theme)
+	themeDeploymentOp, err := r.createOrUpdateThemeDeployment(ctx, internalHost, theme)
 	if err != nil {
 		return err
 	}
 
-	themeServiceOp, err := r.createOrUpdateThemeService(ctx, hostController, theme)
+	themeServiceOp, err := r.createOrUpdateThemeService(ctx, internalHost, theme)
 	if err != nil {
 		return err
 	}
 
 	var ingressOrHTTPRouteOp controllerutil.OperationResult
-	if hostController.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, hostController, theme, hostPackageReferences)
+	if internalHost.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
+		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, internalHost, theme, hostPackageReferences)
 		if err != nil {
 			return err
 		}
 	} else {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, hostController, theme, hostPackageReferences)
+		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, internalHost, theme, hostPackageReferences)
 		if err != nil {
 			return err
 		}
 	}
 
 	kdexv1alpha1.SetConditions(
-		&hostController.Status.Conditions,
+		&internalHost.Status.Conditions,
 		kdexv1alpha1.ConditionStatuses{
 			Degraded:    metav1.ConditionFalse,
 			Progressing: metav1.ConditionFalse,
@@ -476,9 +476,9 @@ func (r *KDexHostControllerReconciler) innerReconcile(
 	return nil
 }
 
-func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
+func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 	ctx context.Context,
-	hostController *kdexv1alpha1.KDexHostController,
+	internalHost *kdexv1alpha1.KDexInternalHost,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 	packageReferences []kdexv1alpha1.PackageReference,
 ) (bool, ctrl.Result, error) {
@@ -491,11 +491,11 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 		func() error {
 			if hostPackageReferences.CreationTimestamp.IsZero() {
 				hostPackageReferences.Annotations = make(map[string]string)
-				for key, value := range hostController.Annotations {
+				for key, value := range internalHost.Annotations {
 					hostPackageReferences.Annotations[key] = value
 				}
 				hostPackageReferences.Labels = make(map[string]string)
-				for key, value := range hostController.Labels {
+				for key, value := range internalHost.Labels {
 					hostPackageReferences.Labels[key] = value
 				}
 
@@ -504,7 +504,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 
 			hostPackageReferences.Spec.PackageReferences = packageReferences
 
-			return ctrl.SetControllerReference(hostController, hostPackageReferences, r.Scheme)
+			return ctrl.SetControllerReference(internalHost, hostPackageReferences, r.Scheme)
 		},
 	)
 
@@ -519,7 +519,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 
 	if err != nil {
 		kdexv1alpha1.SetConditions(
-			&hostController.Status.Conditions,
+			&internalHost.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
 				Degraded:    metav1.ConditionTrue,
 				Progressing: metav1.ConditionFalse,
@@ -536,7 +536,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 		hostPackageReferences.Status.Attributes["importmap"] == "" {
 
 		kdexv1alpha1.SetConditions(
-			&hostController.Status.Conditions,
+			&internalHost.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
 				Degraded:    metav1.ConditionFalse,
 				Progressing: metav1.ConditionTrue,
@@ -552,16 +552,16 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackageReferences(
 	return false, ctrl.Result{}, nil
 }
 
-func (r *KDexHostControllerReconciler) createOrUpdateIngress(
+func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 	ctx context.Context,
-	hostController *kdexv1alpha1.KDexHostController,
+	internalHost *kdexv1alpha1.KDexInternalHost,
 	theme *kdexv1alpha1.KDexTheme,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      hostController.Name,
-			Namespace: hostController.Namespace,
+			Name:      internalHost.Name,
+			Namespace: internalHost.Namespace,
 		},
 	}
 
@@ -572,11 +572,11 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 		func() error {
 			if ingress.CreationTimestamp.IsZero() {
 				ingress.Annotations = make(map[string]string)
-				for key, value := range hostController.Annotations {
+				for key, value := range internalHost.Annotations {
 					ingress.Annotations[key] = value
 				}
 				ingress.Labels = make(map[string]string)
-				for key, value := range hostController.Labels {
+				for key, value := range internalHost.Labels {
 					ingress.Labels[key] = value
 				}
 
@@ -594,14 +594,14 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 
 				ingress.Spec.DefaultBackend.Service.Name = r.ServiceName
 
-				ingress.Spec.DefaultBackend.Service.Port.Name = hostController.Name
-				ingress.Spec.IngressClassName = hostController.Spec.Routing.IngressClassName
+				ingress.Spec.DefaultBackend.Service.Port.Name = internalHost.Name
+				ingress.Spec.IngressClassName = internalHost.Spec.Routing.IngressClassName
 			}
 
 			pathType := networkingv1.PathTypePrefix
-			rules := make([]networkingv1.IngressRule, 0, len(hostController.Spec.Routing.Domains))
+			rules := make([]networkingv1.IngressRule, 0, len(internalHost.Spec.Routing.Domains))
 
-			for _, domain := range hostController.Spec.Routing.Domains {
+			for _, domain := range internalHost.Spec.Routing.Domains {
 				rules = append(rules, networkingv1.IngressRule{
 					Host: domain,
 					IngressRuleValue: networkingv1.IngressRuleValue{
@@ -665,19 +665,19 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 
 			ingress.Spec.Rules = append(r.getMemoizedIngress().Rules, rules...)
 
-			if hostController.Spec.Routing.TLS != nil {
+			if internalHost.Spec.Routing.TLS != nil {
 				ingress.Spec.TLS = append(ingress.Spec.TLS, networkingv1.IngressTLS{
-					SecretName: hostController.Spec.Routing.TLS.SecretRef.Name,
+					SecretName: internalHost.Spec.Routing.TLS.SecretRef.Name,
 				})
 			}
 
-			return ctrl.SetControllerReference(hostController, ingress, r.Scheme)
+			return ctrl.SetControllerReference(internalHost, ingress, r.Scheme)
 		},
 	)
 
 	if err != nil {
 		kdexv1alpha1.SetConditions(
-			&hostController.Status.Conditions,
+			&internalHost.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
 				Degraded:    metav1.ConditionTrue,
 				Progressing: metav1.ConditionFalse,
@@ -693,18 +693,18 @@ func (r *KDexHostControllerReconciler) createOrUpdateIngress(
 	return op, nil
 }
 
-func (r *KDexHostControllerReconciler) createOrUpdateHTTPRoute(
+func (r *KDexInternalHostReconciler) createOrUpdateHTTPRoute(
 	_ context.Context,
-	_ *kdexv1alpha1.KDexHostController,
+	_ *kdexv1alpha1.KDexInternalHost,
 	_ *kdexv1alpha1.KDexTheme,
 	_ *kdexv1alpha1.KDexHostPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	return controllerutil.OperationResultNone, nil
 }
 
-func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
+func (r *KDexInternalHostReconciler) createOrUpdatePackagesDeployment(
 	ctx context.Context,
-	hostController *kdexv1alpha1.KDexHostController,
+	internalHost *kdexv1alpha1.KDexInternalHost,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	if hostPackageReferences == nil {
@@ -714,7 +714,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      hostPackageReferences.Name,
-			Namespace: hostController.Namespace,
+			Namespace: internalHost.Namespace,
 		},
 	}
 
@@ -744,7 +744,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 			foundCorsDomainsEnv := false
 			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
 				if value.Name == "CORS_DOMAINS" {
-					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(hostController.Spec.Routing.Domains)
+					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(internalHost.Spec.Routing.Domains)
 					foundCorsDomainsEnv = true
 				}
 			}
@@ -752,7 +752,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 			if !foundCorsDomainsEnv {
 				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 					Name:  "CORS_DOMAINS",
-					Value: utils.DomainsToMatcher(hostController.Spec.Routing.Domains),
+					Value: utils.DomainsToMatcher(internalHost.Spec.Routing.Domains),
 				})
 			}
 
@@ -765,13 +765,13 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 				}
 			}
 
-			return ctrl.SetControllerReference(hostController, deployment, r.Scheme)
+			return ctrl.SetControllerReference(internalHost, deployment, r.Scheme)
 		},
 	)
 
 	if err != nil {
 		kdexv1alpha1.SetConditions(
-			&hostController.Status.Conditions,
+			&internalHost.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
 				Degraded:    metav1.ConditionTrue,
 				Progressing: metav1.ConditionFalse,
@@ -787,9 +787,9 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesDeployment(
 	return op, nil
 }
 
-func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
+func (r *KDexInternalHostReconciler) createOrUpdatePackagesService(
 	ctx context.Context,
-	hostController *kdexv1alpha1.KDexHostController,
+	internalHost *kdexv1alpha1.KDexInternalHost,
 	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	if hostPackageReferences == nil {
@@ -799,7 +799,7 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      hostPackageReferences.Name,
-			Namespace: hostController.Namespace,
+			Namespace: internalHost.Namespace,
 		},
 	}
 
@@ -826,13 +826,13 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 				service.Spec.Selector["kdex.dev/packages"] = hostPackageReferences.Name
 			}
 
-			return ctrl.SetControllerReference(hostController, service, r.Scheme)
+			return ctrl.SetControllerReference(internalHost, service, r.Scheme)
 		},
 	)
 
 	if err != nil {
 		kdexv1alpha1.SetConditions(
-			&hostController.Status.Conditions,
+			&internalHost.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
 				Degraded:    metav1.ConditionTrue,
 				Progressing: metav1.ConditionFalse,
@@ -848,9 +848,9 @@ func (r *KDexHostControllerReconciler) createOrUpdatePackagesService(
 	return op, nil
 }
 
-func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
+func (r *KDexInternalHostReconciler) createOrUpdateThemeDeployment(
 	ctx context.Context,
-	hostController *kdexv1alpha1.KDexHostController,
+	internalHost *kdexv1alpha1.KDexInternalHost,
 	theme *kdexv1alpha1.KDexTheme,
 ) (controllerutil.OperationResult, error) {
 	if theme == nil {
@@ -860,7 +860,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      theme.Name,
-			Namespace: hostController.Namespace,
+			Namespace: internalHost.Namespace,
 		},
 	}
 
@@ -874,14 +874,14 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 				for key, value := range theme.Annotations {
 					deployment.Annotations[key] = value
 				}
-				for key, value := range hostController.Annotations {
+				for key, value := range internalHost.Annotations {
 					deployment.Annotations[key] = value
 				}
 				deployment.Labels = make(map[string]string)
 				for key, value := range theme.Labels {
 					deployment.Labels[key] = value
 				}
-				for key, value := range hostController.Labels {
+				for key, value := range internalHost.Labels {
 					deployment.Labels[key] = value
 				}
 
@@ -923,7 +923,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 			foundCorsDomainsEnv := false
 			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
 				if value.Name == "CORS_DOMAINS" {
-					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(hostController.Spec.Routing.Domains)
+					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(internalHost.Spec.Routing.Domains)
 					foundCorsDomainsEnv = true
 					break
 				}
@@ -932,17 +932,17 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 			if !foundCorsDomainsEnv {
 				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 					Name:  "CORS_DOMAINS",
-					Value: utils.DomainsToMatcher(hostController.Spec.Routing.Domains),
+					Value: utils.DomainsToMatcher(internalHost.Spec.Routing.Domains),
 				})
 			}
 
-			return ctrl.SetControllerReference(hostController, deployment, r.Scheme)
+			return ctrl.SetControllerReference(internalHost, deployment, r.Scheme)
 		},
 	)
 
 	if err != nil {
 		kdexv1alpha1.SetConditions(
-			&hostController.Status.Conditions,
+			&internalHost.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
 				Degraded:    metav1.ConditionTrue,
 				Progressing: metav1.ConditionFalse,
@@ -958,9 +958,9 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeDeployment(
 	return op, nil
 }
 
-func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
+func (r *KDexInternalHostReconciler) createOrUpdateThemeService(
 	ctx context.Context,
-	hostController *kdexv1alpha1.KDexHostController,
+	internalHost *kdexv1alpha1.KDexInternalHost,
 	theme *kdexv1alpha1.KDexTheme,
 ) (controllerutil.OperationResult, error) {
 	if theme == nil {
@@ -970,7 +970,7 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      theme.Name,
-			Namespace: hostController.Namespace,
+			Namespace: internalHost.Namespace,
 		},
 	}
 
@@ -984,14 +984,14 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 				for key, value := range theme.Annotations {
 					service.Annotations[key] = value
 				}
-				for key, value := range hostController.Annotations {
+				for key, value := range internalHost.Annotations {
 					service.Annotations[key] = value
 				}
 				service.Labels = make(map[string]string)
 				for key, value := range theme.Labels {
 					service.Labels[key] = value
 				}
-				for key, value := range hostController.Labels {
+				for key, value := range internalHost.Labels {
 					service.Labels[key] = value
 				}
 
@@ -1003,13 +1003,13 @@ func (r *KDexHostControllerReconciler) createOrUpdateThemeService(
 				service.Spec.Selector["kdex.dev/theme"] = theme.Name
 			}
 
-			return ctrl.SetControllerReference(hostController, service, r.Scheme)
+			return ctrl.SetControllerReference(internalHost, service, r.Scheme)
 		},
 	)
 
 	if err != nil {
 		kdexv1alpha1.SetConditions(
-			&hostController.Status.Conditions,
+			&internalHost.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
 				Degraded:    metav1.ConditionTrue,
 				Progressing: metav1.ConditionFalse,

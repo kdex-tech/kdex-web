@@ -84,7 +84,7 @@ var _ = BeforeSuite(func() {
 	}
 	opts.BindFlags(flags)
 	simulatedArgs := []string{
-		"--zap-log-level=debug",
+		"--zap-log-level=error",
 		"--zap-encoder=console",
 		"--zap-stacktrace-level=error",
 	}
@@ -93,7 +93,9 @@ var _ = BeforeSuite(func() {
 		panic(err)
 	}
 
-	logger, err := kdexlog.New(&opts, map[string]string{})
+	logger, err := kdexlog.New(&opts, map[string]string{
+		"kdexpagebinding": "2",
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -213,7 +215,7 @@ var _ = BeforeSuite(func() {
 
 	hostStore = host.NewHostStore()
 
-	hostControllerReconciler := &KDexHostControllerReconciler{
+	internalHostReconciler := &KDexInternalHostReconciler{
 		Client:              k8sManager.GetClient(),
 		ControllerNamespace: namespace,
 		Configuration:       configuration,
@@ -224,7 +226,7 @@ var _ = BeforeSuite(func() {
 		Scheme:              k8sManager.GetScheme(),
 		ServiceName:         focalHost,
 	}
-	err = hostControllerReconciler.SetupWithManager(k8sManager)
+	err = internalHostReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	pageBindingControllerReconciler := &KDexPageBindingReconciler{

@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func (r *KDexHostControllerReconciler) findHostControllersForPageBinding(
+func (r *KDexInternalHostReconciler) findInternalHostsForPageBinding(
 	ctx context.Context,
 	obj client.Object,
 ) []reconcile.Request {

@@ -110,7 +110,7 @@ func (r *KDexHostPackageReferencesReconciler) Reconcile(ctx context.Context, req
 func (r *KDexHostPackageReferencesReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	hasFocalHost := func(o client.Object) bool {
 		switch t := o.(type) {
-		case *kdexv1alpha1.KDexHostController:
+		case *kdexv1alpha1.KDexInternalHost:
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexHostPackageReferences:
 			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
