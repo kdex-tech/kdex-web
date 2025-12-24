@@ -297,7 +297,7 @@ func cleanupResources(namespace string) {
 		{&kdexv1alpha1.KDexClusterTheme{}, &kdexv1alpha1.KDexClusterThemeList{}},
 		{&kdexv1alpha1.KDexHost{}, &kdexv1alpha1.KDexHostList{}},
 		{&kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}},
-		{&kdexv1alpha1.KDexHostPackageReferences{}, &kdexv1alpha1.KDexHostPackageReferencesList{}},
+		{&kdexv1alpha1.KDexInternalPackageReferences{}, &kdexv1alpha1.KDexInternalPackageReferencesList{}},
 		{&kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}},
 		{&kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}},
 		{&kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}},

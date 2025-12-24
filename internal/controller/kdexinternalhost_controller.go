@@ -74,7 +74,7 @@ type KDexInternalHostReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts,           verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/status,    verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexhostpackagereferences,     verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpackagereferences,     verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings,              verbs=get;list;watch
 
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,           verbs=get;list;watch
@@ -229,7 +229,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		finalPackageReferences = append(finalPackageReferences, pkgRef)
 	}
 
-	hostPackageReferences := &kdexv1alpha1.KDexHostPackageReferences{
+	internalPackageReferences := &kdexv1alpha1.KDexInternalPackageReferences{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-packages", internalHost.Name),
 			Namespace: internalHost.Namespace,
@@ -239,9 +239,9 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	var importmap string
 
 	if len(finalPackageReferences) == 0 {
-		log.V(2).Info("deleting host package references", "packageReferences", hostPackageReferences.Name)
+		log.V(2).Info("deleting host package references", "packageReferences", internalPackageReferences.Name)
 
-		if err := r.Delete(ctx, hostPackageReferences); err != nil {
+		if err := r.Delete(ctx, internalPackageReferences); err != nil {
 			if client.IgnoreNotFound(err) != nil {
 				kdexv1alpha1.SetConditions(
 					&internalHost.Status.Conditions,
@@ -254,27 +254,27 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					err.Error(),
 				)
 
-				log.V(2).Info("error deleting package references", "packageReferences", hostPackageReferences.Name, "err", err)
+				log.V(2).Info("error deleting package references", "packageReferences", internalPackageReferences.Name, "err", err)
 
 				return ctrl.Result{}, err
 			}
 		}
 
-		hostPackageReferences = nil
+		internalPackageReferences = nil
 	} else {
-		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &internalHost, hostPackageReferences, finalPackageReferences)
+		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &internalHost, internalPackageReferences, finalPackageReferences)
 		if shouldReturn {
-			log.V(2).Info("package references shouldReturn", "packageReferences", hostPackageReferences.Name, "result", r1, "err", err)
+			log.V(2).Info("package references shouldReturn", "packageReferences", internalPackageReferences.Name, "result", r1, "err", err)
 
 			return r1, err
 		}
 
-		importmap = hostPackageReferences.Status.Attributes["importmap"]
+		importmap = internalPackageReferences.Status.Attributes["importmap"]
 	}
 
 	hostHandler.SetHost(&internalHost.Spec, themeAssets, scriptLibraries, importmap)
 
-	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, theme, hostPackageReferences)
+	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, theme, internalPackageReferences)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -283,7 +283,7 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		switch t := o.(type) {
 		case *kdexv1alpha1.KDexInternalHost:
 			return t.Name == r.FocalHost
-		case *kdexv1alpha1.KDexHostPackageReferences:
+		case *kdexv1alpha1.KDexInternalPackageReferences:
 			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
 		case *kdexv1alpha1.KDexInternalPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
@@ -314,7 +314,7 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Owns(&gatewayv1.HTTPRoute{}).
-		Owns(&kdexv1alpha1.KDexHostPackageReferences{}).
+		Owns(&kdexv1alpha1.KDexInternalPackageReferences{}).
 		Owns(&networkingv1.Ingress{}).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
@@ -416,14 +416,14 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
 	theme *kdexv1alpha1.KDexTheme,
-	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
+	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 ) error {
-	packagesDeploymentOp, err := r.createOrUpdatePackagesDeployment(ctx, internalHost, hostPackageReferences)
+	packagesDeploymentOp, err := r.createOrUpdatePackagesDeployment(ctx, internalHost, internalPackageReferences)
 	if err != nil {
 		return err
 	}
 
-	packagesServiceOp, err := r.createOrUpdatePackagesService(ctx, internalHost, hostPackageReferences)
+	packagesServiceOp, err := r.createOrUpdatePackagesService(ctx, internalHost, internalPackageReferences)
 	if err != nil {
 		return err
 	}
@@ -440,12 +440,12 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 
 	var ingressOrHTTPRouteOp controllerutil.OperationResult
 	if internalHost.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, internalHost, theme, hostPackageReferences)
+		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, internalHost, theme, internalPackageReferences)
 		if err != nil {
 			return err
 		}
 	} else {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, internalHost, theme, hostPackageReferences)
+		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, internalHost, theme, internalPackageReferences)
 		if err != nil {
 			return err
 		}
@@ -479,7 +479,7 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
-	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
+	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 	packageReferences []kdexv1alpha1.PackageReference,
 ) (bool, ctrl.Result, error) {
 	log := logf.FromContext(ctx)
@@ -487,34 +487,34 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 	op, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
-		hostPackageReferences,
+		internalPackageReferences,
 		func() error {
-			if hostPackageReferences.CreationTimestamp.IsZero() {
-				hostPackageReferences.Annotations = make(map[string]string)
+			if internalPackageReferences.CreationTimestamp.IsZero() {
+				internalPackageReferences.Annotations = make(map[string]string)
 				for key, value := range internalHost.Annotations {
-					hostPackageReferences.Annotations[key] = value
+					internalPackageReferences.Annotations[key] = value
 				}
-				hostPackageReferences.Labels = make(map[string]string)
+				internalPackageReferences.Labels = make(map[string]string)
 				for key, value := range internalHost.Labels {
-					hostPackageReferences.Labels[key] = value
+					internalPackageReferences.Labels[key] = value
 				}
 
-				hostPackageReferences.Labels["kdex.dev/packages"] = hostPackageReferences.Name
+				internalPackageReferences.Labels["kdex.dev/packages"] = internalPackageReferences.Name
 			}
 
-			hostPackageReferences.Spec.PackageReferences = packageReferences
+			internalPackageReferences.Spec.PackageReferences = packageReferences
 
-			return ctrl.SetControllerReference(internalHost, hostPackageReferences, r.Scheme)
+			return ctrl.SetControllerReference(internalHost, internalPackageReferences, r.Scheme)
 		},
 	)
 
 	log.V(2).Info(
 		"createOrUpdatePackageReferences",
 		"op", op,
-		"attributes", hostPackageReferences.Status.Attributes,
-		"generation", hostPackageReferences.Generation,
-		"observedGeneration", hostPackageReferences.Status.ObservedGeneration,
-		"packageReferences", hostPackageReferences.Spec.PackageReferences,
+		"attributes", internalPackageReferences.Status.Attributes,
+		"generation", internalPackageReferences.Generation,
+		"observedGeneration", internalPackageReferences.Status.ObservedGeneration,
+		"packageReferences", internalPackageReferences.Spec.PackageReferences,
 	)
 
 	if err != nil {
@@ -532,8 +532,8 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 		return true, ctrl.Result{}, err
 	}
 
-	if hostPackageReferences.Status.Attributes["image"] == "" ||
-		hostPackageReferences.Status.Attributes["importmap"] == "" {
+	if internalPackageReferences.Status.Attributes["image"] == "" ||
+		internalPackageReferences.Status.Attributes["importmap"] == "" {
 
 		kdexv1alpha1.SetConditions(
 			&internalHost.Status.Conditions,
@@ -556,7 +556,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
 	theme *kdexv1alpha1.KDexTheme,
-	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
+	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -625,7 +625,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 				})
 			}
 
-			if hostPackageReferences != nil {
+			if internalPackageReferences != nil {
 				for _, rule := range rules {
 					rule.HTTP.Paths = append(rule.HTTP.Paths,
 						networkingv1.HTTPIngressPath{
@@ -633,7 +633,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 							PathType: &pathType,
 							Backend: networkingv1.IngressBackend{
 								Service: &networkingv1.IngressServiceBackend{
-									Name: hostPackageReferences.Name,
+									Name: internalPackageReferences.Name,
 									Port: networkingv1.ServiceBackendPort{
 										Name: "server",
 									},
@@ -697,7 +697,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateHTTPRoute(
 	_ context.Context,
 	_ *kdexv1alpha1.KDexInternalHost,
 	_ *kdexv1alpha1.KDexTheme,
-	_ *kdexv1alpha1.KDexHostPackageReferences,
+	_ *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	return controllerutil.OperationResultNone, nil
 }
@@ -705,15 +705,15 @@ func (r *KDexInternalHostReconciler) createOrUpdateHTTPRoute(
 func (r *KDexInternalHostReconciler) createOrUpdatePackagesDeployment(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
-	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
+	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, error) {
-	if hostPackageReferences == nil {
+	if internalPackageReferences == nil {
 		return controllerutil.OperationResultNone, nil
 	}
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      hostPackageReferences.Name,
+			Name:      internalPackageReferences.Name,
 			Namespace: internalHost.Namespace,
 		},
 	}
@@ -725,20 +725,20 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackagesDeployment(
 		func() error {
 			if deployment.CreationTimestamp.IsZero() {
 				deployment.Annotations = make(map[string]string)
-				for key, value := range hostPackageReferences.Annotations {
+				for key, value := range internalPackageReferences.Annotations {
 					deployment.Annotations[key] = value
 				}
 				deployment.Labels = make(map[string]string)
-				for key, value := range hostPackageReferences.Labels {
+				for key, value := range internalPackageReferences.Labels {
 					deployment.Labels[key] = value
 				}
 
-				deployment.Labels["kdex.dev/packages"] = hostPackageReferences.Name
+				deployment.Labels["kdex.dev/packages"] = internalPackageReferences.Name
 
 				deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
 
-				deployment.Spec.Selector.MatchLabels["kdex.dev/packages"] = hostPackageReferences.Name
-				deployment.Spec.Template.Labels["kdex.dev/packages"] = hostPackageReferences.Name
+				deployment.Spec.Selector.MatchLabels["kdex.dev/packages"] = internalPackageReferences.Name
+				deployment.Spec.Template.Labels["kdex.dev/packages"] = internalPackageReferences.Name
 			}
 
 			foundCorsDomainsEnv := false
@@ -756,11 +756,11 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackagesDeployment(
 				})
 			}
 
-			deployment.Spec.Template.Spec.Containers[0].Name = hostPackageReferences.Name
+			deployment.Spec.Template.Spec.Containers[0].Name = internalPackageReferences.Name
 
 			for idx, value := range deployment.Spec.Template.Spec.Volumes {
 				if value.Name == "oci-image" {
-					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = hostPackageReferences.Status.Attributes["image"]
+					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = internalPackageReferences.Status.Attributes["image"]
 					deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = corev1.PullIfNotPresent
 				}
 			}
@@ -790,15 +790,15 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackagesDeployment(
 func (r *KDexInternalHostReconciler) createOrUpdatePackagesService(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
-	hostPackageReferences *kdexv1alpha1.KDexHostPackageReferences,
+	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, error) {
-	if hostPackageReferences == nil {
+	if internalPackageReferences == nil {
 		return controllerutil.OperationResultNone, nil
 	}
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      hostPackageReferences.Name,
+			Name:      internalPackageReferences.Name,
 			Namespace: internalHost.Namespace,
 		},
 	}
@@ -810,20 +810,20 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackagesService(
 		func() error {
 			if service.CreationTimestamp.IsZero() {
 				service.Annotations = make(map[string]string)
-				for key, value := range hostPackageReferences.Annotations {
+				for key, value := range internalPackageReferences.Annotations {
 					service.Annotations[key] = value
 				}
 				service.Labels = make(map[string]string)
-				for key, value := range hostPackageReferences.Labels {
+				for key, value := range internalPackageReferences.Labels {
 					service.Labels[key] = value
 				}
 
-				service.Labels["kdex.dev/packages"] = hostPackageReferences.Name
+				service.Labels["kdex.dev/packages"] = internalPackageReferences.Name
 
 				service.Spec = *r.getMemoizedService().DeepCopy()
 
 				service.Spec.Selector = make(map[string]string)
-				service.Spec.Selector["kdex.dev/packages"] = hostPackageReferences.Name
+				service.Spec.Selector["kdex.dev/packages"] = internalPackageReferences.Name
 			}
 
 			return ctrl.SetControllerReference(internalHost, service, r.Scheme)

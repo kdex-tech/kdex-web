@@ -86,8 +86,8 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
-  - kdexhostpackagereferences
   - kdexinternalhosts
+  - kdexinternalpackagereferences
   - kdexinternalpagebindings
   - kdexinternaltranslations
   verbs:
@@ -101,8 +101,8 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
-  - kdexhostpackagereferences/finalizers
   - kdexinternalhosts/finalizers
+  - kdexinternalpackagereferences/finalizers
   - kdexinternalpagebindings/finalizers
   - kdexinternaltranslations/finalizers
   verbs:
@@ -110,8 +110,8 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
-  - kdexhostpackagereferences/status
   - kdexinternalhosts/status
+  - kdexinternalpackagereferences/status
   - kdexinternalpagebindings/status
   - kdexinternaltranslations/status
   verbs:
