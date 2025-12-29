@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func CollectBackend(requiredBackends []kdexv1alpha1.KDexObjectReference, obj client.Object) {
+func CollectBackend(requiredBackends *[]kdexv1alpha1.KDexObjectReference, obj client.Object) {
 	if obj == nil {
 		return
 	}
@@ -48,14 +48,14 @@ func CollectBackend(requiredBackends []kdexv1alpha1.KDexObjectReference, obj cli
 			Namespace: obj.GetNamespace(),
 		}
 		found := false
-		for _, rb := range requiredBackends {
+		for _, rb := range *requiredBackends {
 			if rb.Name == ref.Name && rb.Kind == ref.Kind && rb.Namespace == ref.Namespace {
 				found = true
 				break
 			}
 		}
 		if !found {
-			requiredBackends = append(requiredBackends, ref)
+			*requiredBackends = append(*requiredBackends, ref)
 		}
 	}
 }
