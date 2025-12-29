@@ -211,7 +211,7 @@ func main() {
 	}
 
 	conf := configuration.LoadConfiguration(configFile, scheme)
-	hostStore := host.NewHostStore()
+	hostHandler := host.NewHostHandler(focalHost, logger)
 	requeueDelay := time.Duration(requeueDelaySeconds) * time.Second
 
 	if err := (&controller.KDexInternalHostReconciler{
@@ -219,7 +219,7 @@ func main() {
 		ControllerNamespace: controllerNamespace,
 		Configuration:       conf,
 		FocalHost:           focalHost,
-		HostStore:           hostStore,
+		HostHandler:         hostHandler,
 		Port:                webserverPort(webserverAddr),
 		RequeueDelay:        requeueDelay,
 		Scheme:              mgr.GetScheme(),
@@ -232,7 +232,7 @@ func main() {
 		Client:              mgr.GetClient(),
 		ControllerNamespace: controllerNamespace,
 		FocalHost:           focalHost,
-		HostStore:           hostStore,
+		HostHandler:         hostHandler,
 		RequeueDelay:        requeueDelay,
 		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
@@ -243,7 +243,7 @@ func main() {
 		Client:              mgr.GetClient(),
 		ControllerNamespace: controllerNamespace,
 		FocalHost:           focalHost,
-		HostStore:           hostStore,
+		HostHandler:         hostHandler,
 		RequeueDelay:        requeueDelay,
 		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
@@ -274,7 +274,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	srv := server.New(webserverAddr, hostStore)
+	srv := server.New(webserverAddr, hostHandler)
 
 	go func() {
 		setupLog.Info("starting web server")

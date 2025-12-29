@@ -77,12 +77,12 @@ func ResolveHost(
 	objectConditions *[]metav1.Condition,
 	hostRef *corev1.LocalObjectReference,
 	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexHost, bool, ctrl.Result, error) {
+) (*kdexv1alpha1.KDexInternalHost, bool, ctrl.Result, error) {
 	if hostRef == nil {
 		return nil, false, ctrl.Result{}, nil
 	}
 
-	var host kdexv1alpha1.KDexHost
+	var host kdexv1alpha1.KDexInternalHost
 	hostName := types.NamespacedName{
 		Name:      hostRef.Name,
 		Namespace: object.GetNamespace(),

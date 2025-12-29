@@ -21,6 +21,45 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+func CollectBackend(requiredBackends []kdexv1alpha1.KDexObjectReference, obj client.Object) {
+	if obj == nil {
+		return
+	}
+	var ingressPath string
+	switch v := obj.(type) {
+	case *kdexv1alpha1.KDexApp:
+		ingressPath = v.Spec.IngressPath
+	case *kdexv1alpha1.KDexClusterApp:
+		ingressPath = v.Spec.IngressPath
+	case *kdexv1alpha1.KDexScriptLibrary:
+		ingressPath = v.Spec.IngressPath
+	case *kdexv1alpha1.KDexClusterScriptLibrary:
+		ingressPath = v.Spec.IngressPath
+	case *kdexv1alpha1.KDexTheme:
+		ingressPath = v.Spec.IngressPath
+	case *kdexv1alpha1.KDexClusterTheme:
+		ingressPath = v.Spec.IngressPath
+	}
+
+	if ingressPath != "" {
+		ref := kdexv1alpha1.KDexObjectReference{
+			Kind:      obj.GetObjectKind().GroupVersionKind().Kind,
+			Name:      obj.GetName(),
+			Namespace: obj.GetNamespace(),
+		}
+		found := false
+		for _, rb := range requiredBackends {
+			if rb.Name == ref.Name && rb.Kind == ref.Kind && rb.Namespace == ref.Namespace {
+				found = true
+				break
+			}
+		}
+		if !found {
+			requiredBackends = append(requiredBackends, ref)
+		}
+	}
+}
+
 var LikeNamedHandler = handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 	return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: o.GetName()}}}
 })

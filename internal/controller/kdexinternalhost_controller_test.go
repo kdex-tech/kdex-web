@@ -41,12 +41,14 @@ var _ = Describe("KDexInternalHost Controller", func() {
 					Name:      focalHost,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexHostSpec{
-					BrandName:    "KDex Tech",
-					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-					Organization: "KDex Tech Inc.",
-					Routing: kdexv1alpha1.Routing{
-						Domains: []string{"foo.bar"},
+				Spec: kdexv1alpha1.KDexInternalHostSpec{
+					KDexHostSpec: kdexv1alpha1.KDexHostSpec{
+						BrandName:    "KDex Tech",
+						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+						Organization: "KDex Tech Inc.",
+						Routing: kdexv1alpha1.Routing{
+							Domains: []string{"foo.bar"},
+						},
 					},
 				},
 			}

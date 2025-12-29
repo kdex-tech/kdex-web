@@ -58,7 +58,7 @@ var (
 	cancel          context.CancelFunc
 	testEnv         *envtest.Environment
 	cfg             *rest.Config
-	hostStore       *host.HostStore
+	hostHandler     *host.HostHandler
 	k8sClient       client.Client
 	focalHost       string
 	namespace       string
@@ -171,6 +171,7 @@ var _ = BeforeSuite(func() {
 	configuration := configuration.LoadConfiguration("/config.yaml", scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
+	hostHandler = host.NewHostHandler(focalHost, logger)
 	requeueDelay := 2 * time.Second
 
 	mockPageArchetypeReconciler := &MockPageArchetypeReconciler{
@@ -213,14 +214,12 @@ var _ = BeforeSuite(func() {
 	err = mockScriptLibraryReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
-	hostStore = host.NewHostStore()
-
 	internalHostReconciler := &KDexInternalHostReconciler{
 		Client:              k8sManager.GetClient(),
 		ControllerNamespace: namespace,
 		Configuration:       configuration,
 		FocalHost:           focalHost,
-		HostStore:           hostStore,
+		HostHandler:         hostHandler,
 		Port:                8090,
 		RequeueDelay:        requeueDelay,
 		Scheme:              k8sManager.GetScheme(),
@@ -233,7 +232,7 @@ var _ = BeforeSuite(func() {
 		Client:              k8sManager.GetClient(),
 		ControllerNamespace: namespace,
 		FocalHost:           focalHost,
-		HostStore:           hostStore,
+		HostHandler:         hostHandler,
 		RequeueDelay:        requeueDelay,
 		Scheme:              k8sManager.GetScheme(),
 	}
@@ -244,7 +243,7 @@ var _ = BeforeSuite(func() {
 		Client:              k8sClient,
 		ControllerNamespace: namespace,
 		FocalHost:           focalHost,
-		HostStore:           hostStore,
+		HostHandler:         hostHandler,
 		RequeueDelay:        requeueDelay,
 		Scheme:              k8sClient.Scheme(),
 	}

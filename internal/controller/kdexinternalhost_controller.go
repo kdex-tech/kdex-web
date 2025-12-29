@@ -45,8 +45,7 @@ import (
 )
 
 const (
-	internalHostFinalizerName = "kdex.dev/kdex-web-internal-host-finalizer"
-	hostIndexKey              = "spec.hostRef.name"
+	hostIndexKey = "spec.hostRef.name"
 )
 
 // KDexInternalHostReconciler reconciles a KDexInternalHost object
@@ -55,7 +54,7 @@ type KDexInternalHostReconciler struct {
 	Configuration       configuration.NexusConfiguration
 	ControllerNamespace string
 	FocalHost           string
-	HostStore           *host.HostStore
+	HostHandler         *host.HostHandler
 	Port                int32
 	RequeueDelay        time.Duration
 	Scheme              *runtime.Scheme
@@ -117,26 +116,6 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log.V(1).Info("status", "status", internalHost.Status, "err", err, "res", res)
 	}()
 
-	if internalHost.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&internalHost, internalHostFinalizerName) {
-			controllerutil.AddFinalizer(&internalHost, internalHostFinalizerName)
-			if err := r.Update(ctx, &internalHost); err != nil {
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{Requeue: true}, nil
-		}
-	} else {
-		if controllerutil.ContainsFinalizer(&internalHost, internalHostFinalizerName) {
-			r.HostStore.Delete(internalHost.Name)
-
-			controllerutil.RemoveFinalizer(&internalHost, internalHostFinalizerName)
-			if err := r.Update(ctx, &internalHost); err != nil {
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
-	}
-
 	kdexv1alpha1.SetConditions(
 		&internalHost.Status.Conditions,
 		kdexv1alpha1.ConditionStatuses{
@@ -153,17 +132,42 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return r1, err
 	}
 
-	var theme *kdexv1alpha1.KDexTheme
+	var scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec
 	var themeAssets []kdexv1alpha1.Asset
 
 	if themeObj != nil {
 		internalHost.Status.Attributes["theme.generation"] = fmt.Sprintf("%d", themeObj.GetGeneration())
 
-		theme = themeObj.(*kdexv1alpha1.KDexTheme)
-		themeAssets = theme.Spec.Assets
-	}
+		var themeSpec *kdexv1alpha1.KDexThemeSpec
+		switch v := themeObj.(type) {
+		case *kdexv1alpha1.KDexTheme:
+			themeSpec = &v.Spec
+		case *kdexv1alpha1.KDexClusterTheme:
+			themeSpec = &v.Spec
+		}
 
-	var scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec
+		themeAssets = themeSpec.Assets
+
+		themeScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, themeSpec.ScriptLibraryRef, r.RequeueDelay)
+		if shouldReturn {
+			return r1, err
+		}
+
+		if themeScriptLibraryObj != nil {
+			internalHost.Status.Attributes["theme.scriptLibrary.generation"] = fmt.Sprintf("%d", themeScriptLibraryObj.GetGeneration())
+
+			var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
+
+			switch v := themeScriptLibraryObj.(type) {
+			case *kdexv1alpha1.KDexScriptLibrary:
+				scriptLibrary = v.Spec
+			case *kdexv1alpha1.KDexClusterScriptLibrary:
+				scriptLibrary = v.Spec
+			}
+
+			scriptLibraries = append(scriptLibraries, scriptLibrary)
+		}
+	}
 
 	scriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, internalHost.Spec.ScriptLibraryRef, r.RequeueDelay)
 	if shouldReturn {
@@ -185,30 +189,6 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		scriptLibraries = append(scriptLibraries, scriptLibrary)
 	}
 
-	if theme != nil {
-		themeScriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, theme.Spec.ScriptLibraryRef, r.RequeueDelay)
-		if shouldReturn {
-			return r1, err
-		}
-
-		if themeScriptLibraryObj != nil {
-			internalHost.Status.Attributes["theme.scriptLibrary.generation"] = fmt.Sprintf("%d", themeScriptLibraryObj.GetGeneration())
-
-			var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
-
-			switch v := themeScriptLibraryObj.(type) {
-			case *kdexv1alpha1.KDexScriptLibrary:
-				scriptLibrary = v.Spec
-			case *kdexv1alpha1.KDexClusterScriptLibrary:
-				scriptLibrary = v.Spec
-			}
-
-			scriptLibraries = append(scriptLibraries, scriptLibrary)
-		}
-	}
-
-	hostHandler := r.HostStore.GetOrCreate(internalHost.Name)
-
 	allPackageReferences := []kdexv1alpha1.PackageReference{}
 	for _, scriptLibrary := range scriptLibraries {
 		if scriptLibrary.PackageReference != nil {
@@ -216,11 +196,11 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
-	for _, p := range hostHandler.Pages.List() {
+	for _, p := range r.HostHandler.Pages.List() {
 		allPackageReferences = append(allPackageReferences, p.PackageReferences...)
 	}
 
-	uniquePackageReferences := make(map[string]kdexv1alpha1.PackageReference)
+	uniquePackageReferences := map[string]kdexv1alpha1.PackageReference{}
 	for _, pkgRef := range allPackageReferences {
 		uniquePackageReferences[pkgRef.Name+"@"+pkgRef.Version] = pkgRef
 	}
@@ -273,9 +253,111 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		importmap = internalPackageReferences.Status.Attributes["importmap"]
 	}
 
-	hostHandler.SetHost(&internalHost.Spec, themeAssets, scriptLibraries, importmap)
+	r.HostHandler.SetHost(&internalHost.Spec.KDexHostSpec, themeAssets, scriptLibraries, importmap)
 
-	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, theme, internalPackageReferences)
+	backends := []resolvedBackend{}
+	for _, ref := range internalHost.Spec.RequiredBackends {
+		obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
+		if shouldReturn {
+			return r1, err
+		}
+		if obj == nil {
+			continue
+		}
+
+		var backendSpec kdexv1alpha1.Backend
+		switch v := obj.(type) {
+		case *kdexv1alpha1.KDexApp:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexClusterApp:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexScriptLibrary:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexClusterScriptLibrary:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexTheme:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexClusterTheme:
+			backendSpec = v.Spec.Backend
+		}
+
+		if backendSpec.IngressPath != "" {
+			backends = append(backends, resolvedBackend{
+				Backend:   backendSpec,
+				Kind:      obj.GetObjectKind().GroupVersionKind().Kind,
+				Name:      obj.GetName(),
+				Namespace: obj.GetNamespace(),
+			})
+		}
+	}
+
+	internalPages := &kdexv1alpha1.KDexInternalPageBindingList{}
+	if err := r.List(ctx, internalPages, client.InNamespace(internalHost.Namespace), client.MatchingFields{hostIndexKey: internalHost.Name}); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	for _, internalPage := range internalPages.Items {
+		for _, ref := range internalPage.Spec.RequiredBackends {
+			obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
+			if shouldReturn {
+				return r1, err
+			}
+
+			if obj == nil {
+				continue
+			}
+
+			var backendSpec kdexv1alpha1.Backend
+			switch v := obj.(type) {
+			case *kdexv1alpha1.KDexApp:
+				backendSpec = v.Spec.Backend
+			case *kdexv1alpha1.KDexClusterApp:
+				backendSpec = v.Spec.Backend
+			case *kdexv1alpha1.KDexScriptLibrary:
+				backendSpec = v.Spec.Backend
+			case *kdexv1alpha1.KDexClusterScriptLibrary:
+				backendSpec = v.Spec.Backend
+			case *kdexv1alpha1.KDexTheme:
+				backendSpec = v.Spec.Backend
+			case *kdexv1alpha1.KDexClusterTheme:
+				backendSpec = v.Spec.Backend
+			}
+
+			if backendSpec.IngressPath != "" {
+				backends = append(backends, resolvedBackend{
+					Backend:   backendSpec,
+					Kind:      obj.GetObjectKind().GroupVersionKind().Kind,
+					Name:      obj.GetName(),
+					Namespace: obj.GetNamespace(),
+				})
+			}
+		}
+	}
+
+	// deduplicate backends
+	backendMap := map[string]resolvedBackend{}
+	seen := map[string]bool{}
+	for _, backend := range backends {
+		key := fmt.Sprintf("%s/%s/%s", backend.Kind, backend.Name, backend.Namespace)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		backendMap[key] = backend
+	}
+	backends = []resolvedBackend{}
+	for _, backend := range backendMap {
+		backends = append(backends, backend)
+	}
+
+	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, backends)
+}
+
+type resolvedBackend struct {
+	Backend   kdexv1alpha1.Backend
+	Kind      string
+	Name      string
+	Namespace string
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -447,8 +529,8 @@ func (r *KDexInternalHostReconciler) getMemoizedService() *corev1.ServiceSpec {
 func (r *KDexInternalHostReconciler) innerReconcile(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
-	theme *kdexv1alpha1.KDexTheme,
 	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
+	backends []resolvedBackend,
 ) error {
 	packagesDeploymentOp, err := r.createOrUpdatePackagesDeployment(ctx, internalHost, internalPackageReferences)
 	if err != nil {
@@ -460,24 +542,29 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 		return err
 	}
 
-	themeDeploymentOp, err := r.createOrUpdateThemeDeployment(ctx, internalHost, theme)
-	if err != nil {
-		return err
+	for _, rb := range backends {
+		_, err := r.createOrUpdateBackendDeployment(ctx, internalHost, rb.Name, rb.Kind, rb.Backend)
+		if err != nil {
+			return err
+		}
+		_, err = r.createOrUpdateBackendService(ctx, internalHost, rb.Name, rb.Kind)
+		if err != nil {
+			return err
+		}
 	}
 
-	themeServiceOp, err := r.createOrUpdateThemeService(ctx, internalHost, theme)
-	if err != nil {
+	if err := r.cleanupObsoleteBackends(ctx, internalHost, backends); err != nil {
 		return err
 	}
 
 	var ingressOrHTTPRouteOp controllerutil.OperationResult
 	if internalHost.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, internalHost, theme, internalPackageReferences)
+		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, internalHost, backends, internalPackageReferences)
 		if err != nil {
 			return err
 		}
 	} else {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, internalHost, theme, internalPackageReferences)
+		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, internalHost, backends, internalPackageReferences)
 		if err != nil {
 			return err
 		}
@@ -500,8 +587,6 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 		"reconciled",
 		"packagesDeploymentOp", packagesDeploymentOp,
 		"packagesServiceOp", packagesServiceOp,
-		"themeDeploymentOp", themeDeploymentOp,
-		"themeServiceOp", themeServiceOp,
 		"ingressOrHTTPRouteOp", ingressOrHTTPRouteOp,
 	)
 
@@ -587,7 +672,7 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
-	theme *kdexv1alpha1.KDexTheme,
+	backends []resolvedBackend,
 	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	ingress := &networkingv1.Ingress{
@@ -676,15 +761,15 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 				}
 			}
 
-			if theme != nil {
+			for _, rb := range backends {
 				for _, rule := range rules {
 					rule.HTTP.Paths = append(rule.HTTP.Paths,
 						networkingv1.HTTPIngressPath{
-							Path:     theme.Spec.IngressPath,
+							Path:     rb.Backend.IngressPath,
 							PathType: &pathType,
 							Backend: networkingv1.IngressBackend{
 								Service: &networkingv1.IngressServiceBackend{
-									Name: theme.Name,
+									Name: rb.Name,
 									Port: networkingv1.ServiceBackendPort{
 										Name: "server",
 									},
@@ -728,7 +813,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 func (r *KDexInternalHostReconciler) createOrUpdateHTTPRoute(
 	_ context.Context,
 	_ *kdexv1alpha1.KDexInternalHost,
-	_ *kdexv1alpha1.KDexTheme,
+	_ []resolvedBackend,
 	_ *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	return controllerutil.OperationResultNone, nil
@@ -880,18 +965,16 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackagesService(
 	return op, nil
 }
 
-func (r *KDexInternalHostReconciler) createOrUpdateThemeDeployment(
+func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
-	theme *kdexv1alpha1.KDexTheme,
+	name string,
+	kind string,
+	backend kdexv1alpha1.Backend,
 ) (controllerutil.OperationResult, error) {
-	if theme == nil {
-		return controllerutil.OperationResultNone, nil
-	}
-
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      theme.Name,
+			Name:      name,
 			Namespace: internalHost.Namespace,
 		},
 	}
@@ -903,51 +986,47 @@ func (r *KDexInternalHostReconciler) createOrUpdateThemeDeployment(
 		func() error {
 			if deployment.CreationTimestamp.IsZero() {
 				deployment.Annotations = make(map[string]string)
-				for key, value := range theme.Annotations {
-					deployment.Annotations[key] = value
-				}
 				for key, value := range internalHost.Annotations {
 					deployment.Annotations[key] = value
 				}
 				deployment.Labels = make(map[string]string)
-				for key, value := range theme.Labels {
-					deployment.Labels[key] = value
-				}
 				for key, value := range internalHost.Labels {
 					deployment.Labels[key] = value
 				}
 
-				deployment.Labels["kdex.dev/theme"] = theme.Name
+				deployment.Labels["kdex.dev/backend"] = name
+				deployment.Labels["kdex.dev/host"] = internalHost.Name
+				deployment.Labels["kdex.dev/kind"] = kind
 
 				deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
 
-				deployment.Spec.Selector.MatchLabels["kdex.dev/theme"] = theme.Name
-				deployment.Spec.Template.Labels["kdex.dev/theme"] = theme.Name
+				deployment.Spec.Selector.MatchLabels["kdex.dev/backend"] = name
+				deployment.Spec.Template.Labels["kdex.dev/backend"] = name
 			}
 
-			deployment.Spec.Template.Spec.Containers[0].Name = theme.Name
+			deployment.Spec.Template.Spec.Containers[0].Name = name
 
-			if len(theme.Spec.ImagePullSecrets) > 0 {
-				deployment.Spec.Template.Spec.ImagePullSecrets = append(r.getMemoizedDeployment().Template.Spec.ImagePullSecrets, theme.Spec.ImagePullSecrets...)
+			if len(backend.ImagePullSecrets) > 0 {
+				deployment.Spec.Template.Spec.ImagePullSecrets = append(r.getMemoizedDeployment().Template.Spec.ImagePullSecrets, backend.ImagePullSecrets...)
 			}
 
-			if theme.Spec.Replicas != nil {
-				deployment.Spec.Replicas = theme.Spec.Replicas
+			if backend.Replicas != nil {
+				deployment.Spec.Replicas = backend.Replicas
 			}
 
-			if theme.Spec.Resources.Size() > 0 {
-				deployment.Spec.Template.Spec.Containers[0].Resources = theme.Spec.Resources
+			if backend.Resources.Size() > 0 {
+				deployment.Spec.Template.Spec.Containers[0].Resources = backend.Resources
 			}
 
-			if theme.Spec.ServerImage != "" {
-				deployment.Spec.Template.Spec.Containers[0].Image = theme.Spec.ServerImage
-				deployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = theme.Spec.ServerImagePullPolicy
+			if backend.ServerImage != "" {
+				deployment.Spec.Template.Spec.Containers[0].Image = backend.ServerImage
+				deployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = backend.ServerImagePullPolicy
 			}
 
 			for idx, value := range deployment.Spec.Template.Spec.Volumes {
 				if value.Name == "oci-image" {
-					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = theme.Spec.StaticImage
-					deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = theme.Spec.StaticImagePullPolicy
+					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = backend.StaticImage
+					deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = backend.StaticImagePullPolicy
 					break
 				}
 			}
@@ -990,18 +1069,15 @@ func (r *KDexInternalHostReconciler) createOrUpdateThemeDeployment(
 	return op, nil
 }
 
-func (r *KDexInternalHostReconciler) createOrUpdateThemeService(
+func (r *KDexInternalHostReconciler) createOrUpdateBackendService(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
-	theme *kdexv1alpha1.KDexTheme,
+	name string,
+	kind string,
 ) (controllerutil.OperationResult, error) {
-	if theme == nil {
-		return controllerutil.OperationResultNone, nil
-	}
-
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      theme.Name,
+			Name:      name,
 			Namespace: internalHost.Namespace,
 		},
 	}
@@ -1013,26 +1089,22 @@ func (r *KDexInternalHostReconciler) createOrUpdateThemeService(
 		func() error {
 			if service.CreationTimestamp.IsZero() {
 				service.Annotations = make(map[string]string)
-				for key, value := range theme.Annotations {
-					service.Annotations[key] = value
-				}
 				for key, value := range internalHost.Annotations {
 					service.Annotations[key] = value
 				}
 				service.Labels = make(map[string]string)
-				for key, value := range theme.Labels {
-					service.Labels[key] = value
-				}
 				for key, value := range internalHost.Labels {
 					service.Labels[key] = value
 				}
 
-				service.Labels["kdex.dev/theme"] = theme.Name
+				service.Labels["kdex.dev/backend"] = name
+				service.Labels["kdex.dev/host"] = internalHost.Name
+				service.Labels["kdex.dev/kind"] = kind
 
 				service.Spec = *r.getMemoizedService().DeepCopy()
 
 				service.Spec.Selector = make(map[string]string)
-				service.Spec.Selector["kdex.dev/theme"] = theme.Name
+				service.Spec.Selector["kdex.dev/backend"] = name
 			}
 
 			return ctrl.SetControllerReference(internalHost, service, r.Scheme)
@@ -1055,4 +1127,49 @@ func (r *KDexInternalHostReconciler) createOrUpdateThemeService(
 	}
 
 	return op, nil
+}
+
+func (r *KDexInternalHostReconciler) cleanupObsoleteBackends(
+	ctx context.Context,
+	internalHost *kdexv1alpha1.KDexInternalHost,
+	backends []resolvedBackend,
+) error {
+	backendNames := make(map[string]bool)
+	for _, rb := range backends {
+		backendNames[rb.Name] = true
+	}
+
+	labelSelector := client.MatchingLabels{
+		"kdex.dev/host": internalHost.Name,
+	}
+
+	// Cleanup Deployments
+	deploymentList := &appsv1.DeploymentList{}
+	if err := r.List(ctx, deploymentList, client.InNamespace(internalHost.Namespace), labelSelector); err != nil {
+		return err
+	}
+
+	for _, deployment := range deploymentList.Items {
+		if !backendNames[deployment.Name] {
+			if err := r.Delete(ctx, &deployment); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Cleanup Services
+	serviceList := &corev1.ServiceList{}
+	if err := r.List(ctx, serviceList, client.InNamespace(internalHost.Namespace), labelSelector); err != nil {
+		return err
+	}
+
+	for _, service := range serviceList.Items {
+		if !backendNames[service.Name] {
+			if err := r.Delete(ctx, &service); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

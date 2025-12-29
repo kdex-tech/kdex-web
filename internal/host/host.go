@@ -143,7 +143,7 @@ func (th *HostHandler) L10nRenderLocked(
 	l language.Tag,
 ) (string, error) {
 	renderer := render.Renderer{
-		BasePath:        handler.Page.Spec.BasePath,
+		BasePath:        handler.Page.BasePath,
 		BrandName:       th.host.BrandName,
 		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: th.defaultLanguage,
@@ -159,11 +159,11 @@ func (th *HostHandler) L10nRenderLocked(
 		Navigations:     handler.NavigationToHTMLMap(),
 		Organization:    th.host.Organization,
 		PageMap:         pageMap,
-		PatternPath:     handler.Page.Spec.PatternPath,
+		PatternPath:     handler.Page.PatternPath,
 		TemplateContent: handler.MainTemplate,
-		TemplateName:    handler.Page.Name,
+		TemplateName:    handler.Name,
 		Theme:           th.host.Assets.String(),
-		Title:           handler.Page.Spec.Label,
+		Title:           handler.Page.Label,
 	}
 
 	return renderer.RenderPage()
@@ -177,7 +177,7 @@ func (th *HostHandler) L10nRendersLocked(
 	for _, l := range th.Translations.Languages() {
 		rendered, err := th.L10nRenderLocked(handler, pageMaps[l], l)
 		if err != nil {
-			th.log.Error(err, "failed to render page for language", "page", handler.Page.Name, "language", l)
+			th.log.Error(err, "failed to render page for language", "page", handler.Name, "language", l)
 			continue
 		}
 		l10nRenders[l.String()] = rendered
@@ -276,8 +276,8 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	fmt.Fprintf(
 		&buffer,
 		kdexUIMetaTemplate,
-		handler.Page.Spec.BasePath,
-		handler.Page.Spec.PatternPath,
+		handler.Page.BasePath,
+		handler.Page.PatternPath,
 	)
 
 	// data-check-batch-endpoint="/~/check/batch"
@@ -345,11 +345,10 @@ func (th *HostHandler) RebuildMux() {
 	}
 
 	for _, ph := range pageHandlers {
-		basePath := ph.Page.Spec.BasePath
-		name := ph.Page.Name
+		basePath := ph.Page.BasePath
 
 		if basePath == "" {
-			th.log.V(1).Info("somehow page has empty basePath, skipping", "page", name)
+			th.log.V(1).Info("somehow page has empty basePath, skipping", "page", ph.Name)
 			continue
 		}
 
@@ -357,8 +356,8 @@ func (th *HostHandler) RebuildMux() {
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			// variables captured in scope of handler
-			name := name
-			basePath := basePath
+			name := ph.Name
+			basePath := ph.Page.BasePath
 			l10nRenders := l10nRenders
 			th := th
 
@@ -385,7 +384,7 @@ func (th *HostHandler) RebuildMux() {
 		mux.HandleFunc("GET "+basePath, handler)
 		mux.HandleFunc("GET /{l10n}"+basePath, handler)
 
-		patternPath := ph.Page.Spec.PatternPath
+		patternPath := ph.Page.PatternPath
 		if patternPath != "" {
 			mux.HandleFunc("GET "+patternPath, handler)
 			mux.HandleFunc("GET /{l10n}"+patternPath, handler)
@@ -465,7 +464,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		var pageHandler *page.PageHandler
 
 		for _, ph := range th.Pages.List() {
-			if ph.Page.Spec.BasePath == basePath {
+			if ph.Page.BasePath == basePath {
 				pageHandler = &ph
 				break
 			}
@@ -500,7 +499,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		pageMap := *rootEntry.Children
 
 		renderer := render.Renderer{
-			BasePath:        pageHandler.Page.Spec.BasePath,
+			BasePath:        pageHandler.Page.BasePath,
 			BrandName:       th.host.BrandName,
 			DefaultLanguage: th.defaultLanguage,
 			Language:        langTag.String(),
@@ -509,8 +508,8 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 			MessagePrinter:  th.messagePrinterLocked(langTag),
 			Organization:    th.host.Organization,
 			PageMap:         pageMap,
-			PatternPath:     pageHandler.Page.Spec.PatternPath,
-			Title:           pageHandler.Page.Spec.Label,
+			PatternPath:     pageHandler.Page.PatternPath,
+			Title:           pageHandler.Page.Label,
 		}
 
 		templateData, err := renderer.TemplateData()

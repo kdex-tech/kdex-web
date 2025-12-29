@@ -5,16 +5,14 @@ import (
 )
 
 type PageHandler struct {
-	// root object
-	Page *kdexv1alpha1.KDexInternalPageBinding
-
-	// dereferenced resources
 	Content           map[string]PackedContent
 	Footer            string
 	Header            string
 	MainTemplate      string
+	Name              string
 	Navigations       map[string]string
 	PackageReferences []kdexv1alpha1.PackageReference
+	Page              *kdexv1alpha1.KDexPageBindingSpec
 	Scripts           []kdexv1alpha1.ScriptDef
 }
 

@@ -9,7 +9,6 @@ import (
 	"golang.org/x/text/message/catalog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
 )
@@ -31,17 +30,11 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 			isDefaultLanguage: true,
 			items: &map[string]PageHandler{
 				"foo": {
-					Page: &kdexv1alpha1.KDexInternalPageBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
-						},
-						Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-							KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-								Label: "Foo",
-								Paths: kdexv1alpha1.Paths{
-									BasePath: "/foo",
-								},
-							},
+					Name: "foo",
+					Page: &kdexv1alpha1.KDexPageBindingSpec{
+						Label: "Foo",
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/foo",
 						},
 					},
 				},
@@ -61,53 +54,35 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 			isDefaultLanguage: true,
 			items: &map[string]PageHandler{
 				"foo": {
-					Page: &kdexv1alpha1.KDexInternalPageBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
+					Name: "foo",
+					Page: &kdexv1alpha1.KDexPageBindingSpec{
+						Label: "Foo",
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/foo",
 						},
-						Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-							KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-								Label: "Foo",
-								Paths: kdexv1alpha1.Paths{
-									BasePath: "/foo",
-								},
-								ParentPageRef: &corev1.LocalObjectReference{
-									Name: "home",
-								},
-							},
+						ParentPageRef: &corev1.LocalObjectReference{
+							Name: "home",
 						},
 					},
 				},
 				"home": {
-					Page: &kdexv1alpha1.KDexInternalPageBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "home",
-						},
-						Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-							KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-								Label: "Home",
-								Paths: kdexv1alpha1.Paths{
-									BasePath: "/home",
-								},
-							},
+					Name: "home",
+					Page: &kdexv1alpha1.KDexPageBindingSpec{
+						Label: "Home",
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/home",
 						},
 					},
 				},
 				"contact": {
-					Page: &kdexv1alpha1.KDexInternalPageBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "contact",
+					Name: "contact",
+					Page: &kdexv1alpha1.KDexPageBindingSpec{
+						Label: "Contact Us",
+						NavigationHints: &kdexv1alpha1.NavigationHints{
+							Weight: resource.MustParse("100"),
 						},
-						Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-							KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-								Label: "Contact Us",
-								NavigationHints: &kdexv1alpha1.NavigationHints{
-									Weight: resource.MustParse("100"),
-								},
-								Paths: kdexv1alpha1.Paths{
-									BasePath: "/contact",
-								},
-							},
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/contact",
 						},
 					},
 				},
@@ -143,17 +118,11 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 			isDefaultLanguage: false,
 			items: &map[string]PageHandler{
 				"foo": {
-					Page: &kdexv1alpha1.KDexInternalPageBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "foo",
-						},
-						Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-							KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-								Label: "Foo",
-								Paths: kdexv1alpha1.Paths{
-									BasePath: "/foo",
-								},
-							},
+					Name: "foo",
+					Page: &kdexv1alpha1.KDexPageBindingSpec{
+						Label: "Foo",
+						Paths: kdexv1alpha1.Paths{
+							BasePath: "/foo",
 						},
 					},
 				},

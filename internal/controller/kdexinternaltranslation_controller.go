@@ -42,7 +42,7 @@ type KDexInternalTranslationReconciler struct {
 	client.Client
 	ControllerNamespace string
 	FocalHost           string
-	HostStore           *host.HostStore
+	HostHandler         *host.HostHandler
 	RequeueDelay        time.Duration
 	Scheme              *runtime.Scheme
 }
@@ -99,11 +99,7 @@ func (r *KDexInternalTranslationReconciler) Reconcile(ctx context.Context, req c
 		}
 	} else {
 		if controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
-			hostHandler, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
-
-			if ok {
-				hostHandler.RemoveTranslation(translation.Name)
-			}
+			r.HostHandler.RemoveTranslation(translation.Name)
 
 			controllerutil.RemoveFinalizer(&translation, translationFinalizerName)
 			if err := r.Update(ctx, &translation); err != nil {
@@ -123,24 +119,12 @@ func (r *KDexInternalTranslationReconciler) Reconcile(ctx context.Context, req c
 		"Reconciling",
 	)
 
-	hostHandler, ok := r.HostStore.Get(translation.Spec.HostRef.Name)
-
-	if !ok {
-		kdexv1alpha1.SetConditions(
-			&translation.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionTrue,
-				Progressing: metav1.ConditionFalse,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconcileError,
-			"Host not found",
-		)
-
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+	_, shouldReturn, r1, err := ResolveHost(ctx, r.Client, &translation, &translation.Status.Conditions, &translation.Spec.HostRef, r.RequeueDelay)
+	if shouldReturn {
+		return r1, err
 	}
 
-	hostHandler.AddOrUpdateTranslation(translation.Name, &translation.Spec)
+	r.HostHandler.AddOrUpdateTranslation(translation.Name, &translation.Spec)
 
 	kdexv1alpha1.SetConditions(
 		&translation.Status.Conditions,
@@ -193,6 +177,9 @@ func (r *KDexInternalTranslationReconciler) SetupWithManager(mgr ctrl.Manager) e
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexInternalTranslation{}).
 		WithEventFilter(enabledFilter).
+		Watches(
+			&kdexv1alpha1.KDexInternalHost{},
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalTranslation{}, &kdexv1alpha1.KDexInternalTranslationList{}, "{.Spec.HostRef}")).
 		WithOptions(
 			controller.TypedOptions[reconcile.Request]{
 				LogConstructor: LogConstructor("kdexinternaltranslation", mgr),

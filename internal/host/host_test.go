@@ -7,7 +7,6 @@ import (
 	G "github.com/onsi/gomega"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal/page"
 )
@@ -69,17 +68,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 				},
 			},
 			pageHandler: page.PageHandler{
-				Page: &kdexv1alpha1.KDexInternalPageBinding{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "sample-page-binding",
-					},
-					Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-						KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-							Label: "TITLE",
-							Paths: kdexv1alpha1.Paths{
-								BasePath: "/",
-							},
-						},
+				Name: "sample-page-binding",
+				Page: &kdexv1alpha1.KDexPageBindingSpec{
+					Label: "TITLE",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
 					},
 				},
 				MainTemplate: primaryTemplate,
@@ -130,17 +123,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 				},
 			},
 			pageHandler: page.PageHandler{
-				Page: &kdexv1alpha1.KDexInternalPageBinding{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "sample-render-page",
-					},
-					Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-						KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-							Label: "TITLE",
-							Paths: kdexv1alpha1.Paths{
-								BasePath: "/",
-							},
-						},
+				Name: "sample-page-binding",
+				Page: &kdexv1alpha1.KDexPageBindingSpec{
+					Label: "TITLE",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
 					},
 				},
 				MainTemplate: primaryTemplate,
@@ -191,17 +178,11 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 				},
 			},
 			pageHandler: page.PageHandler{
-				Page: &kdexv1alpha1.KDexInternalPageBinding{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "sample-render-page",
-					},
-					Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-						KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-							Label: "TITLE",
-							Paths: kdexv1alpha1.Paths{
-								BasePath: "/",
-							},
-						},
+				Name: "sample-page-binding",
+				Page: &kdexv1alpha1.KDexPageBindingSpec{
+					Label: "TITLE",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
 					},
 				},
 				MainTemplate: primaryTemplate,
@@ -268,17 +249,11 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 				},
 			},
 			pageHandler: page.PageHandler{
-				Page: &kdexv1alpha1.KDexInternalPageBinding{
-					ObjectMeta: v1.ObjectMeta{
-						Name: "sample-render-page",
-					},
-					Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-						KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-							Label: "TITLE",
-							Paths: kdexv1alpha1.Paths{
-								BasePath: "/",
-							},
-						},
+				Name: "sample-page-binding",
+				Page: &kdexv1alpha1.KDexPageBindingSpec{
+					Label: "TITLE",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
 					},
 				},
 				MainTemplate: primaryTemplate,

@@ -31,7 +31,7 @@ func (p PageHandler) NavigationToHTMLMap() map[string]string {
 	items := map[string]string{}
 
 	for navKey := range p.Navigations {
-		items[navKey] = fmt.Sprintf(navigationTemplate, navKey, navKey, p.Page.Spec.BasePath, navKey)
+		items[navKey] = fmt.Sprintf(navigationTemplate, navKey, navKey, p.Page.BasePath, navKey)
 	}
 
 	return items

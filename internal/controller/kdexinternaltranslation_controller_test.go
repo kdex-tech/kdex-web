@@ -92,13 +92,15 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
+					Spec: kdexv1alpha1.KDexInternalHostSpec{
+						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
 							},
 						},
 					},
@@ -140,18 +142,15 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexInternalTranslation{}, true)
 
-			host, ok := hostStore.Get(focalHost)
-			Expect(ok).To(BeTrue())
-
 			mp_en := message.NewPrinter(
 				language.English,
-				message.Catalog(host.Translations),
+				message.Catalog(hostHandler.Translations),
 			)
 			Expect(mp_en.Sprintf("key-1")).To(Equal("KEY_1_ENGLISH"))
 
 			mp_fr := message.NewPrinter(
 				language.French,
-				message.Catalog(host.Translations),
+				message.Catalog(hostHandler.Translations),
 			)
 			Expect(mp_fr.Sprintf("key-1")).To(Equal("KEY_1_FRENCH"))
 		})

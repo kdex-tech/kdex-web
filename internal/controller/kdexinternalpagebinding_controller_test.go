@@ -153,13 +153,15 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
+					Spec: kdexv1alpha1.KDexInternalHostSpec{
+						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
 							},
 						},
 					},
@@ -238,15 +240,17 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
+					Spec: kdexv1alpha1.KDexInternalHostSpec{
+						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
+								Strategy: kdexv1alpha1.IngressRoutingStrategy,
 							},
-							Strategy: kdexv1alpha1.IngressRoutingStrategy,
 						},
 					},
 				},
@@ -345,13 +349,15 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
+					Spec: kdexv1alpha1.KDexInternalHostSpec{
+						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
 							},
 						},
 					},
@@ -458,13 +464,15 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
+					Spec: kdexv1alpha1.KDexInternalHostSpec{
+						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
 							},
 						},
 					},
@@ -487,9 +495,6 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexInternalPageBinding{}, true)
 
-			hostHandler, ok := hostStore.Get(focalHost)
-			Expect(ok).To(BeTrue())
-
 			pageHandler, ok := hostHandler.Pages.Get(resource.Name)
 			Expect(ok).To(BeTrue())
 
@@ -509,9 +514,6 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 			)
 
 			check := func(g Gomega) {
-				hostHandler, ok = hostStore.Get(focalHost)
-				g.Expect(ok).To(BeTrue())
-
 				pageHandler, ok = hostHandler.Pages.Get(resource.Name)
 				g.Expect(ok).To(BeTrue())
 
@@ -602,13 +604,15 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
+					Spec: kdexv1alpha1.KDexInternalHostSpec{
+						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
 							},
 						},
 					},
@@ -622,9 +626,6 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexInternalPageBinding{}, true)
-
-			hostHandler, ok := hostStore.Get(focalHost)
-			Expect(ok).To(BeTrue())
 
 			pageHandler, ok := hostHandler.Pages.Get(resource.Name)
 			Expect(ok).To(BeTrue())
@@ -649,9 +650,6 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 				&kdexv1alpha1.KDexPageHeader{}, true)
 
 			check := func(g Gomega) {
-				hostHandler, ok := hostStore.Get(focalHost)
-				Expect(ok).To(BeTrue())
-
 				pageHandler, ok = hostHandler.Pages.Get(resource.Name)
 				g.Expect(ok).To(BeTrue())
 
@@ -705,13 +703,15 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
+					Spec: kdexv1alpha1.KDexInternalHostSpec{
+						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
 							},
 						},
 					},
@@ -787,13 +787,15 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 						Name:      focalHost,
 						Namespace: namespace,
 					},
-					Spec: kdexv1alpha1.KDexHostSpec{
-						BrandName:    "KDex Tech",
-						ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-						Organization: "KDex Tech Inc.",
-						Routing: kdexv1alpha1.Routing{
-							Domains: []string{
-								"example.com",
+					Spec: kdexv1alpha1.KDexInternalHostSpec{
+						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
+							BrandName:    "KDex Tech",
+							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+							Organization: "KDex Tech Inc.",
+							Routing: kdexv1alpha1.Routing{
+								Domains: []string{
+									"example.com",
+								},
 							},
 						},
 					},
