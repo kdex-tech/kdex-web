@@ -60,6 +60,7 @@ func ResolveContents(
 			Content: page.PackedContent{
 				AppName:           app.GetName(),
 				AppGeneration:     fmt.Sprintf("%d", app.GetGeneration()),
+				Attributes:        contentEntry.Attributes,
 				Content:           contentEntry.RawHTML,
 				CustomElementName: contentEntry.CustomElementName,
 				Slot:              contentEntry.Slot,

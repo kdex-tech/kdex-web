@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	customElementTemplate = `<%s id="content-%s" data-app-name="%s" data-app-generation="%s"></%s>`
+	customElementTemplate = `<%s id="content-%s" data-app-name="%s" data-app-generation="%s"%s></%s>`
 	navigationTemplate    = `<div id="navigation-%s"></div>
 <script type="text/javascript">
 fetch('/~/navigation/%s/{{ .Language }}%s')
@@ -42,5 +42,10 @@ func (r *PackedContent) ToHTML(slot string) string {
 		return fmt.Sprintf(rawHTMLTemplate, slot, r.Content)
 	}
 
-	return fmt.Sprintf(customElementTemplate, r.CustomElementName, slot, r.AppName, r.AppGeneration, r.CustomElementName)
+	attributes := ""
+	for k, v := range r.Attributes {
+		attributes += fmt.Sprintf(` %s="%s"`, k, v)
+	}
+
+	return fmt.Sprintf(customElementTemplate, r.CustomElementName, slot, r.AppName, r.AppGeneration, attributes, r.CustomElementName)
 }

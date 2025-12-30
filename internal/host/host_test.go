@@ -201,6 +201,47 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			lang: "en",
 			want: []string{"FOOTER", "key", "/~/navigation/main/en/", "MAIN", "TITLE"},
 		},
+		{
+			name: "basic web component",
+			host: THost{
+				name: "sample-host",
+				host: kdexv1alpha1.KDexHostSpec{
+					BrandName:    "KDex Tech",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
+					},
+				},
+			},
+			pageHandler: page.PageHandler{
+				Name: "sample-page-binding",
+				Page: &kdexv1alpha1.KDexPageBindingSpec{
+					Label: "TITLE",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
+					},
+				},
+				MainTemplate: primaryTemplate,
+				Content: map[string]page.PackedContent{
+					"main": {
+						AppName:           "sample-app",
+						AppGeneration:     "1",
+						Attributes:        map[string]string{"data-test": "test"},
+						CustomElementName: "sample-element",
+						Slot:              "main",
+					},
+				},
+				Footer: "FOOTER",
+				Header: `{{ l10n "key" }}`,
+				Navigations: map[string]string{
+					"main": "NAV",
+				},
+			},
+			lang: "en",
+			want: []string{"FOOTER", "key", "/~/navigation/main/en/", `<sample-element id="content-main" data-app-name="sample-app" data-app-generation="1" data-test="test"></sample-element>`, "TITLE"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

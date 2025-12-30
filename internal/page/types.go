@@ -19,6 +19,7 @@ type PageHandler struct {
 type PackedContent struct {
 	AppName           string
 	AppGeneration     string
+	Attributes        map[string]string
 	Content           string
 	CustomElementName string
 	Slot              string
