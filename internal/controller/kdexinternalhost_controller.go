@@ -189,6 +189,53 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		scriptLibraries = append(scriptLibraries, scriptLibrary)
 	}
 
+	requiredBackends := []resolvedBackend{}
+	seenPaths := map[string]bool{}
+	for _, ref := range internalHost.Spec.RequiredBackends {
+		obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
+		if shouldReturn {
+			return r1, err
+		}
+		if obj == nil {
+			continue
+		}
+
+		var backendSpec kdexv1alpha1.Backend
+		switch v := obj.(type) {
+		case *kdexv1alpha1.KDexApp:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexClusterApp:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexScriptLibrary:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexClusterScriptLibrary:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexTheme:
+			backendSpec = v.Spec.Backend
+		case *kdexv1alpha1.KDexClusterTheme:
+			backendSpec = v.Spec.Backend
+		}
+
+		if seenPaths[backendSpec.IngressPath] {
+			return ctrl.Result{}, fmt.Errorf("duplicated path %s, paths must be unique across backends and pages", backendSpec.IngressPath)
+		}
+		seenPaths[backendSpec.IngressPath] = true
+
+		requiredBackends = append(requiredBackends, resolvedBackend{
+			Backend:   backendSpec,
+			Kind:      obj.GetObjectKind().GroupVersionKind().Kind,
+			Name:      obj.GetName(),
+			Namespace: obj.GetNamespace(),
+		})
+	}
+
+	for _, pageHandler := range r.HostHandler.Pages.List() {
+		if seenPaths[pageHandler.Page.BasePath] {
+			return ctrl.Result{}, fmt.Errorf("duplicated path %s, paths must be unique across backends and pages", pageHandler.Page.BasePath)
+		}
+		seenPaths[pageHandler.Page.BasePath] = true
+	}
+
 	allPackageReferences := []kdexv1alpha1.PackageReference{}
 	for _, scriptLibrary := range scriptLibraries {
 		if scriptLibrary.PackageReference != nil {
@@ -255,102 +302,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	r.HostHandler.SetHost(&internalHost.Spec.KDexHostSpec, themeAssets, scriptLibraries, importmap)
 
-	backends := []resolvedBackend{}
-	for _, ref := range internalHost.Spec.RequiredBackends {
-		obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
-		if shouldReturn {
-			return r1, err
-		}
-		if obj == nil {
-			continue
-		}
-
-		var backendSpec kdexv1alpha1.Backend
-		switch v := obj.(type) {
-		case *kdexv1alpha1.KDexApp:
-			backendSpec = v.Spec.Backend
-		case *kdexv1alpha1.KDexClusterApp:
-			backendSpec = v.Spec.Backend
-		case *kdexv1alpha1.KDexScriptLibrary:
-			backendSpec = v.Spec.Backend
-		case *kdexv1alpha1.KDexClusterScriptLibrary:
-			backendSpec = v.Spec.Backend
-		case *kdexv1alpha1.KDexTheme:
-			backendSpec = v.Spec.Backend
-		case *kdexv1alpha1.KDexClusterTheme:
-			backendSpec = v.Spec.Backend
-		}
-
-		if backendSpec.IngressPath != "" {
-			backends = append(backends, resolvedBackend{
-				Backend:   backendSpec,
-				Kind:      obj.GetObjectKind().GroupVersionKind().Kind,
-				Name:      obj.GetName(),
-				Namespace: obj.GetNamespace(),
-			})
-		}
-	}
-
-	internalPages := &kdexv1alpha1.KDexInternalPageBindingList{}
-	if err := r.List(ctx, internalPages, client.InNamespace(internalHost.Namespace), client.MatchingFields{hostIndexKey: internalHost.Name}); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	for _, internalPage := range internalPages.Items {
-		for _, ref := range internalPage.Spec.RequiredBackends {
-			obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
-			if shouldReturn {
-				return r1, err
-			}
-
-			if obj == nil {
-				continue
-			}
-
-			var backendSpec kdexv1alpha1.Backend
-			switch v := obj.(type) {
-			case *kdexv1alpha1.KDexApp:
-				backendSpec = v.Spec.Backend
-			case *kdexv1alpha1.KDexClusterApp:
-				backendSpec = v.Spec.Backend
-			case *kdexv1alpha1.KDexScriptLibrary:
-				backendSpec = v.Spec.Backend
-			case *kdexv1alpha1.KDexClusterScriptLibrary:
-				backendSpec = v.Spec.Backend
-			case *kdexv1alpha1.KDexTheme:
-				backendSpec = v.Spec.Backend
-			case *kdexv1alpha1.KDexClusterTheme:
-				backendSpec = v.Spec.Backend
-			}
-
-			if backendSpec.IngressPath != "" {
-				backends = append(backends, resolvedBackend{
-					Backend:   backendSpec,
-					Kind:      obj.GetObjectKind().GroupVersionKind().Kind,
-					Name:      obj.GetName(),
-					Namespace: obj.GetNamespace(),
-				})
-			}
-		}
-	}
-
-	// deduplicate backends
-	backendMap := map[string]resolvedBackend{}
-	seen := map[string]bool{}
-	for _, backend := range backends {
-		key := fmt.Sprintf("%s/%s/%s", backend.Kind, backend.Name, backend.Namespace)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		backendMap[key] = backend
-	}
-	backends = []resolvedBackend{}
-	for _, backend := range backendMap {
-		backends = append(backends, backend)
-	}
-
-	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, backends)
+	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, requiredBackends)
 }
 
 type resolvedBackend struct {
