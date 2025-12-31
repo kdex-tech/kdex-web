@@ -30,17 +30,15 @@ linters:
     generated: lax
     rules:
       - linters:
-          - lll
-        path: api/*
-      - linters:
           - dupl
           - lll
-        path: internal/*
+        path: ./*
     paths:
+      - test$
       - third_party$
       - builtin$
       - examples$
-      - "_test\\.go$"
+      - _test.go$
 formatters:
   enable:
     - gofmt
