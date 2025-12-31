@@ -88,7 +88,7 @@ func (s *PageStore) BuildMenuEntries(
 			}
 
 			if entry.Children == nil {
-				entry.Children = &map[string]interface{}{}
+				entry.Children = &map[string]any{}
 			}
 
 			label := page.Label

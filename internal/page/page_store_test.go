@@ -18,7 +18,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 		name              string
 		items             *map[string]PageHandler
 		isDefaultLanguage bool
-		want              *map[string]interface{}
+		want              *map[string]any
 	}{
 		{
 			name:  "empty",
@@ -39,7 +39,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]interface{}{
+			want: &map[string]any{
 				"Foo": render.PageEntry{
 					BasePath: "/foo",
 					Href:     "/foo",
@@ -87,10 +87,10 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]interface{}{
+			want: &map[string]any{
 				"Home": render.PageEntry{
 					BasePath: "/home",
-					Children: &map[string]interface{}{
+					Children: &map[string]any{
 						"Foo": render.PageEntry{
 							BasePath: "/foo",
 							Href:     "/foo",
@@ -127,7 +127,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 					},
 				},
 			},
-			want: &map[string]interface{}{
+			want: &map[string]any{
 				"Foo": render.PageEntry{
 					BasePath: "/foo",
 					Href:     "/en/foo",

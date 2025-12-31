@@ -139,7 +139,7 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 
 func (th *HostHandler) L10nRenderLocked(
 	handler page.PageHandler,
-	pageMap map[string]interface{},
+	pageMap map[string]any,
 	l language.Tag,
 ) (string, error) {
 	renderer := render.Renderer{
@@ -171,7 +171,7 @@ func (th *HostHandler) L10nRenderLocked(
 
 func (th *HostHandler) L10nRendersLocked(
 	handler page.PageHandler,
-	pageMaps map[language.Tag]map[string]interface{},
+	pageMaps map[language.Tag]map[string]any,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, l := range th.Translations.Languages() {
@@ -236,7 +236,7 @@ func (th *HostHandler) renderAnnouncementPageLocked() map[string]string {
 			Meta:            meta,
 			Navigations:     map[string]string{},
 			Organization:    th.host.Organization,
-			PageMap:         map[string]interface{}{},
+			PageMap:         map[string]any{},
 			PatternPath:     "",
 			TemplateContent: announcementPageTemplate,
 			TemplateName:    "announcement",

@@ -251,7 +251,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
-			got, gotErr := th.L10nRenderLocked(tt.pageHandler, map[string]interface{}{}, language.Make(tt.lang))
+			got, gotErr := th.L10nRenderLocked(tt.pageHandler, map[string]any{}, language.Make(tt.lang))
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 
@@ -345,7 +345,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
-			got := th.L10nRendersLocked(tt.pageHandler, map[language.Tag]map[string]interface{}{})
+			got := th.L10nRendersLocked(tt.pageHandler, map[language.Tag]map[string]any{})
 
 			for key, values := range tt.want {
 				l10nRender := got[key]
