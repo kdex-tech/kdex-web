@@ -69,18 +69,17 @@ type KDexInternalHostReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,                       verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,                          verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,   verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,            verbs=get;list;watch;create;update;patch;delete
-
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts,           verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/status,    verbs=get;update;patch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpackagereferences,     verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings,              verbs=get;list;watch
-
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,           verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterscriptlibraries,    verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,                    verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterthemes,             verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts,             verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/finalizers,  verbs=update
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/status,      verbs=get;update;patch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpackagereferences, verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings,      verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternaltranslations,      verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,           verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,                    verbs=get;list;watch
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,            verbs=get;list;watch;create;update;patch;delete
 
 // nolint:gocyclo
 func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {

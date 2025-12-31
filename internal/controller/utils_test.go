@@ -20,29 +20,6 @@ type Pairs struct {
 	list     client.ObjectList
 }
 
-func addOrUpdateHost(
-	ctx context.Context,
-	k8sClient client.Client,
-	host kdexv1alpha1.KDexHost,
-) {
-	Eventually(func(g Gomega) error {
-		list := &kdexv1alpha1.KDexHostList{}
-		err := k8sClient.List(ctx, list, &client.ListOptions{
-			Namespace:     host.Namespace,
-			FieldSelector: fields.OneTermEqualSelector("metadata.name", host.Name),
-		})
-		g.Expect(err).NotTo(HaveOccurred())
-		if len(list.Items) > 0 {
-			existing := list.Items[0]
-			existing.Spec = host.Spec
-			g.Expect(k8sClient.Update(ctx, &existing)).To(Succeed())
-		} else {
-			g.Expect(k8sClient.Create(ctx, &host)).To(Succeed())
-		}
-		return nil
-	}).Should(Succeed())
-}
-
 func addOrUpdateInternalHost(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -295,7 +272,6 @@ func cleanupResources(namespace string) {
 		{&kdexv1alpha1.KDexClusterPageNavigation{}, &kdexv1alpha1.KDexClusterPageNavigationList{}},
 		{&kdexv1alpha1.KDexClusterScriptLibrary{}, &kdexv1alpha1.KDexClusterScriptLibraryList{}},
 		{&kdexv1alpha1.KDexClusterTheme{}, &kdexv1alpha1.KDexClusterThemeList{}},
-		{&kdexv1alpha1.KDexHost{}, &kdexv1alpha1.KDexHostList{}},
 		{&kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}},
 		{&kdexv1alpha1.KDexInternalPackageReferences{}, &kdexv1alpha1.KDexInternalPackageReferencesList{}},
 		{&kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}},
