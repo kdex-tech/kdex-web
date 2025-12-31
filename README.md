@@ -16,7 +16,7 @@
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-build docker-push IMG=<some-registry>/kdex-web:tag
+make docker-buildx-local PLATFORMS=linux/amd64 REPOSITORY=k3d-registry:5000 IMG=kdex-tech/kdex-web
 ```
 
 **NOTE:** This image ought to be published in the personal registry you specified.
