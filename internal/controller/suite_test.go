@@ -23,14 +23,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/assert/yaml"
-	"golang.org/x/mod/modfile"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -117,13 +117,8 @@ var _ = BeforeSuite(func() {
 	}
 	defer os.RemoveAll(tempDir)
 
-	kdexCrdVersion := getCRDModuleVersion()
-	array := fetchSetofCRDs(kdexCrdVersion, tempDir)
-
-	for _, path := range array {
-		fullPath := fmt.Sprintf("https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/%s/config/crd/%s", kdexCrdVersion, path)
-		addRemoteCRD(&testEnv.CRDDirectoryPaths, tempDir, fullPath)
-	}
+	crdModulePath := getCRDModulePath()
+	testEnv.CRDDirectoryPaths = append(testEnv.CRDDirectoryPaths, filepath.Join(crdModulePath, "config", "crd", "bases"))
 
 	addRemoteCRD(&testEnv.CRDDirectoryPaths, tempDir, "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml")
 
@@ -300,61 +295,13 @@ func downloadCRD(url, tempDir string) (string, error) {
 	return filePath, nil
 }
 
-func getCRDModuleVersion() string {
-	cwd, err := os.Getwd()
+func getCRDModulePath() string {
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "kdex.dev/crds")
+	out, err := cmd.Output()
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("failed to get crd module path: %w", err))
 	}
-	fmt.Fprintf(GinkgoWriter, "Current working directory: %s\n", cwd)
-
-	modBytes, err := os.ReadFile("../../go.mod")
-	if err != nil {
-		panic(err)
-	}
-
-	modFile, err := modfile.Parse("go.mod", modBytes, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, r := range modFile.Replace {
-		fmt.Printf("  Old: %s => New: %s %s\n", r.Old.Path, r.New.Path, r.New.Version)
-		if r.Old.Path == "kdex.dev/crds" {
-			return r.New.Version
-		}
-	}
-
-	panic("Couldn't find kdex-crds in go.mod")
-}
-
-func fetchSetofCRDs(kdexCrdVersion string, tempDir string) []string {
-	yamlURL := fmt.Sprintf("https://raw.githubusercontent.com/kdex-tech/kdex-crds/refs/tags/%s/config/crd/kustomization.yaml", kdexCrdVersion)
-	req, err := http.NewRequest("GET", yamlURL, nil)
-	if err != nil {
-		panic(err)
-	}
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	yamlObject := struct {
-		Resources []string `yaml:"resources"`
-	}{}
-
-	err = yaml.Unmarshal(body, &yamlObject)
-	if err != nil {
-		panic(err)
-	}
-
-	return yamlObject.Resources
+	return strings.TrimSpace(string(out))
 }
 
 // getFirstFoundEnvTestBinaryDir locates the first binary in the specified path.
