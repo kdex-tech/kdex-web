@@ -166,7 +166,7 @@ var _ = BeforeSuite(func() {
 	configuration := configuration.LoadConfiguration("/config.yaml", scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	hostHandler = host.NewHostHandler(focalHost, logger)
+	hostHandler = host.NewHostHandler(focalHost, namespace, logger)
 	requeueDelay := 2 * time.Second
 
 	mockPageArchetypeReconciler := &MockPageArchetypeReconciler{

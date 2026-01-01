@@ -19,6 +19,7 @@ import (
 
 type HostHandler struct {
 	Name                 string
+	Namespace            string
 	Mux                  *http.ServeMux
 	Pages                *page.PageStore
 	ScriptLibraries      []kdexv1alpha1.KDexScriptLibrarySpec
@@ -32,9 +33,10 @@ type HostHandler struct {
 	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
 }
 
-func NewHostHandler(name string, log logr.Logger) *HostHandler {
+func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler {
 	th := &HostHandler{
 		Name:                 name,
+		Namespace:            namespace,
 		defaultLanguage:      "en",
 		log:                  log.WithValues("host", name),
 		translationResources: map[string]kdexv1alpha1.KDexTranslationSpec{},
@@ -227,6 +229,10 @@ func (th *HostHandler) renderAnnouncementPageLocked() map[string]string {
 			FootScript:      th.FootScriptToHTML(page.PageHandler{}),
 			Header:          "",
 			HeadScript:      th.HeadScriptToHTML(page.PageHandler{}),
+			Host: render.Host{
+				Name:      th.Name,
+				Namespace: th.Namespace,
+			},
 			Language:        l.String(),
 			Languages:       th.availableLanguagesLocked(),
 			LastModified:    time.Now(),

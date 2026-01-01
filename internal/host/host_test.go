@@ -247,7 +247,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(tt.host.name, logr.Discard())
+			th := NewHostHandler(tt.host.name, "default", logr.Discard())
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
@@ -341,7 +341,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(tt.host.name, logr.Discard())
+			th := NewHostHandler(tt.host.name, "default", logr.Discard())
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
@@ -426,7 +426,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(tt.host.name, logr.Discard())
+			th := NewHostHandler(tt.host.name, "default", logr.Discard())
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 

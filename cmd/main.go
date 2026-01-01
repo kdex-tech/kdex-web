@@ -211,7 +211,7 @@ func main() {
 	}
 
 	conf := configuration.LoadConfiguration(configFile, scheme)
-	hostHandler := host.NewHostHandler(focalHost, logger)
+	hostHandler := host.NewHostHandler(focalHost, controllerNamespace, logger)
 	requeueDelay := time.Duration(requeueDelaySeconds) * time.Second
 
 	if err := (&controller.KDexInternalHostReconciler{
