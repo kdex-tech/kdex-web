@@ -483,21 +483,24 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 	backends []resolvedBackend,
 ) error {
-	// Synthetic Backend for the packages
-	packagesBackend := resolvedBackend{
-		Backend: kdexv1alpha1.Backend{
-			IngressPath:           r.Configuration.BackendDefault.ModulePath,
-			ServerImage:           internalPackageReferences.Status.Attributes["image"],
-			ServerImagePullPolicy: corev1.PullIfNotPresent,
-		},
-		Name: internalPackageReferences.Name,
-		Kind: "KDexInternalPackageReferences",
+	if internalPackageReferences != nil {
+		// Synthetic Backend for the packages
+
+		packagesBackend := resolvedBackend{
+			Backend: kdexv1alpha1.Backend{
+				IngressPath:           r.Configuration.BackendDefault.ModulePath,
+				ServerImage:           internalPackageReferences.Status.Attributes["image"],
+				ServerImagePullPolicy: corev1.PullIfNotPresent,
+			},
+			Name: internalPackageReferences.Name,
+			Kind: "KDexInternalPackageReferences",
+		}
+
+		backends = append(backends, packagesBackend)
 	}
 
-	var err error
-
-	backends = append(backends, packagesBackend)
 	backendOps := map[string]controllerutil.OperationResult{}
+	var err error
 
 	for _, rb := range backends {
 		keyBase := fmt.Sprintf("%s/%s", strings.ToLower(rb.Kind), rb.Name)
