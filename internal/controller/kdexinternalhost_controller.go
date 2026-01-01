@@ -25,6 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -807,6 +808,22 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 			}
 
 			deployment.Spec.Template.Spec.Containers[0].Name = name
+
+			foundPathPrefixEnv := false
+			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
+				if value.Name == "PATH_PREFIX" {
+					foundPathPrefixEnv = true
+					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = backend.IngressPath
+					break
+				}
+			}
+
+			if !foundPathPrefixEnv {
+				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+					Name:  "PATH_PREFIX",
+					Value: backend.IngressPath,
+				})
+			}
 
 			if len(backend.ImagePullSecrets) > 0 {
 				deployment.Spec.Template.Spec.ImagePullSecrets = append(r.getMemoizedBackendDeployment().Template.Spec.ImagePullSecrets, backend.ImagePullSecrets...)
