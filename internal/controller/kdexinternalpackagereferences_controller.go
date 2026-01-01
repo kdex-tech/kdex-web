@@ -103,7 +103,7 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 		"Reconciling",
 	)
 
-	return r.createOrUpdateJob(ctx, &internalPackageReferences)
+	return r.createOrUpdateJob(ctx, r.Configuration.BackendDefault.ModulePath, &internalPackageReferences)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -155,9 +155,10 @@ func (r *KDexInternalPackageReferencesReconciler) SetupWithManager(mgr ctrl.Mana
 
 func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 	ctx context.Context,
+	modulePath string,
 	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 ) (ctrl.Result, error) {
-	configMapOp, configMap, err := r.createOrUpdateJobConfigMap(ctx, internalPackageReferences)
+	configMapOp, configMap, err := r.createOrUpdateJobConfigMap(ctx, modulePath, internalPackageReferences)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -464,6 +465,7 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 
 func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJobConfigMap(
 	ctx context.Context,
+	modulePath string,
 	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, *corev1.ConfigMap, error) {
 	configmap := &corev1.ConfigMap{
@@ -495,10 +497,10 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJobConfigMap(
 
 			dockerfile := `
 FROM scratch
-COPY importmap.json /modules/importmap.json
-COPY node_modules /modules
+COPY --chown=65532:65532 importmap.json importmap.json
+COPY --chown=65532:65532 node_modules .
 `
-			generateJS := `import { Generator } from "@jspm/generator";
+			generateJS := fmt.Sprintf(`import { Generator } from '@jspm/generator';
 import fs from 'fs';
 
 const generator = new Generator({
@@ -517,15 +519,16 @@ try {
 
     let importMap = JSON.stringify(generator.getMap(), null, 2)
 
-    importMap = importMap.replaceAll(/\.\/node_modules/g, '/modules')
+    importMap = importMap.replaceAll(/\.\/node_modules/g, '%s')
 
-    console.error('The import map is:', importMap);
+    console.log('The import map is:', importMap);
 
     fs.writeFileSync('importmap.json', importMap);
 } catch (err) {
     console.error('Error:', err);
+    process.exit(1);
 }
-`
+`, modulePath)
 
 			packageJSON := `{
   "name": "importmap",

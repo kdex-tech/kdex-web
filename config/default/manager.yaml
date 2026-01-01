@@ -108,19 +108,16 @@ metadata:
   name: controller-manager
   namespace: system
 data:
-    config.yaml: |
-      defaultImageRegistry:
-        host: k3d-registry:5000
-        insecure: true
+  config.yaml: |
+    backendDefault:
+      modulePath: /_modules
+      serverImage: k3d-registry:5000/kdex-tech/kdex-themeserver:latest
+      serverImagePullPolicy: Always
 
-      defaultNpmRegistry:
-        host: npm-registry-verdaccio.npm-registry:4873
-        insecure: true
+    defaultImageRegistry:
+      host: k3d-registry:5000
+      insecure: true
 
-      staticServing:
-        deployment:
-          template:
-            spec:
-              containers:
-              - image: k3d-registry:5000/kdex-tech/kdex-themeserver:latest
-                imagePullPolicy: Always
+    defaultNpmRegistry:
+      host: npm-registry-verdaccio.npm-registry:4873
+      insecure: true

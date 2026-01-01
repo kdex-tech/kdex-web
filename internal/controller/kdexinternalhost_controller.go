@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,7 +32,6 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	"kdex.dev/web/internal/host"
-	"kdex.dev/web/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -426,7 +426,7 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *KDexInternalHostReconciler) getMemoizedDeployment() *appsv1.DeploymentSpec {
+func (r *KDexInternalHostReconciler) getMemoizedBackendDeployment() *appsv1.DeploymentSpec {
 	r.mu.RLock()
 
 	if r.memoizedDeployment != nil {
@@ -438,7 +438,7 @@ func (r *KDexInternalHostReconciler) getMemoizedDeployment() *appsv1.DeploymentS
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.memoizedDeployment = r.Configuration.StaticServing.Deployment.DeepCopy()
+	r.memoizedDeployment = r.Configuration.BackendDefault.Deployment.DeepCopy()
 
 	return r.memoizedDeployment
 }
@@ -455,7 +455,7 @@ func (r *KDexInternalHostReconciler) getMemoizedIngress() *networkingv1.IngressS
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.memoizedIngress = r.Configuration.StaticServing.Ingress.DeepCopy()
+	r.memoizedIngress = r.Configuration.BackendDefault.Ingress.DeepCopy()
 
 	return r.memoizedIngress
 }
@@ -472,7 +472,7 @@ func (r *KDexInternalHostReconciler) getMemoizedService() *corev1.ServiceSpec {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.memoizedService = r.Configuration.StaticServing.Service.DeepCopy()
+	r.memoizedService = r.Configuration.BackendDefault.Service.DeepCopy()
 
 	return r.memoizedService
 }
@@ -483,22 +483,30 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 	backends []resolvedBackend,
 ) error {
-	packagesDeploymentOp, err := r.createOrUpdatePackagesDeployment(ctx, internalHost, internalPackageReferences)
-	if err != nil {
-		return err
+	// Synthetic Backend for the packages
+	packagesBackend := resolvedBackend{
+		Backend: kdexv1alpha1.Backend{
+			IngressPath:           r.Configuration.BackendDefault.ModulePath,
+			ServerImage:           internalPackageReferences.Status.Attributes["image"],
+			ServerImagePullPolicy: corev1.PullIfNotPresent,
+		},
+		Name: internalPackageReferences.Name,
+		Kind: "KDexInternalPackageReferences",
 	}
 
-	packagesServiceOp, err := r.createOrUpdatePackagesService(ctx, internalHost, internalPackageReferences)
-	if err != nil {
-		return err
-	}
+	var err error
+
+	backends = append(backends, packagesBackend)
+	backendOps := map[string]controllerutil.OperationResult{}
 
 	for _, rb := range backends {
-		_, err := r.createOrUpdateBackendDeployment(ctx, internalHost, rb.Name, rb.Kind, rb.Backend)
+		keyBase := fmt.Sprintf("%s/%s", strings.ToLower(rb.Kind), rb.Name)
+
+		backendOps[keyBase+"/deployment"], err = r.createOrUpdateBackendDeployment(ctx, internalHost, rb.Name, rb.Kind, rb.Backend)
 		if err != nil {
 			return err
 		}
-		_, err = r.createOrUpdateBackendService(ctx, internalHost, rb.Name, rb.Kind)
+		backendOps[keyBase+"/service"], err = r.createOrUpdateBackendService(ctx, internalHost, rb.Name, rb.Kind)
 		if err != nil {
 			return err
 		}
@@ -510,12 +518,12 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 
 	var ingressOrHTTPRouteOp controllerutil.OperationResult
 	if internalHost.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, internalHost, backends, internalPackageReferences)
+		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, internalHost, backends)
 		if err != nil {
 			return err
 		}
 	} else {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, internalHost, backends, internalPackageReferences)
+		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, internalHost, backends)
 		if err != nil {
 			return err
 		}
@@ -536,8 +544,7 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 
 	log.V(1).Info(
 		"reconciled",
-		"packagesDeploymentOp", packagesDeploymentOp,
-		"packagesServiceOp", packagesServiceOp,
+		"backendOps", backendOps,
 		"ingressOrHTTPRouteOp", ingressOrHTTPRouteOp,
 	)
 
@@ -624,7 +631,6 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
 	backends []resolvedBackend,
-	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -693,25 +699,6 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 				})
 			}
 
-			if internalPackageReferences != nil {
-				for _, rule := range rules {
-					rule.HTTP.Paths = append(rule.HTTP.Paths,
-						networkingv1.HTTPIngressPath{
-							Path:     "/modules",
-							PathType: &pathType,
-							Backend: networkingv1.IngressBackend{
-								Service: &networkingv1.IngressServiceBackend{
-									Name: internalPackageReferences.Name,
-									Port: networkingv1.ServiceBackendPort{
-										Name: "server",
-									},
-								},
-							},
-						},
-					)
-				}
-			}
-
 			for _, rb := range backends {
 				for _, rule := range rules {
 					rule.HTTP.Paths = append(rule.HTTP.Paths,
@@ -765,155 +752,8 @@ func (r *KDexInternalHostReconciler) createOrUpdateHTTPRoute(
 	_ context.Context,
 	_ *kdexv1alpha1.KDexInternalHost,
 	_ []resolvedBackend,
-	_ *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, error) {
 	return controllerutil.OperationResultNone, nil
-}
-
-func (r *KDexInternalHostReconciler) createOrUpdatePackagesDeployment(
-	ctx context.Context,
-	internalHost *kdexv1alpha1.KDexInternalHost,
-	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
-) (controllerutil.OperationResult, error) {
-	if internalPackageReferences == nil {
-		return controllerutil.OperationResultNone, nil
-	}
-
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      internalPackageReferences.Name,
-			Namespace: internalHost.Namespace,
-		},
-	}
-
-	op, err := ctrl.CreateOrUpdate(
-		ctx,
-		r.Client,
-		deployment,
-		func() error {
-			if deployment.CreationTimestamp.IsZero() {
-				deployment.Annotations = make(map[string]string)
-				for key, value := range internalPackageReferences.Annotations {
-					deployment.Annotations[key] = value
-				}
-				deployment.Labels = make(map[string]string)
-				for key, value := range internalPackageReferences.Labels {
-					deployment.Labels[key] = value
-				}
-
-				deployment.Labels["kdex.dev/packages"] = internalPackageReferences.Name
-
-				deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
-
-				deployment.Spec.Selector.MatchLabels["kdex.dev/packages"] = internalPackageReferences.Name
-				deployment.Spec.Template.Labels["kdex.dev/packages"] = internalPackageReferences.Name
-			}
-
-			foundCorsDomainsEnv := false
-			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
-				if value.Name == "CORS_DOMAINS" {
-					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(internalHost.Spec.Routing.Domains)
-					foundCorsDomainsEnv = true
-				}
-			}
-
-			if !foundCorsDomainsEnv {
-				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-					Name:  "CORS_DOMAINS",
-					Value: utils.DomainsToMatcher(internalHost.Spec.Routing.Domains),
-				})
-			}
-
-			deployment.Spec.Template.Spec.Containers[0].Name = internalPackageReferences.Name
-
-			for idx, value := range deployment.Spec.Template.Spec.Volumes {
-				if value.Name == "oci-image" {
-					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = internalPackageReferences.Status.Attributes["image"]
-					deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = corev1.PullIfNotPresent
-				}
-			}
-
-			return ctrl.SetControllerReference(internalHost, deployment, r.Scheme)
-		},
-	)
-
-	if err != nil {
-		kdexv1alpha1.SetConditions(
-			&internalHost.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionTrue,
-				Progressing: metav1.ConditionFalse,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconcileError,
-			err.Error(),
-		)
-
-		return controllerutil.OperationResultNone, err
-	}
-
-	return op, nil
-}
-
-func (r *KDexInternalHostReconciler) createOrUpdatePackagesService(
-	ctx context.Context,
-	internalHost *kdexv1alpha1.KDexInternalHost,
-	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
-) (controllerutil.OperationResult, error) {
-	if internalPackageReferences == nil {
-		return controllerutil.OperationResultNone, nil
-	}
-
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      internalPackageReferences.Name,
-			Namespace: internalHost.Namespace,
-		},
-	}
-
-	op, err := ctrl.CreateOrUpdate(
-		ctx,
-		r.Client,
-		service,
-		func() error {
-			if service.CreationTimestamp.IsZero() {
-				service.Annotations = make(map[string]string)
-				for key, value := range internalPackageReferences.Annotations {
-					service.Annotations[key] = value
-				}
-				service.Labels = make(map[string]string)
-				for key, value := range internalPackageReferences.Labels {
-					service.Labels[key] = value
-				}
-
-				service.Labels["kdex.dev/packages"] = internalPackageReferences.Name
-
-				service.Spec = *r.getMemoizedService().DeepCopy()
-
-				service.Spec.Selector = make(map[string]string)
-				service.Spec.Selector["kdex.dev/packages"] = internalPackageReferences.Name
-			}
-
-			return ctrl.SetControllerReference(internalHost, service, r.Scheme)
-		},
-	)
-
-	if err != nil {
-		kdexv1alpha1.SetConditions(
-			&internalHost.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionTrue,
-				Progressing: metav1.ConditionFalse,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconcileError,
-			err.Error(),
-		)
-
-		return controllerutil.OperationResultNone, err
-	}
-
-	return op, nil
 }
 
 func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
@@ -945,20 +785,28 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 					deployment.Labels[key] = value
 				}
 
+				deployment.Labels["kdex.dev/type"] = "backend"
 				deployment.Labels["kdex.dev/backend"] = name
 				deployment.Labels["kdex.dev/host"] = internalHost.Name
 				deployment.Labels["kdex.dev/kind"] = kind
 
-				deployment.Spec = *r.getMemoizedDeployment().DeepCopy()
+				deployment.Spec = *r.getMemoizedBackendDeployment().DeepCopy()
 
+				deployment.Spec.Selector.MatchLabels["kdex.dev/type"] = "backend"
 				deployment.Spec.Selector.MatchLabels["kdex.dev/backend"] = name
+				deployment.Spec.Selector.MatchLabels["kdex.dev/host"] = internalHost.Name
+				deployment.Spec.Selector.MatchLabels["kdex.dev/kind"] = kind
+
+				deployment.Spec.Template.Labels["kdex.dev/type"] = "backend"
 				deployment.Spec.Template.Labels["kdex.dev/backend"] = name
+				deployment.Spec.Template.Labels["kdex.dev/host"] = internalHost.Name
+				deployment.Spec.Template.Labels["kdex.dev/kind"] = kind
 			}
 
 			deployment.Spec.Template.Spec.Containers[0].Name = name
 
 			if len(backend.ImagePullSecrets) > 0 {
-				deployment.Spec.Template.Spec.ImagePullSecrets = append(r.getMemoizedDeployment().Template.Spec.ImagePullSecrets, backend.ImagePullSecrets...)
+				deployment.Spec.Template.Spec.ImagePullSecrets = append(r.getMemoizedBackendDeployment().Template.Spec.ImagePullSecrets, backend.ImagePullSecrets...)
 			}
 
 			if backend.Replicas != nil {
@@ -971,31 +819,57 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 
 			if backend.ServerImage != "" {
 				deployment.Spec.Template.Spec.Containers[0].Image = backend.ServerImage
+			} else {
+				deployment.Spec.Template.Spec.Containers[0].Image = r.Configuration.BackendDefault.ServerImage
+			}
+
+			if backend.ServerImagePullPolicy != "" {
 				deployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = backend.ServerImagePullPolicy
+			} else {
+				deployment.Spec.Template.Spec.Containers[0].ImagePullPolicy = r.Configuration.BackendDefault.ServerImagePullPolicy
 			}
 
-			for idx, value := range deployment.Spec.Template.Spec.Volumes {
-				if value.Name == "oci-image" {
-					deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = backend.StaticImage
-					deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = backend.StaticImagePullPolicy
-					break
+			if backend.StaticImage != "" {
+				foundOCIVolume := false
+				for idx, value := range deployment.Spec.Template.Spec.Volumes {
+					if value.Name == "oci-image" {
+						foundOCIVolume = true
+						deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = backend.StaticImage
+						deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = backend.StaticImagePullPolicy
+						break
+					}
 				}
-			}
 
-			foundCorsDomainsEnv := false
-			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
-				if value.Name == "CORS_DOMAINS" {
-					deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = utils.DomainsToMatcher(internalHost.Spec.Routing.Domains)
-					foundCorsDomainsEnv = true
-					break
+				if !foundOCIVolume {
+					deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{
+						Name: "oci-image",
+						VolumeSource: corev1.VolumeSource{
+							Image: &corev1.ImageVolumeSource{
+								Reference:  backend.StaticImage,
+								PullPolicy: backend.StaticImagePullPolicy,
+							},
+						},
+					})
 				}
-			}
 
-			if !foundCorsDomainsEnv {
-				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
-					Name:  "CORS_DOMAINS",
-					Value: utils.DomainsToMatcher(internalHost.Spec.Routing.Domains),
-				})
+				foundOCIVolumeMount := false
+				for idx, value := range deployment.Spec.Template.Spec.Containers[0].VolumeMounts {
+					if value.Name == "oci-image" {
+						foundOCIVolumeMount = true
+						deployment.Spec.Template.Spec.Containers[0].VolumeMounts[idx].MountPath = "/public"
+						deployment.Spec.Template.Spec.Containers[0].VolumeMounts[idx].Name = "oci-image"
+						deployment.Spec.Template.Spec.Containers[0].VolumeMounts[idx].ReadOnly = true
+						break
+					}
+				}
+
+				if !foundOCIVolumeMount {
+					deployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(deployment.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
+						Name:      "oci-image",
+						MountPath: "/public",
+						ReadOnly:  true,
+					})
+				}
 			}
 
 			return ctrl.SetControllerReference(internalHost, deployment, r.Scheme)
@@ -1048,6 +922,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendService(
 					service.Labels[key] = value
 				}
 
+				service.Labels["kdex.dev/type"] = "backend"
 				service.Labels["kdex.dev/backend"] = name
 				service.Labels["kdex.dev/host"] = internalHost.Name
 				service.Labels["kdex.dev/kind"] = kind
@@ -1055,7 +930,11 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendService(
 				service.Spec = *r.getMemoizedService().DeepCopy()
 
 				service.Spec.Selector = make(map[string]string)
+
+				service.Spec.Selector["kdex.dev/type"] = "backend"
 				service.Spec.Selector["kdex.dev/backend"] = name
+				service.Spec.Selector["kdex.dev/host"] = internalHost.Name
+				service.Spec.Selector["kdex.dev/kind"] = kind
 			}
 
 			return ctrl.SetControllerReference(internalHost, service, r.Scheme)
@@ -1091,6 +970,7 @@ func (r *KDexInternalHostReconciler) cleanupObsoleteBackends(
 	}
 
 	labelSelector := client.MatchingLabels{
+		"kdex.dev/type": "backend",
 		"kdex.dev/host": internalHost.Name,
 	}
 
