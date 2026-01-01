@@ -23,7 +23,7 @@ type HostHandler struct {
 	Pages                *page.PageStore
 	ScriptLibraries      []kdexv1alpha1.KDexScriptLibrarySpec
 	Translations         *catalog.Builder
-	assets               []kdexv1alpha1.Asset
+	themeAssets          []kdexv1alpha1.Asset
 	defaultLanguage      string
 	host                 *kdexv1alpha1.KDexHostSpec
 	importmap            string
@@ -162,7 +162,7 @@ func (th *HostHandler) L10nRenderLocked(
 		PatternPath:     handler.Page.PatternPath,
 		TemplateContent: handler.MainTemplate,
 		TemplateName:    handler.Name,
-		Theme:           th.host.Assets.String(),
+		Theme:           th.ThemeAssetsToString(),
 		Title:           handler.Page.Label,
 	}
 
@@ -189,8 +189,6 @@ const (
 	announcementPageTemplate = `<!DOCTYPE html>
 <html lang="{{.Language}}">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	{{.Meta}}
 	<title>{{l10n "announcement.title" .BrandName}}</title>
 	{{.HeadScript}}
@@ -240,7 +238,7 @@ func (th *HostHandler) renderAnnouncementPageLocked() map[string]string {
 			PatternPath:     "",
 			TemplateContent: announcementPageTemplate,
 			TemplateName:    "announcement",
-			Theme:           th.host.Assets.String(),
+			Theme:           th.ThemeAssetsToString(),
 			Title:           "",
 		}
 
@@ -290,6 +288,17 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	// data-logout-css-query="nav.nav .nav-dropdown a.logout"
 	// data-path-separator="/_/"
 	// data-state-endpoint="/~/state/out"
+
+	return buffer.String()
+}
+
+func (th *HostHandler) ThemeAssetsToString() string {
+	var buffer bytes.Buffer
+
+	for _, asset := range th.themeAssets {
+		buffer.WriteString(asset.ToTag())
+		buffer.WriteRune('\n')
+	}
 
 	return buffer.String()
 }
@@ -415,7 +424,7 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (th *HostHandler) SetHost(
 	host *kdexv1alpha1.KDexHostSpec,
-	assets []kdexv1alpha1.Asset,
+	themeAssets []kdexv1alpha1.Asset,
 	scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec,
 	importmap string,
 ) {
@@ -423,7 +432,7 @@ func (th *HostHandler) SetHost(
 	th.defaultLanguage = host.DefaultLang
 	th.host = host
 	th.ScriptLibraries = scriptLibraries
-	th.assets = assets
+	th.themeAssets = themeAssets
 	th.importmap = importmap
 	th.mu.Unlock()
 	th.RebuildMux()
