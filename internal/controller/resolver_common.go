@@ -23,12 +23,14 @@ import (
 func ResolveContents(
 	ctx context.Context,
 	c client.Client,
-	pageBinding *kdexv1alpha1.KDexInternalPageBinding,
+	referrer client.Object,
+	referrerConditions *[]metav1.Condition,
+	contentEntries []kdexv1alpha1.ContentEntry,
 	requeueDelay time.Duration,
 ) (map[string]page.ResolvedContentEntry, bool, ctrl.Result, error) {
 	contents := make(map[string]page.ResolvedContentEntry)
 
-	for _, contentEntry := range pageBinding.Spec.ContentEntries {
+	for _, contentEntry := range contentEntries {
 		appRef := contentEntry.AppRef
 		if appRef == nil {
 			contents[contentEntry.Slot] = page.ResolvedContentEntry{
@@ -41,7 +43,7 @@ func ResolveContents(
 			continue
 		}
 
-		app, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, c, pageBinding, &pageBinding.Status.Conditions, appRef, requeueDelay)
+		app, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, c, referrer, referrerConditions, appRef, requeueDelay)
 		if shouldReturn {
 			return nil, shouldReturn, r1, err
 		}

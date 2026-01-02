@@ -14,6 +14,7 @@ type PageHandler struct {
 	PackageReferences []kdexv1alpha1.PackageReference
 	Page              *kdexv1alpha1.KDexPageBindingSpec
 	Scripts           []kdexv1alpha1.ScriptDef
+	UtilityPage       *kdexv1alpha1.KDexUtilityPageSpec
 }
 
 type PackedContent struct {

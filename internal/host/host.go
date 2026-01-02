@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -32,7 +31,7 @@ type HostHandler struct {
 	log                  logr.Logger
 	mu                   sync.RWMutex
 	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
-	announcementTemplate string
+	utilityPages         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 }
 
 func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler {
@@ -42,6 +41,7 @@ func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler
 		defaultLanguage:      "en",
 		log:                  log.WithValues("host", name),
 		translationResources: map[string]kdexv1alpha1.KDexTranslationSpec{},
+		utilityPages:         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
 	}
 
 	catalogBuilder := catalog.NewBuilder()
@@ -145,12 +145,14 @@ func (th *HostHandler) L10nRenderLocked(
 	handler page.PageHandler,
 	pageMap map[string]any,
 	l language.Tag,
+	extraTemplateData map[string]any,
 ) (string, error) {
 	renderer := render.Renderer{
 		BasePath:        handler.Page.BasePath,
 		BrandName:       th.host.BrandName,
 		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: th.defaultLanguage,
+		Extra:           extraTemplateData,
 		Footer:          handler.Footer,
 		FootScript:      th.FootScriptToHTML(handler),
 		Header:          handler.Header,
@@ -179,7 +181,7 @@ func (th *HostHandler) L10nRendersLocked(
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, l := range th.Translations.Languages() {
-		rendered, err := th.L10nRenderLocked(handler, pageMaps[l], l)
+		rendered, err := th.L10nRenderLocked(handler, pageMaps[l], l, map[string]any{})
 		if err != nil {
 			th.log.Error(err, "failed to render page for language", "page", handler.Name, "language", l)
 			continue
@@ -189,63 +191,30 @@ func (th *HostHandler) L10nRendersLocked(
 	return l10nRenders
 }
 
-func (th *HostHandler) LoadAnnouncementTemplate(path string) error {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return err
+func (th *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
+	if ph.UtilityPage == nil {
+		return
 	}
+	th.log.V(1).Info("add or update utility page", "name", ph.Name, "type", ph.UtilityPage.Type)
 	th.mu.Lock()
-	defer th.mu.Unlock()
-	th.announcementTemplate = string(content)
-	return nil
+	th.utilityPages[ph.UtilityPage.Type] = ph
+	th.mu.Unlock()
+	th.RebuildMux()
 }
 
-func (th *HostHandler) renderAnnouncementPageLocked() map[string]string {
-	l10nRenders := make(map[string]string)
-
-	meta := ""
-	if len(th.host.Assets) > 0 {
-		meta = th.host.Assets.String()
+func (th *HostHandler) renderUtilityPageLocked(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any) string {
+	ph, ok := th.utilityPages[utilityType]
+	if !ok {
+		return ""
 	}
 
-	for _, l := range th.Translations.Languages() {
-		renderer := render.Renderer{
-			BasePath:        "/",
-			BrandName:       th.host.BrandName,
-			Contents:        map[string]string{},
-			DefaultLanguage: th.defaultLanguage,
-			Footer:          "",
-			FootScript:      th.FootScriptToHTML(page.PageHandler{}),
-			Header:          "",
-			HeadScript:      th.HeadScriptToHTML(page.PageHandler{}),
-			Host: render.Host{
-				Name:      th.Name,
-				Namespace: th.Namespace,
-			},
-			Language:        l.String(),
-			Languages:       th.availableLanguagesLocked(),
-			LastModified:    time.Now(),
-			MessagePrinter:  th.messagePrinterLocked(l),
-			Meta:            meta,
-			Navigations:     map[string]string{},
-			Organization:    th.host.Organization,
-			PageMap:         map[string]any{},
-			PatternPath:     "",
-			TemplateContent: th.announcementTemplate,
-			TemplateName:    "announcement",
-			Theme:           th.ThemeAssetsToString(),
-			Title:           "",
-		}
-
-		rendered, err := renderer.RenderPage()
-		if err != nil {
-			th.log.Error(err, "failed to render announcement page for language", "language", l)
-			continue
-		}
-		l10nRenders[l.String()] = rendered
+	rendered, err := th.L10nRenderLocked(ph, map[string]any{}, l, extraTemplateData)
+	if err != nil {
+		th.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
+		return ""
 	}
 
-	return l10nRenders
+	return rendered
 }
 
 const (
@@ -313,20 +282,19 @@ func (th *HostHandler) RebuildMux() {
 	pageHandlers := th.Pages.List()
 
 	if len(pageHandlers) == 0 {
-		// Render announcement page for all languages
-		l10nRenders := th.renderAnnouncementPageLocked()
-
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 
-			rendered, ok := l10nRenders[l.String()]
-			if !ok {
-				// Fallback to default language if translation not available
-				rendered, ok = l10nRenders[th.defaultLanguage]
-				if !ok {
-					http.Error(w, "internal error", http.StatusInternalServerError)
-					return
-				}
+			rendered := th.renderUtilityPageLocked(
+				kdexv1alpha1.AnnouncementUtilityPageType,
+				l,
+				map[string]any{},
+			)
+
+			if rendered == "" {
+				// Fallback to standard http error if no custom announcement page
+				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				return
 			}
 
 			th.log.V(1).Info("serving announcement page", "language", l.String())
@@ -409,12 +377,76 @@ func (th *HostHandler) RemoveTranslation(name string) {
 
 func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	th.mu.RLock()
-	defer th.mu.RUnlock()
-	if th.Mux != nil {
-		th.Mux.ServeHTTP(w, r)
-	} else {
-		http.NotFound(w, r)
+	mux := th.Mux
+	th.mu.RUnlock()
+
+	if mux == nil {
+		th.serveError(w, r, http.StatusNotFound, "not found")
+		return
 	}
+
+	ew := &errorResponseWriter{ResponseWriter: w}
+	mux.ServeHTTP(ew, r)
+
+	if ew.statusCode >= 400 {
+		th.serveError(w, r, ew.statusCode, ew.statusMsg)
+	}
+}
+
+type errorResponseWriter struct {
+	http.ResponseWriter
+	statusCode  int
+	statusMsg   string
+	wroteHeader bool
+}
+
+func (ew *errorResponseWriter) WriteHeader(code int) {
+	if ew.wroteHeader {
+		return
+	}
+	ew.statusCode = code
+	if code >= 400 {
+		// Intercept error
+		ew.statusMsg = http.StatusText(code)
+		return
+	}
+	ew.wroteHeader = true
+	ew.ResponseWriter.WriteHeader(code)
+}
+
+func (ew *errorResponseWriter) Write(b []byte) (int, error) {
+	if ew.statusCode >= 400 {
+		// Drop original error body, we will render our own
+		return len(b), nil
+	}
+	if !ew.wroteHeader {
+		ew.WriteHeader(http.StatusOK)
+	}
+	return ew.ResponseWriter.Write(b)
+}
+
+func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {
+	th.mu.RLock()
+	defaultLang := th.defaultLanguage
+	languages := th.Translations.Languages()
+	l := kdexhttp.GetLang(r, defaultLang, languages)
+	rendered := th.renderUtilityPageLocked(
+		kdexv1alpha1.ErrorUtilityPageType,
+		l,
+		map[string]any{"ErrorCode": code, "ErrorMessage": msg},
+	)
+	th.mu.RUnlock()
+
+	if rendered == "" {
+		// Fallback to standard http error if no custom error page
+		http.Error(w, http.StatusText(code), code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Language", l.String())
+	w.WriteHeader(code)
+	_, _ = w.Write([]byte(rendered))
 }
 
 func (th *HostHandler) SetHost(
@@ -463,7 +495,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		l10n := r.PathValue("l10n")
 		navKey := r.PathValue("navKey")
 
-		th.log.V(1).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
+		th.log.V(2).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
 
 		var pageHandler *page.PageHandler
 

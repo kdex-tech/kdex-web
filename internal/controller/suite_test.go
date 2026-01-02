@@ -245,6 +245,17 @@ var _ = BeforeSuite(func() {
 	err = translationReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
+	internalUtilityPageReconciler := &KDexInternalUtilityPageReconciler{
+		Client:              k8sManager.GetClient(),
+		ControllerNamespace: namespace,
+		FocalHost:           focalHost,
+		HostHandler:         hostHandler,
+		RequeueDelay:        requeueDelay,
+		Scheme:              k8sManager.GetScheme(),
+	}
+	err = internalUtilityPageReconciler.SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
 	go func() {
 		defer GinkgoRecover()
 		err := k8sManager.Start(ctx)

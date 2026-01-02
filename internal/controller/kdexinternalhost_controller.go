@@ -373,16 +373,16 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkingv1.Ingress{}).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.ScriptLibraryRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.ScriptLibraryRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.ScriptLibraryRef}")).
 		Watches(
 			&kdexv1alpha1.KDexTheme{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.DefaultThemeRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.ThemeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterTheme{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.Host.DefaultThemeRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.ThemeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexInternalPageBinding{},
 			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {

@@ -243,7 +243,7 @@ func (r *KDexInternalPageBindingReconciler) innerReconcile(
 		pageArchetypeSpec = v.Spec
 	}
 
-	contents, shouldReturn, response, err := ResolveContents(ctx, r.Client, pageBinding, r.RequeueDelay)
+	contents, shouldReturn, response, err := ResolveContents(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, pageBinding.Spec.ContentEntries, r.RequeueDelay)
 	if shouldReturn {
 		return response, err
 	}
@@ -252,28 +252,6 @@ func (r *KDexInternalPageBindingReconciler) innerReconcile(
 		if content.App != nil {
 			pageBinding.Status.Attributes[k+".content.generation"] = content.Content.AppGeneration
 		}
-	}
-
-	navigationRef := pageBinding.Spec.OverrideMainNavigationRef
-	if navigationRef == nil {
-		navigationRef = pageArchetypeSpec.DefaultMainNavigationRef
-	}
-	navigations, shouldReturn, response, err := ResolvePageNavigations(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, navigationRef, pageArchetypeSpec.ExtraNavigations, r.RequeueDelay)
-	if shouldReturn {
-		return response, err
-	}
-
-	for k, navigation := range navigations {
-		pageBinding.Status.Attributes[k+".navigation.generation"] = fmt.Sprintf("%d", navigation.Generation)
-	}
-
-	parentPageObj, shouldReturn, r1, err := ResolvePageBinding(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, pageBinding.Spec.ParentPageRef, r.RequeueDelay)
-	if shouldReturn {
-		return r1, err
-	}
-
-	if parentPageObj != nil {
-		pageBinding.Status.Attributes["parent.pageBinding.generation"] = fmt.Sprintf("%d", parentPageObj.GetGeneration())
 	}
 
 	headerRef := pageBinding.Spec.OverrideHeaderRef
@@ -302,9 +280,35 @@ func (r *KDexInternalPageBindingReconciler) innerReconcile(
 		pageBinding.Status.Attributes["footer.generation"] = fmt.Sprintf("%d", footerObj.GetGeneration())
 	}
 
-	_, shouldReturn, r1, err = ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, pageBinding.Spec.ScriptLibraryRef, r.RequeueDelay)
+	navigationRef := pageBinding.Spec.OverrideMainNavigationRef
+	if navigationRef == nil {
+		navigationRef = pageArchetypeSpec.DefaultMainNavigationRef
+	}
+	navigations, shouldReturn, response, err := ResolvePageNavigations(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, navigationRef, pageArchetypeSpec.ExtraNavigations, r.RequeueDelay)
+	if shouldReturn {
+		return response, err
+	}
+
+	for k, navigation := range navigations {
+		pageBinding.Status.Attributes[k+".navigation.generation"] = fmt.Sprintf("%d", navigation.Generation)
+	}
+
+	parentPageObj, shouldReturn, r1, err := ResolvePageBinding(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, pageBinding.Spec.ParentPageRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
+	}
+
+	if parentPageObj != nil {
+		pageBinding.Status.Attributes["parent.pageBinding.generation"] = fmt.Sprintf("%d", parentPageObj.GetGeneration())
+	}
+
+	scriptLibraryObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, pageBinding.Spec.ScriptLibraryRef, r.RequeueDelay)
+	if shouldReturn {
+		return r1, err
+	}
+
+	if scriptLibraryObj != nil {
+		pageBinding.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
 	}
 
 	_, shouldReturn, r1, err = ResolveHost(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, &pageBinding.Spec.HostRef, r.RequeueDelay)

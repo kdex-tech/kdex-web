@@ -45,13 +45,14 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		host            THost
-		lang            string
-		pageHandler     page.PageHandler
-		translationName string
-		translation     *kdexv1alpha1.KDexTranslationSpec
-		want            []string
+		name              string
+		host              THost
+		lang              string
+		pageHandler       page.PageHandler
+		extraTemplateData map[string]any
+		translationName   string
+		translation       *kdexv1alpha1.KDexTranslationSpec
+		want              []string
 	}{
 		{
 			name: "english translation",
@@ -242,6 +243,47 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			lang: "en",
 			want: []string{"FOOTER", "key", "/~/navigation/main/en/", `<sample-element id="content-main" data-app-name="sample-app" data-app-generation="1" data-test="test"></sample-element>`, "TITLE"},
 		},
+		{
+			name: "extra template data",
+			host: THost{
+				name: "sample-host",
+				host: kdexv1alpha1.KDexHostSpec{
+					BrandName:    "KDex Tech",
+					DefaultLang:  "en",
+					ModulePolicy: kdexv1alpha1.LooseModulePolicy,
+					Organization: "KDex Tech Inc.",
+					Routing: kdexv1alpha1.Routing{
+						Domains: []string{"foo.bar"},
+					},
+				},
+			},
+			pageHandler: page.PageHandler{
+				Name: "sample-page-binding",
+				Page: &kdexv1alpha1.KDexPageBindingSpec{
+					Label: "TITLE",
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
+					},
+				},
+				MainTemplate: primaryTemplate,
+				Content: map[string]page.PackedContent{
+					"main": {
+						Content: "MAIN",
+						Slot:    "main",
+					},
+				},
+				Footer: `FOOTER {{ .Extra.extra }}`,
+				Header: `{{ l10n "key" }}`,
+				Navigations: map[string]string{
+					"main": "NAV",
+				},
+			},
+			lang: "en",
+			extraTemplateData: map[string]any{
+				"extra": "extra data",
+			},
+			want: []string{"FOOTER extra data", "key", "/~/navigation/main/en/", "MAIN", "TITLE"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -251,7 +293,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
-			got, gotErr := th.L10nRenderLocked(tt.pageHandler, map[string]any{}, language.Make(tt.lang))
+			got, gotErr := th.L10nRenderLocked(tt.pageHandler, map[string]any{}, language.Make(tt.lang), tt.extraTemplateData)
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 

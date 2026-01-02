@@ -214,10 +214,6 @@ func main() {
 
 	conf := configuration.LoadConfiguration(configFile, scheme)
 	hostHandler := host.NewHostHandler(focalHost, controllerNamespace, logger)
-	if err := hostHandler.LoadAnnouncementTemplate(announcementTemplate); err != nil {
-		setupLog.Error(err, "unable to load announcement template", "path", announcementTemplate)
-		os.Exit(1)
-	}
 	requeueDelay := time.Duration(requeueDelaySeconds) * time.Second
 
 	if err := (&controller.KDexInternalHostReconciler{
@@ -265,6 +261,17 @@ func main() {
 		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalPackageReferences")
+		os.Exit(1)
+	}
+	if err := (&controller.KDexInternalUtilityPageReconciler{
+		Client:              mgr.GetClient(),
+		ControllerNamespace: controllerNamespace,
+		FocalHost:           focalHost,
+		HostHandler:         hostHandler,
+		RequeueDelay:        requeueDelay,
+		Scheme:              mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalUtilityPage")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
