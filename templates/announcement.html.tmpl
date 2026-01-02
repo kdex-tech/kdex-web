@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="{{.Language}}">
+
+<head>
+    {{.Meta}}
+    <title>{{l10n "announcement.title" .BrandName}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@latest/build/styles/monokai-sublime.min.css">
+    {{.HeadScript}}
+    {{.Theme}}
+    <style>
+        :root {
+            --primary-color: #1a202c;
+            --secondary-color: #4a5568;
+            --bg-color: #f7fafc;
+            --card-bg: rgba(255, 255, 255, 0.8);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle at top left, #ffffff, #edf2f7);
+            color: var(--primary-color);
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border-radius: 2rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            margin: 2rem;
+        }
+
+        h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #1a202c 0%, #4a5568 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .message {
+            font-size: 1.25rem;
+            line-height: 1.7;
+            color: var(--secondary-color);
+            margin-bottom: 3rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .code-container {
+            position: relative;
+            text-align: left;
+            margin: 2rem 0;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .code-header {
+            background: #333;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .dot-1 {
+            background: #ff5f56;
+        }
+
+        .dot-2 {
+            background: #ffbd2e;
+        }
+
+        .dot-3 {
+            background: #27c93f;
+        }
+
+        pre {
+            margin: 0;
+            background: #23241f !important;
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+
+        code {
+            font-family: 'Fira Code', monospace !important;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #f8f8f2;
+            white-space: pre !important;
+        }
+
+        .footer {
+            margin-top: 3rem;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 1rem;
+            display: inline-block;
+        }
+
+        .footer p {
+            margin: 0;
+            font-size: 0.875rem;
+            color: #718096;
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <div class="container">
+            <h1>{{l10n "announcement.title" .BrandName}}</h1>
+            <p class="message">{{l10n "announcement.message"}}</p>
+
+            <div class="code-container">
+                <div class="code-header">
+                    <div class="dot dot-1"></div>
+                    <div class="dot dot-2"></div>
+                    <div class="dot dot-3"></div>
+                    <span
+                        style="color: #888; font-size: 0.75rem; margin-left: auto; font-family: sans-serif;">example.yaml</span>
+                </div>
+                <kdex-highlight>
+                    <pre><code class="language-yaml">apiVersion: kdex.dev/v1alpha1
+kind: KDexPageBinding
+metadata:
+  name: my-home-page
+  namespace: {{.Host.Namespace}}
+spec:
+  basePath: /
+  contentEntries:
+    - rawHTML: &lt;p&gt;{{"{{"}} l10n .BrandName {{"}}"}}&lt;/p&gt;
+      slot: main
+  hostRef:
+    name: {{.Host.Name}}
+  label: home
+  pageArchetypeRef:
+    kind: KDexClusterPageArchetype
+    name: kdex-default-page-archetype</code></pre>
+                </kdex-highlight>
+            </div>
+
+            <div class="footer">
+                <p>{{l10n "announcement.organization" .Organization}}</p>
+            </div>
+        </div>
+    </main>
+    {{.FootScript}}
+    <script type="module">
+        class KdexSecureCode extends HTMLElement {
+            constructor() {
+                super();
+                this.attachShadow({ mode: 'open' });
+            }
+
+            connectedCallback() {
+                const rawCode = this.querySelector('code');
+                if (!rawCode) return;
+
+                const content = rawCode.textContent;
+                const lang = rawCode.className || 'language-yaml';
+                this.innerHTML = '';
+
+                const link1 = document.createElement('link');
+                link1.rel = 'stylesheet';
+                link1.href = 'https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap';
+
+                const link2 = document.createElement('link');
+                link2.rel = 'stylesheet';
+                link2.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@latest/build/styles/monokai-sublime.min.css';
+
+                const style = document.createElement('style');
+                style.textContent = 'pre { margin: 0; background: #23241f !important; padding: 1.5rem; overflow-x: auto; border-radius: 0 0 1rem 1rem; } ' +
+                    'code { font-family: "Fira Code", monospace !important; font-size: 0.95rem; line-height: 1.6; color: #f8f8f2; }';
+
+                const pre = document.createElement('pre');
+                const code = document.createElement('code');
+                code.className = lang;
+                code.textContent = content;
+
+                pre.appendChild(code);
+                this.shadowRoot.append(link1, link2, style, pre);
+
+                requestAnimationFrame(() => this.highlight(code));
+            }
+
+            async highlight(code) {
+                try {
+                    const [hljs, yaml] = await Promise.all([
+                        import('https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@latest/build/es/highlight.min.js').then(m => m.default),
+                        import('https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@latest/build/es/languages/yaml.min.js').then(m => m.default)
+                    ]);
+
+                    if (!window.hljsYamlRegistered) {
+                        hljs.registerLanguage('yaml', yaml);
+                        window.hljsYamlRegistered = true;
+                    }
+                    hljs.highlightElement(code);
+                } catch (e) {
+                    console.error('Shadow highlighting failed', e);
+                }
+            }
+        }
+
+        if (!customElements.get('kdex-highlight')) {
+            customElements.define('kdex-highlight', KdexSecureCode);
+        }
+    </script>
+</body>
+
+</html>
