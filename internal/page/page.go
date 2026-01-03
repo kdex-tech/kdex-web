@@ -31,10 +31,31 @@ func (p PageHandler) NavigationToHTMLMap() map[string]string {
 	items := map[string]string{}
 
 	for navKey := range p.Navigations {
-		items[navKey] = fmt.Sprintf(navigationTemplate, navKey, navKey, p.Page.BasePath, navKey)
+		items[navKey] = fmt.Sprintf(navigationTemplate, navKey, navKey, p.BasePath(), navKey)
 	}
 
 	return items
+}
+
+func (p PageHandler) BasePath() string {
+	if p.Page == nil {
+		return ""
+	}
+	return p.Page.BasePath
+}
+
+func (p PageHandler) Label() string {
+	if p.Page == nil {
+		return ""
+	}
+	return p.Page.Label
+}
+
+func (p PageHandler) PatternPath() string {
+	if p.Page == nil {
+		return ""
+	}
+	return p.Page.PatternPath
 }
 
 func (r *PackedContent) ToHTML(slot string) string {

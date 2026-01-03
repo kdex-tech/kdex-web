@@ -148,7 +148,7 @@ func (th *HostHandler) L10nRenderLocked(
 	extraTemplateData map[string]any,
 ) (string, error) {
 	renderer := render.Renderer{
-		BasePath:        handler.Page.BasePath,
+		BasePath:        handler.BasePath(),
 		BrandName:       th.host.BrandName,
 		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: th.defaultLanguage,
@@ -165,11 +165,11 @@ func (th *HostHandler) L10nRenderLocked(
 		Navigations:     handler.NavigationToHTMLMap(),
 		Organization:    th.host.Organization,
 		PageMap:         pageMap,
-		PatternPath:     handler.Page.PatternPath,
+		PatternPath:     handler.PatternPath(),
 		TemplateContent: handler.MainTemplate,
 		TemplateName:    handler.Name,
 		Theme:           th.ThemeAssetsToString(),
-		Title:           handler.Page.Label,
+		Title:           handler.Label(),
 	}
 
 	return renderer.RenderPage()
@@ -238,8 +238,8 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	fmt.Fprintf(
 		&buffer,
 		kdexUIMetaTemplate,
-		handler.Page.BasePath,
-		handler.Page.PatternPath,
+		handler.BasePath(),
+		handler.PatternPath(),
 	)
 
 	// data-check-batch-endpoint="/~/check/batch"
@@ -292,8 +292,7 @@ func (th *HostHandler) RebuildMux() {
 			)
 
 			if rendered == "" {
-				// Fallback to standard http error if no custom announcement page
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				th.serveError(w, r, http.StatusNotFound, "not found")
 				return
 			}
 
@@ -304,12 +303,12 @@ func (th *HostHandler) RebuildMux() {
 
 			_, err := w.Write([]byte(rendered))
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				th.serveError(w, r, http.StatusInternalServerError, err.Error())
 			}
 		}
 
-		mux.HandleFunc("GET /", handler)
-		mux.HandleFunc("GET /{l10n}/", handler)
+		mux.HandleFunc("GET /{$}", handler)
+		mux.HandleFunc("GET /{l10n}/{$}", handler)
 
 		th.Mux = mux
 
@@ -317,7 +316,7 @@ func (th *HostHandler) RebuildMux() {
 	}
 
 	for _, ph := range pageHandlers {
-		basePath := ph.Page.BasePath
+		basePath := ph.BasePath()
 
 		if basePath == "" {
 			th.log.V(1).Info("somehow page has empty basePath, skipping", "page", ph.Name)
@@ -329,7 +328,7 @@ func (th *HostHandler) RebuildMux() {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			// variables captured in scope of handler
 			name := ph.Name
-			basePath := ph.Page.BasePath
+			basePath := basePath
 			l10nRenders := l10nRenders
 			th := th
 
@@ -338,7 +337,7 @@ func (th *HostHandler) RebuildMux() {
 			rendered, ok := l10nRenders[l.String()]
 
 			if !ok {
-				http.Error(w, "not found", http.StatusNotFound)
+				th.serveError(w, r, http.StatusNotFound, "not found")
 				return
 			}
 
@@ -349,7 +348,7 @@ func (th *HostHandler) RebuildMux() {
 
 			_, err := w.Write([]byte(rendered))
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				th.serveError(w, r, http.StatusInternalServerError, err.Error())
 			}
 		}
 
@@ -500,14 +499,14 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		var pageHandler *page.PageHandler
 
 		for _, ph := range th.Pages.List() {
-			if ph.Page.BasePath == basePath {
+			if ph.BasePath() == basePath {
 				pageHandler = &ph
 				break
 			}
 		}
 
 		if pageHandler == nil {
-			http.NotFound(w, r)
+			th.serveError(w, r, http.StatusNotFound, "page not found")
 			return
 		}
 
@@ -521,7 +520,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		}
 
 		if nav == "" {
-			http.NotFound(w, r)
+			th.serveError(w, r, http.StatusNotFound, "navigation not found")
 			return
 		}
 
@@ -544,26 +543,26 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 			MessagePrinter:  th.messagePrinterLocked(langTag),
 			Organization:    th.host.Organization,
 			PageMap:         pageMap,
-			PatternPath:     pageHandler.Page.PatternPath,
-			Title:           pageHandler.Page.Label,
+			PatternPath:     pageHandler.PatternPath(),
+			Title:           pageHandler.Label(),
 		}
 
 		templateData, err := renderer.TemplateData()
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			th.serveError(w, r, http.StatusInternalServerError, err.Error())
 			return
 		}
 
 		rendered, err := renderer.RenderOne(navKey, nav, templateData)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			th.serveError(w, r, http.StatusInternalServerError, err.Error())
 			return
 		}
 
 		w.Header().Set("Content-Type", "text/html")
 		_, err = w.Write([]byte(rendered))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			th.serveError(w, r, http.StatusInternalServerError, err.Error())
 		}
 	}
 
@@ -574,7 +573,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 		w.Header().Set("Content-Type", "application/json")
 		_, err := fmt.Fprintf(w, `{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			th.serveError(w, r, http.StatusInternalServerError, err.Error())
 		}
 	}
 
