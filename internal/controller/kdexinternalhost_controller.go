@@ -25,7 +25,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,10 +42,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-)
-
-const (
-	hostIndexKey = "spec.hostRef.name"
 )
 
 // KDexInternalHostReconciler reconciles a KDexInternalHost object
@@ -329,7 +324,7 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 	}
 
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexInternalPageBinding{}, hostIndexKey, func(rawObj client.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexInternalPageBinding{}, HOST_INDEX_KEY, func(rawObj client.Object) []string {
 		pageBinding := rawObj.(*kdexv1alpha1.KDexInternalPageBinding)
 		if pageBinding.Spec.HostRef.Name == "" {
 			return nil
@@ -339,7 +334,7 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexInternalTranslation{}, hostIndexKey, func(rawObj client.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexInternalTranslation{}, HOST_INDEX_KEY, func(rawObj client.Object) []string {
 		translation := rawObj.(*kdexv1alpha1.KDexInternalTranslation)
 		if translation.Spec.HostRef.Name == "" {
 			return nil
@@ -789,19 +784,19 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 					deployment.Labels[key] = value
 				}
 
-				deployment.Labels["kdex.dev/type"] = "backend"
+				deployment.Labels["kdex.dev/type"] = BACKEND
 				deployment.Labels["kdex.dev/backend"] = name
 				deployment.Labels["kdex.dev/host"] = internalHost.Name
 				deployment.Labels["kdex.dev/kind"] = kind
 
 				deployment.Spec = *r.getMemoizedBackendDeployment().DeepCopy()
 
-				deployment.Spec.Selector.MatchLabels["kdex.dev/type"] = "backend"
+				deployment.Spec.Selector.MatchLabels["kdex.dev/type"] = BACKEND
 				deployment.Spec.Selector.MatchLabels["kdex.dev/backend"] = name
 				deployment.Spec.Selector.MatchLabels["kdex.dev/host"] = internalHost.Name
 				deployment.Spec.Selector.MatchLabels["kdex.dev/kind"] = kind
 
-				deployment.Spec.Template.Labels["kdex.dev/type"] = "backend"
+				deployment.Spec.Template.Labels["kdex.dev/type"] = BACKEND
 				deployment.Spec.Template.Labels["kdex.dev/backend"] = name
 				deployment.Spec.Template.Labels["kdex.dev/host"] = internalHost.Name
 				deployment.Spec.Template.Labels["kdex.dev/kind"] = kind
@@ -819,7 +814,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 			}
 
 			if !foundPathPrefixEnv {
-				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, v1.EnvVar{
+				deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, corev1.EnvVar{
 					Name:  "PATH_PREFIX",
 					Value: backend.IngressPath,
 				})
@@ -852,7 +847,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 			if backend.StaticImage != "" {
 				foundOCIVolume := false
 				for idx, value := range deployment.Spec.Template.Spec.Volumes {
-					if value.Name == "oci-image" {
+					if value.Name == OCI_IMAGE {
 						foundOCIVolume = true
 						deployment.Spec.Template.Spec.Volumes[idx].Image.Reference = backend.StaticImage
 						deployment.Spec.Template.Spec.Volumes[idx].Image.PullPolicy = backend.StaticImagePullPolicy
@@ -862,7 +857,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 
 				if !foundOCIVolume {
 					deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, corev1.Volume{
-						Name: "oci-image",
+						Name: OCI_IMAGE,
 						VolumeSource: corev1.VolumeSource{
 							Image: &corev1.ImageVolumeSource{
 								Reference:  backend.StaticImage,
@@ -874,10 +869,10 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 
 				foundOCIVolumeMount := false
 				for idx, value := range deployment.Spec.Template.Spec.Containers[0].VolumeMounts {
-					if value.Name == "oci-image" {
+					if value.Name == OCI_IMAGE {
 						foundOCIVolumeMount = true
 						deployment.Spec.Template.Spec.Containers[0].VolumeMounts[idx].MountPath = "/public"
-						deployment.Spec.Template.Spec.Containers[0].VolumeMounts[idx].Name = "oci-image"
+						deployment.Spec.Template.Spec.Containers[0].VolumeMounts[idx].Name = OCI_IMAGE
 						deployment.Spec.Template.Spec.Containers[0].VolumeMounts[idx].ReadOnly = true
 						break
 					}
@@ -885,7 +880,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 
 				if !foundOCIVolumeMount {
 					deployment.Spec.Template.Spec.Containers[0].VolumeMounts = append(deployment.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
-						Name:      "oci-image",
+						Name:      OCI_IMAGE,
 						MountPath: "/public",
 						ReadOnly:  true,
 					})
@@ -942,7 +937,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendService(
 					service.Labels[key] = value
 				}
 
-				service.Labels["kdex.dev/type"] = "backend"
+				service.Labels["kdex.dev/type"] = BACKEND
 				service.Labels["kdex.dev/backend"] = name
 				service.Labels["kdex.dev/host"] = internalHost.Name
 				service.Labels["kdex.dev/kind"] = kind
@@ -951,7 +946,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendService(
 
 				service.Spec.Selector = make(map[string]string)
 
-				service.Spec.Selector["kdex.dev/type"] = "backend"
+				service.Spec.Selector["kdex.dev/type"] = BACKEND
 				service.Spec.Selector["kdex.dev/backend"] = name
 				service.Spec.Selector["kdex.dev/host"] = internalHost.Name
 				service.Spec.Selector["kdex.dev/kind"] = kind
@@ -990,7 +985,7 @@ func (r *KDexInternalHostReconciler) cleanupObsoleteBackends(
 	}
 
 	labelSelector := client.MatchingLabels{
-		"kdex.dev/type": "backend",
+		"kdex.dev/type": BACKEND,
 		"kdex.dev/host": internalHost.Name,
 	}
 

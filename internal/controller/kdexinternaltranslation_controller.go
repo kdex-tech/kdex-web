@@ -35,8 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const translationFinalizerName = "kdex.dev/kdex-web-translation-finalizer"
-
 // KDexInternalTranslationReconciler reconciles a KDexInternalTranslation object
 type KDexInternalTranslationReconciler struct {
 	client.Client
@@ -82,18 +80,18 @@ func (r *KDexInternalTranslationReconciler) Reconcile(ctx context.Context, req c
 	}()
 
 	if translation.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
-			controllerutil.AddFinalizer(&translation, translationFinalizerName)
+		if !controllerutil.ContainsFinalizer(&translation, TRANSLATION_FINALIZER) {
+			controllerutil.AddFinalizer(&translation, TRANSLATION_FINALIZER)
 			if err := r.Update(ctx, &translation); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{Requeue: true}, nil
 		}
 	} else {
-		if controllerutil.ContainsFinalizer(&translation, translationFinalizerName) {
+		if controllerutil.ContainsFinalizer(&translation, TRANSLATION_FINALIZER) {
 			r.HostHandler.RemoveTranslation(translation.Name)
 
-			controllerutil.RemoveFinalizer(&translation, translationFinalizerName)
+			controllerutil.RemoveFinalizer(&translation, TRANSLATION_FINALIZER)
 			if err := r.Update(ctx, &translation); err != nil {
 				return ctrl.Result{}, err
 			}

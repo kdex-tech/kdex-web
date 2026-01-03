@@ -47,6 +47,7 @@ type KDexInternalUtilityPageReconciler struct {
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalutilitypages/finalizers,verbs=update
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalutilitypages/status,    verbs=get;update;patch
 
+// nolint:gocyclo
 func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 

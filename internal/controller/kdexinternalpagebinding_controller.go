@@ -36,8 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const pageBindingFinalizerName = "kdex.dev/kdex-nexus-page-binding-finalizer"
-
 // KDexInternalPageBindingReconciler reconciles a KDexInternalPageBinding object
 type KDexInternalPageBindingReconciler struct {
 	client.Client
@@ -95,18 +93,18 @@ func (r *KDexInternalPageBindingReconciler) Reconcile(ctx context.Context, req c
 	}()
 
 	if pageBinding.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&pageBinding, pageBindingFinalizerName) {
-			controllerutil.AddFinalizer(&pageBinding, pageBindingFinalizerName)
+		if !controllerutil.ContainsFinalizer(&pageBinding, PAGE_BINDING_FINALIZER) {
+			controllerutil.AddFinalizer(&pageBinding, PAGE_BINDING_FINALIZER)
 			if err := r.Update(ctx, &pageBinding); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{Requeue: true}, nil
 		}
 	} else {
-		if controllerutil.ContainsFinalizer(&pageBinding, pageBindingFinalizerName) {
+		if controllerutil.ContainsFinalizer(&pageBinding, PAGE_BINDING_FINALIZER) {
 			r.HostHandler.Pages.Delete(pageBinding.Name)
 
-			controllerutil.RemoveFinalizer(&pageBinding, pageBindingFinalizerName)
+			controllerutil.RemoveFinalizer(&pageBinding, PAGE_BINDING_FINALIZER)
 			if err := r.Update(ctx, &pageBinding); err != nil {
 				return ctrl.Result{}, err
 			}
