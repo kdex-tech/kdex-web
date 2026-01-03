@@ -114,7 +114,7 @@ func (r *KDexInternalTranslationReconciler) Reconcile(ctx context.Context, req c
 		return r1, err
 	}
 
-	r.HostHandler.AddOrUpdateTranslation(translation.Name, &translation.Spec)
+	r.HostHandler.AddOrUpdateTranslation(translation.Name, &translation.Spec.KDexTranslationSpec)
 
 	kdexv1alpha1.SetConditions(
 		&translation.Status.Conditions,

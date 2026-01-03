@@ -46,23 +46,25 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexTranslationSpec{
+				Spec: kdexv1alpha1.KDexInternalTranslationSpec{
 					HostRef: corev1.LocalObjectReference{
 						Name: focalHost,
 					},
-					Translations: []kdexv1alpha1.Translation{
-						{
-							Lang: "en",
-							KeysAndValues: map[string]string{
-								"key-1": "KEY_1_ENGLISH",
-								"key-2": "KEY_2_ENGLISH",
+					KDexTranslationSpec: kdexv1alpha1.KDexTranslationSpec{
+						Translations: []kdexv1alpha1.Translation{
+							{
+								Lang: "en",
+								KeysAndValues: map[string]string{
+									"key-1": "KEY_1_ENGLISH",
+									"key-2": "KEY_2_ENGLISH",
+								},
 							},
-						},
-						{
-							Lang: "fr",
-							KeysAndValues: map[string]string{
-								"key-1": "KEY_1_FRENCH",
-								"key-2": "KEY_2_FRENCH",
+							{
+								Lang: "fr",
+								KeysAndValues: map[string]string{
+									"key-1": "KEY_1_FRENCH",
+									"key-2": "KEY_2_FRENCH",
+								},
 							},
 						},
 					},
@@ -101,6 +103,11 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 								Domains: []string{
 									"example.com",
 								},
+							},
+						},
+						InternalTranslationRefs: []corev1.LocalObjectReference{
+							{
+								Name: resource.Name,
 							},
 						},
 					},

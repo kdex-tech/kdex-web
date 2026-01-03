@@ -317,8 +317,6 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
 		case *kdexv1alpha1.KDexInternalPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
-		case *kdexv1alpha1.KDexInternalTranslation:
-			return t.Spec.HostRef.Name == r.FocalHost
 		default:
 			return true
 		}
