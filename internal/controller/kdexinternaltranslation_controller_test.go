@@ -151,13 +151,13 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 
 			mp_en := message.NewPrinter(
 				language.English,
-				message.Catalog(hostHandler.Translations),
+				message.Catalog(hostHandler.Translations.Catalog()),
 			)
 			Expect(mp_en.Sprintf("key-1")).To(Equal("KEY_1_ENGLISH"))
 
 			mp_fr := message.NewPrinter(
 				language.French,
-				message.Catalog(hostHandler.Translations),
+				message.Catalog(hostHandler.Translations.Catalog()),
 			)
 			Expect(mp_fr.Sprintf("key-1")).To(Equal("KEY_1_FRENCH"))
 		})

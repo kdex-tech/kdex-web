@@ -475,7 +475,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 			for lang, expected := range tt.langTests {
 				messagePrinter := message.NewPrinter(
 					language.Make(lang),
-					message.Catalog(th.Translations),
+					message.Catalog(th.Translations.Catalog()),
 				)
 				g.Expect(
 					messagePrinter.Sprintf(expected.key),

@@ -2,6 +2,7 @@ package host
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -23,7 +24,7 @@ type HostHandler struct {
 	Namespace            string
 	Pages                *page.PageStore
 	ScriptLibraries      []kdexv1alpha1.KDexScriptLibrarySpec
-	Translations         *catalog.Builder
+	Translations         Translations
 	defaultLanguage      string
 	host                 *kdexv1alpha1.KDexHostSpec
 	importmap            string
@@ -32,6 +33,50 @@ type HostHandler struct {
 	themeAssets          []kdexv1alpha1.Asset
 	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
+
+	// TODO: register all routes added to the mux so that we can map them in openapi
+}
+
+type Translations struct {
+	catalog *catalog.Builder
+	keys    []string
+}
+
+func NewTranslations(defaultLanguage string, translations map[string]kdexv1alpha1.KDexTranslationSpec) (*Translations, error) {
+	catalogBuilder := catalog.NewBuilder()
+
+	if err := catalogBuilder.SetString(language.Make(defaultLanguage), "_", "_"); err != nil {
+		return nil, fmt.Errorf("failed to set default translation %s %s", defaultLanguage, "_")
+	}
+
+	keys := []string{}
+	for name, translation := range translations {
+		for _, tr := range translation.Translations {
+			for key, value := range tr.KeysAndValues {
+				if err := catalogBuilder.SetString(language.Make(tr.Lang), key, value); err != nil {
+					return nil, fmt.Errorf("failed to set translation %s %s %s %s", name, tr.Lang, key, value)
+				}
+				keys = append(keys, key)
+			}
+		}
+	}
+
+	return &Translations{
+		catalog: catalogBuilder,
+		keys:    keys,
+	}, nil
+}
+
+func (t *Translations) Catalog() *catalog.Builder {
+	return t.catalog
+}
+
+func (t *Translations) Keys() []string {
+	return t.keys
+}
+
+func (t *Translations) Languages() []language.Tag {
+	return t.catalog.Languages()
 }
 
 type errorResponseWriter struct {
@@ -233,12 +278,12 @@ func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler
 		utilityPages:         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
 	}
 
-	catalogBuilder := catalog.NewBuilder()
-	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
-		th.log.Error(err, "failed to add default placeholder translation")
+	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
+	if err != nil {
+		panic(err)
 	}
 
-	th.Translations = catalogBuilder
+	th.Translations = *translations
 	th.Pages = page.NewPageStore(
 		name,
 		th.RebuildMux,
@@ -311,7 +356,6 @@ func (th *HostHandler) RebuildMux() {
 			name := ph.Name
 			basePath := basePath
 			l10nRenders := l10nRenders
-			th := th
 
 			l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 
@@ -428,10 +472,8 @@ func (ew *errorResponseWriter) WriteHeader(code int) {
 func (th *HostHandler) availableLanguagesLocked() []string {
 	var availableLangs []string
 
-	if th.Translations != nil {
-		for _, tag := range th.Translations.Languages() {
-			availableLangs = append(availableLangs, tag.String())
-		}
+	for _, tag := range th.Translations.Languages() {
+		availableLangs = append(availableLangs, tag.String())
 	}
 
 	return availableLangs
@@ -454,7 +496,7 @@ func (th *HostHandler) unimplementedHandler(path string, mux *http.ServeMux) {
 func (th *HostHandler) messagePrinterLocked(tag language.Tag) *message.Printer {
 	return message.NewPrinter(
 		tag,
-		message.Catalog(th.Translations),
+		message.Catalog(th.Translations.Catalog()),
 	)
 }
 
@@ -462,8 +504,8 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	th.navigationHandler(mux)
+	th.translationHandler(mux)
 
-	// TODO: implement a translation handler
 	// TODO: implement a state handler
 	// TODO: implement an oauth handler
 	// TODO: implement a check handler
@@ -562,24 +604,48 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux) {
 	)
 }
 
-func (th *HostHandler) rebuildTranslationsLocked() {
-	catalogBuilder := catalog.NewBuilder()
-
-	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
-		th.log.Error(err, "failed to add placeholder translation")
-	}
-
-	for _, translation := range th.translationResources {
-		for name, tr := range translation.Translations {
-			for key, value := range tr.KeysAndValues {
-				if err := catalogBuilder.SetString(language.Make(tr.Lang), key, value); err != nil {
-					th.log.Error(err, "failed to set translation", "translation", name, "lang", tr.Lang, "key", key, "value", value)
-				}
+func (th *HostHandler) translationHandler(mux *http.ServeMux) {
+	mux.HandleFunc(
+		"GET /~/translation/{l10n}",
+		func(w http.ResponseWriter, r *http.Request) {
+			l10n := r.PathValue("l10n")
+			langTag := language.Make(l10n)
+			if langTag.IsRoot() {
+				langTag = language.Make(th.defaultLanguage)
 			}
-		}
+
+			// Get all the keys and values for the given language
+			keys := th.Translations.Keys()
+			// check query parameters for array of keys
+			queryParams := r.URL.Query()
+			keysParam := queryParams["keys"]
+			if len(keysParam) > 0 {
+				keys = keysParam
+			}
+
+			keysAndValues := map[string]string{}
+			printer := th.messagePrinterLocked(langTag)
+			for _, key := range keys {
+				keysAndValues[key] = printer.Sprintf(key)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			err := json.NewEncoder(w).Encode(keysAndValues)
+			if err != nil {
+				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+			}
+		},
+	)
+}
+
+func (th *HostHandler) rebuildTranslationsLocked() {
+	translations, err := NewTranslations(th.defaultLanguage, th.translationResources)
+	if err != nil {
+		th.log.Error(err, "failed to create translations")
+		return
 	}
 
-	th.Translations = catalogBuilder
+	th.Translations = *translations
 }
 
 func (th *HostHandler) renderUtilityPageLocked(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any) string {
@@ -599,9 +665,7 @@ func (th *HostHandler) renderUtilityPageLocked(utilityType kdexv1alpha1.KDexUtil
 
 func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {
 	th.mu.RLock()
-	defaultLang := th.defaultLanguage
-	languages := th.Translations.Languages()
-	l := kdexhttp.GetLang(r, defaultLang, languages)
+	l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 	rendered := th.renderUtilityPageLocked(
 		kdexv1alpha1.ErrorUtilityPageType,
 		l,
