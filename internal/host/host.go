@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -196,12 +197,15 @@ func (th *HostHandler) L10nRenderLocked(
 	l language.Tag,
 	extraTemplateData map[string]any,
 ) (string, error) {
+
+	// make sure everything passed to the renderer is mutation safe (i.e. copy it)
+
 	renderer := render.Renderer{
 		BasePath:        handler.BasePath(),
 		BrandName:       th.host.BrandName,
 		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: th.defaultLanguage,
-		Extra:           extraTemplateData,
+		Extra:           maps.Clone(extraTemplateData),
 		Footer:          handler.Footer,
 		FootScript:      th.FootScriptToHTML(handler),
 		Header:          handler.Header,
@@ -213,7 +217,7 @@ func (th *HostHandler) L10nRenderLocked(
 		Meta:            th.MetaToString(handler),
 		Navigations:     handler.NavigationToHTMLMap(),
 		Organization:    th.host.Organization,
-		PageMap:         pageMap,
+		PageMap:         maps.Clone(pageMap),
 		PatternPath:     handler.PatternPath(),
 		TemplateContent: handler.MainTemplate,
 		TemplateName:    handler.Name,
