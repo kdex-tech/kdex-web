@@ -340,8 +340,8 @@ func (r *KDexInternalPageBindingReconciler) innerReconcile(
 	}
 
 	navigationsMap := map[string]string{}
-	for _, navigation := range navigations {
-		navigationsMap[navigation.Name] = navigation.Spec.Content
+	for slot, navigation := range navigations {
+		navigationsMap[slot] = navigation.Spec.Content
 	}
 
 	r.HostHandler.Pages.Set(page.PageHandler{

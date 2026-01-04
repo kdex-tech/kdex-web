@@ -29,9 +29,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+const UTILITY_PAGE_FINALIZER = "kdex.dev/kdex-web-utility-page-finalizer"
 
 // KDexInternalUtilityPageReconciler reconciles a KDexInternalUtilityPage object
 type KDexInternalUtilityPageReconciler struct {
@@ -66,6 +69,26 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 		log.V(1).Info("skipping utility page for non-focal host",
 			"hostRef", internalUtilityPage.Spec.HostRef.Name,
 			"focalHost", r.FocalHost)
+		return ctrl.Result{}, nil
+	}
+
+	if internalUtilityPage.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(&internalUtilityPage, UTILITY_PAGE_FINALIZER) {
+			controllerutil.AddFinalizer(&internalUtilityPage, UTILITY_PAGE_FINALIZER)
+			if err := r.Update(ctx, &internalUtilityPage); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{Requeue: true}, nil
+		}
+	} else {
+		if controllerutil.ContainsFinalizer(&internalUtilityPage, UTILITY_PAGE_FINALIZER) {
+			r.HostHandler.RemoveUtilityPage(internalUtilityPage.Name)
+
+			controllerutil.RemoveFinalizer(&internalUtilityPage, UTILITY_PAGE_FINALIZER)
+			if err := r.Update(ctx, &internalUtilityPage); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
 		return ctrl.Result{}, nil
 	}
 

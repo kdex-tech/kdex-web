@@ -400,6 +400,20 @@ func (th *HostHandler) RemoveTranslation(name string) {
 	th.RebuildMux() // Called after lock is released
 }
 
+func (th *HostHandler) RemoveUtilityPage(name string) {
+	th.log.V(1).Info("delete utility page", "name", name)
+	th.mu.Lock()
+	for t, ph := range th.utilityPages {
+		if ph.Name == name {
+			delete(th.utilityPages, t)
+			break
+		}
+	}
+	th.mu.Unlock()
+
+	th.RebuildMux() // Called after lock is released
+}
+
 func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	th.mu.RLock()
 	mux := th.Mux
