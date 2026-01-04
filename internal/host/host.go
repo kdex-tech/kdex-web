@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -627,6 +628,25 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 			printer := th.messagePrinterLocked(langTag)
 			for _, key := range keys {
 				keysAndValues[key] = printer.Sprintf(key)
+				// replace each occurance of the string `%!s(MISSING)` with a placeholder `{{n}}` where `n` is the alphabetic index of the placeholder
+				parts := strings.Split(keysAndValues[key], "%!s(MISSING)")
+				if len(parts) > 1 {
+					var builder strings.Builder
+					for i, part := range parts {
+						builder.WriteString(part)
+						if i < len(parts)-1 {
+							// Convert index to alphabetic character (0 -> a, 1 -> b, etc.)
+							placeholder := 'a' + i
+							if placeholder > 'z' {
+								// Fallback or handle wrap if more than 26 placeholders are present
+								fmt.Fprintf(&builder, "{{%d}}", i)
+							} else {
+								fmt.Fprintf(&builder, "{{%c}}", placeholder)
+							}
+						}
+					}
+					keysAndValues[key] = builder.String()
+				}
 			}
 
 			w.Header().Set("Content-Type", "application/json")
