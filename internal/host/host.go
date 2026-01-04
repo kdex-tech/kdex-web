@@ -18,46 +18,38 @@ import (
 )
 
 type HostHandler struct {
+	Mux                  *http.ServeMux
 	Name                 string
 	Namespace            string
-	Mux                  *http.ServeMux
 	Pages                *page.PageStore
 	ScriptLibraries      []kdexv1alpha1.KDexScriptLibrarySpec
 	Translations         *catalog.Builder
-	themeAssets          []kdexv1alpha1.Asset
 	defaultLanguage      string
 	host                 *kdexv1alpha1.KDexHostSpec
 	importmap            string
 	log                  logr.Logger
 	mu                   sync.RWMutex
+	themeAssets          []kdexv1alpha1.Asset
 	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 }
 
-func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler {
-	th := &HostHandler{
-		Name:                 name,
-		Namespace:            namespace,
-		defaultLanguage:      "en",
-		log:                  log.WithValues("host", name),
-		translationResources: map[string]kdexv1alpha1.KDexTranslationSpec{},
-		utilityPages:         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
-	}
-
-	catalogBuilder := catalog.NewBuilder()
-	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
-		th.log.Error(err, "failed to add default placeholder translation")
-	}
-
-	th.Translations = catalogBuilder
-	th.Pages = page.NewPageStore(
-		name,
-		th.RebuildMux,
-		th.log.WithName("pages"),
-	)
-	th.RebuildMux()
-	return th
+type errorResponseWriter struct {
+	http.ResponseWriter
+	statusCode  int
+	statusMsg   string
+	wroteHeader bool
 }
+
+const (
+	kdexUIMetaTemplate = `<meta
+  name="kdex-ui"
+  data-page-basepath="%s"
+  data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
+  data-page-patternpath="%s"
+/>
+`
+)
 
 func (th *HostHandler) AddOrUpdateTranslation(name string, translation *kdexv1alpha1.KDexTranslationSpec) {
 	if translation == nil {
@@ -68,6 +60,17 @@ func (th *HostHandler) AddOrUpdateTranslation(name string, translation *kdexv1al
 	th.translationResources[name] = *translation
 	th.mu.Unlock()
 	th.RebuildMux() // Called after lock is released
+}
+
+func (th *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
+	if ph.UtilityPage == nil {
+		return
+	}
+	th.log.V(1).Info("add or update utility page", "name", ph.Name, "type", ph.UtilityPage.Type)
+	th.mu.Lock()
+	th.utilityPages[ph.UtilityPage.Type] = ph
+	th.mu.Unlock()
+	th.RebuildMux()
 }
 
 func (th *HostHandler) Domains() []string {
@@ -191,42 +194,6 @@ func (th *HostHandler) L10nRendersLocked(
 	return l10nRenders
 }
 
-func (th *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
-	if ph.UtilityPage == nil {
-		return
-	}
-	th.log.V(1).Info("add or update utility page", "name", ph.Name, "type", ph.UtilityPage.Type)
-	th.mu.Lock()
-	th.utilityPages[ph.UtilityPage.Type] = ph
-	th.mu.Unlock()
-	th.RebuildMux()
-}
-
-func (th *HostHandler) renderUtilityPageLocked(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any) string {
-	ph, ok := th.utilityPages[utilityType]
-	if !ok {
-		return ""
-	}
-
-	rendered, err := th.L10nRenderLocked(ph, map[string]any{}, l, extraTemplateData)
-	if err != nil {
-		th.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
-		return ""
-	}
-
-	return rendered
-}
-
-const (
-	kdexUIMetaTemplate = `<meta
-  name="kdex-ui"
-  data-page-basepath="%s"
-  data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
-  data-page-patternpath="%s"
-/>
-`
-)
-
 func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 
@@ -256,15 +223,29 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 	return buffer.String()
 }
 
-func (th *HostHandler) ThemeAssetsToString() string {
-	var buffer bytes.Buffer
-
-	for _, asset := range th.themeAssets {
-		buffer.WriteString(asset.ToTag())
-		buffer.WriteRune('\n')
+func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler {
+	th := &HostHandler{
+		Name:                 name,
+		Namespace:            namespace,
+		defaultLanguage:      "en",
+		log:                  log.WithValues("host", name),
+		translationResources: map[string]kdexv1alpha1.KDexTranslationSpec{},
+		utilityPages:         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
 	}
 
-	return buffer.String()
+	catalogBuilder := catalog.NewBuilder()
+	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
+		th.log.Error(err, "failed to add default placeholder translation")
+	}
+
+	th.Translations = catalogBuilder
+	th.Pages = page.NewPageStore(
+		name,
+		th.RebuildMux,
+		th.log.WithName("pages"),
+	)
+	th.RebuildMux()
+	return th
 }
 
 func (th *HostHandler) RebuildMux() {
@@ -392,11 +373,42 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-type errorResponseWriter struct {
-	http.ResponseWriter
-	statusCode  int
-	statusMsg   string
-	wroteHeader bool
+func (th *HostHandler) SetHost(
+	host *kdexv1alpha1.KDexHostSpec,
+	themeAssets []kdexv1alpha1.Asset,
+	scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec,
+	importmap string,
+) {
+	th.mu.Lock()
+	th.defaultLanguage = host.DefaultLang
+	th.host = host
+	th.ScriptLibraries = scriptLibraries
+	th.themeAssets = themeAssets
+	th.importmap = importmap
+	th.mu.Unlock()
+	th.RebuildMux()
+}
+
+func (th *HostHandler) ThemeAssetsToString() string {
+	var buffer bytes.Buffer
+
+	for _, asset := range th.themeAssets {
+		buffer.WriteString(asset.ToTag())
+		buffer.WriteRune('\n')
+	}
+
+	return buffer.String()
+}
+
+func (ew *errorResponseWriter) Write(b []byte) (int, error) {
+	if ew.statusCode >= 400 {
+		// Drop original error body, we will render our own
+		return len(b), nil
+	}
+	if !ew.wroteHeader {
+		ew.WriteHeader(http.StatusOK)
+	}
+	return ew.ResponseWriter.Write(b)
 }
 
 func (ew *errorResponseWriter) WriteHeader(code int) {
@@ -413,15 +425,176 @@ func (ew *errorResponseWriter) WriteHeader(code int) {
 	ew.ResponseWriter.WriteHeader(code)
 }
 
-func (ew *errorResponseWriter) Write(b []byte) (int, error) {
-	if ew.statusCode >= 400 {
-		// Drop original error body, we will render our own
-		return len(b), nil
+func (th *HostHandler) availableLanguagesLocked() []string {
+	var availableLangs []string
+
+	if th.Translations != nil {
+		for _, tag := range th.Translations.Languages() {
+			availableLangs = append(availableLangs, tag.String())
+		}
 	}
-	if !ew.wroteHeader {
-		ew.WriteHeader(http.StatusOK)
+
+	return availableLangs
+}
+
+func (th *HostHandler) unimplementedHandler(path string, mux *http.ServeMux) {
+	mux.HandleFunc(
+		path,
+		func(w http.ResponseWriter, r *http.Request) {
+			th.log.V(1).Info("unimplemented handler", "path", r.URL.Path)
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprintf(w, `{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
+			if err != nil {
+				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+			}
+		},
+	)
+}
+
+func (th *HostHandler) messagePrinterLocked(tag language.Tag) *message.Printer {
+	return message.NewPrinter(
+		tag,
+		message.Catalog(th.Translations),
+	)
+}
+
+func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
+	mux := http.NewServeMux()
+
+	th.navigationHandler(mux)
+
+	// TODO: implement a translation handler
+	// TODO: implement a state handler
+	// TODO: implement an oauth handler
+	// TODO: implement a check handler
+	// TODO: implement an openapi handler
+
+	th.unimplementedHandler("GET /~/check/", mux)
+	th.unimplementedHandler("GET /~/oauth/", mux)
+	th.unimplementedHandler("GET /~/state/", mux)
+	th.unimplementedHandler("GET /~/openapi/", mux)
+
+	return mux
+}
+
+func (th *HostHandler) navigationHandler(mux *http.ServeMux) {
+	mux.HandleFunc(
+		"GET /~/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}",
+		func(w http.ResponseWriter, r *http.Request) {
+			th.mu.RLock()
+			defer th.mu.RUnlock()
+
+			basePath := "/" + r.PathValue("basePathMinusLeadingSlash")
+			l10n := r.PathValue("l10n")
+			navKey := r.PathValue("navKey")
+
+			th.log.V(2).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
+
+			var pageHandler *page.PageHandler
+
+			for _, ph := range th.Pages.List() {
+				if ph.BasePath() == basePath {
+					pageHandler = &ph
+					break
+				}
+			}
+
+			if pageHandler == nil {
+				th.serveError(w, r, http.StatusNotFound, "page not found")
+				return
+			}
+
+			var nav string
+
+			for key, n := range pageHandler.Navigations {
+				if key == navKey {
+					nav = n
+					break
+				}
+			}
+
+			if nav == "" {
+				th.serveError(w, r, http.StatusNotFound, "navigation not found")
+				return
+			}
+
+			langTag := language.Make(l10n)
+			if langTag.IsRoot() {
+				langTag = language.Make(th.defaultLanguage)
+			}
+
+			rootEntry := &render.PageEntry{}
+			th.Pages.BuildMenuEntries(rootEntry, &langTag, langTag.String() == th.defaultLanguage, nil)
+			pageMap := *rootEntry.Children
+
+			renderer := render.Renderer{
+				BasePath:        pageHandler.Page.BasePath,
+				BrandName:       th.host.BrandName,
+				DefaultLanguage: th.defaultLanguage,
+				Language:        langTag.String(),
+				Languages:       th.availableLanguagesLocked(),
+				LastModified:    time.Now(),
+				MessagePrinter:  th.messagePrinterLocked(langTag),
+				Organization:    th.host.Organization,
+				PageMap:         pageMap,
+				PatternPath:     pageHandler.PatternPath(),
+				Title:           pageHandler.Label(),
+			}
+
+			templateData, err := renderer.TemplateData()
+			if err != nil {
+				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			rendered, err := renderer.RenderOne(navKey, nav, templateData)
+			if err != nil {
+				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			w.Header().Set("Content-Type", "text/html")
+			_, err = w.Write([]byte(rendered))
+			if err != nil {
+				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+			}
+		},
+	)
+}
+
+func (th *HostHandler) rebuildTranslationsLocked() {
+	catalogBuilder := catalog.NewBuilder()
+
+	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
+		th.log.Error(err, "failed to add placeholder translation")
 	}
-	return ew.ResponseWriter.Write(b)
+
+	for _, translation := range th.translationResources {
+		for name, tr := range translation.Translations {
+			for key, value := range tr.KeysAndValues {
+				if err := catalogBuilder.SetString(language.Make(tr.Lang), key, value); err != nil {
+					th.log.Error(err, "failed to set translation", "translation", name, "lang", tr.Lang, "key", key, "value", value)
+				}
+			}
+		}
+	}
+
+	th.Translations = catalogBuilder
+}
+
+func (th *HostHandler) renderUtilityPageLocked(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any) string {
+	ph, ok := th.utilityPages[utilityType]
+	if !ok {
+		return ""
+	}
+
+	rendered, err := th.L10nRenderLocked(ph, map[string]any{}, l, extraTemplateData)
+	if err != nil {
+		th.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
+		return ""
+	}
+
+	return rendered
 }
 
 func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {
@@ -446,161 +619,4 @@ func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 	w.Header().Set("Content-Language", l.String())
 	w.WriteHeader(code)
 	_, _ = w.Write([]byte(rendered))
-}
-
-func (th *HostHandler) SetHost(
-	host *kdexv1alpha1.KDexHostSpec,
-	themeAssets []kdexv1alpha1.Asset,
-	scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec,
-	importmap string,
-) {
-	th.mu.Lock()
-	th.defaultLanguage = host.DefaultLang
-	th.host = host
-	th.ScriptLibraries = scriptLibraries
-	th.themeAssets = themeAssets
-	th.importmap = importmap
-	th.mu.Unlock()
-	th.RebuildMux()
-}
-
-func (th *HostHandler) availableLanguagesLocked() []string {
-	var availableLangs []string
-
-	if th.Translations != nil {
-		for _, tag := range th.Translations.Languages() {
-			availableLangs = append(availableLangs, tag.String())
-		}
-	}
-
-	return availableLangs
-}
-
-func (th *HostHandler) messagePrinterLocked(tag language.Tag) *message.Printer {
-	return message.NewPrinter(
-		tag,
-		message.Catalog(th.Translations),
-	)
-}
-
-func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
-	mux := http.NewServeMux()
-
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		th.mu.RLock()
-		defer th.mu.RUnlock()
-
-		basePath := "/" + r.PathValue("basePathMinusLeadingSlash")
-		l10n := r.PathValue("l10n")
-		navKey := r.PathValue("navKey")
-
-		th.log.V(2).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
-
-		var pageHandler *page.PageHandler
-
-		for _, ph := range th.Pages.List() {
-			if ph.BasePath() == basePath {
-				pageHandler = &ph
-				break
-			}
-		}
-
-		if pageHandler == nil {
-			th.serveError(w, r, http.StatusNotFound, "page not found")
-			return
-		}
-
-		var nav string
-
-		for key, n := range pageHandler.Navigations {
-			if key == navKey {
-				nav = n
-				break
-			}
-		}
-
-		if nav == "" {
-			th.serveError(w, r, http.StatusNotFound, "navigation not found")
-			return
-		}
-
-		langTag := language.Make(l10n)
-		if langTag.IsRoot() {
-			langTag = language.Make(th.defaultLanguage)
-		}
-
-		rootEntry := &render.PageEntry{}
-		th.Pages.BuildMenuEntries(rootEntry, &langTag, langTag.String() == th.defaultLanguage, nil)
-		pageMap := *rootEntry.Children
-
-		renderer := render.Renderer{
-			BasePath:        pageHandler.Page.BasePath,
-			BrandName:       th.host.BrandName,
-			DefaultLanguage: th.defaultLanguage,
-			Language:        langTag.String(),
-			Languages:       th.availableLanguagesLocked(),
-			LastModified:    time.Now(),
-			MessagePrinter:  th.messagePrinterLocked(langTag),
-			Organization:    th.host.Organization,
-			PageMap:         pageMap,
-			PatternPath:     pageHandler.PatternPath(),
-			Title:           pageHandler.Label(),
-		}
-
-		templateData, err := renderer.TemplateData()
-		if err != nil {
-			th.serveError(w, r, http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		rendered, err := renderer.RenderOne(navKey, nav, templateData)
-		if err != nil {
-			th.serveError(w, r, http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/html")
-		_, err = w.Write([]byte(rendered))
-		if err != nil {
-			th.serveError(w, r, http.StatusInternalServerError, err.Error())
-		}
-	}
-
-	mux.HandleFunc("GET /~/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}", handler)
-
-	handler = func(w http.ResponseWriter, r *http.Request) {
-		th.log.V(1).Info("unimplemented handler", "path", r.URL.Path)
-		w.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(w, `{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
-		if err != nil {
-			th.serveError(w, r, http.StatusInternalServerError, err.Error())
-		}
-	}
-
-	mux.HandleFunc("GET /~/check/", handler)
-	mux.HandleFunc("GET /~/oauth/", handler)
-	mux.HandleFunc("GET /~/navigation", handler)
-	mux.HandleFunc("GET /~/state", handler)
-
-	return mux
-}
-
-func (th *HostHandler) rebuildTranslationsLocked() {
-	catalogBuilder := catalog.NewBuilder()
-
-	if err := catalogBuilder.SetString(language.Make(th.defaultLanguage), "_", "_"); err != nil {
-		th.log.Error(err, "failed to add placeholder translation")
-	}
-
-	for _, translation := range th.translationResources {
-		for name, tr := range translation.Translations {
-			for key, value := range tr.KeysAndValues {
-				if err := catalogBuilder.SetString(language.Make(tr.Lang), key, value); err != nil {
-					th.log.Error(err, "failed to set translation", "translation", name, "lang", tr.Lang, "key", key, "value", value)
-				}
-			}
-		}
-	}
-
-	th.Translations = catalogBuilder
 }

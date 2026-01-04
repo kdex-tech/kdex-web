@@ -9,6 +9,9 @@ import (
 )
 
 func New(address string, hostHandler *host.HostHandler) *http.Server {
+	// TODO: add authentication middleware
+	// TODO: add policy based access control
+
 	handler := middleware.WithLogger(
 		logf.Log.WithName("server"),
 	)(
