@@ -592,9 +592,6 @@ func (th *HostHandler) rebuildTranslationsLocked() {
 		th.log.Error(err, "failed to add placeholder translation")
 	}
 
-	// Add default translations for announcement page
-	th.addDefaultAnnouncementTranslationsLocked(catalogBuilder)
-
 	for _, translation := range th.translationResources {
 		for name, tr := range translation.Translations {
 			for key, value := range tr.KeysAndValues {
@@ -606,26 +603,4 @@ func (th *HostHandler) rebuildTranslationsLocked() {
 	}
 
 	th.Translations = catalogBuilder
-}
-
-func (th *HostHandler) addDefaultAnnouncementTranslationsLocked(catalogBuilder *catalog.Builder) {
-	// English translations
-	_ = catalogBuilder.SetString(language.English, "announcement.title", "Welcome to %s")
-	_ = catalogBuilder.SetString(language.English, "announcement.message", "This host is ready to serve requests, but no pages have been deployed yet. Please deploy pages to start serving content.")
-	_ = catalogBuilder.SetString(language.English, "announcement.organization", "Organization: %s")
-
-	// Spanish translations
-	_ = catalogBuilder.SetString(language.Spanish, "announcement.title", "Bienvenido a %s")
-	_ = catalogBuilder.SetString(language.Spanish, "announcement.message", "Este host está listo para servir solicitudes, pero aún no se han desplegado páginas. Por favor, despliegue páginas para comenzar a servir contenido.")
-	_ = catalogBuilder.SetString(language.Spanish, "announcement.organization", "Organización: %s")
-
-	// French translations
-	_ = catalogBuilder.SetString(language.French, "announcement.title", "Bienvenue sur %s")
-	_ = catalogBuilder.SetString(language.French, "announcement.message", "Ce serveur est prêt à traiter les requêtes, mais aucune page n'a encore été déployée. Veuillez déployer des pages pour commencer à servir du contenu.")
-	_ = catalogBuilder.SetString(language.French, "announcement.organization", "Organisation : %s")
-
-	// German translations
-	_ = catalogBuilder.SetString(language.German, "announcement.title", "Willkommen bei %s")
-	_ = catalogBuilder.SetString(language.German, "announcement.message", "Dieser Host ist bereit, Anfragen zu bearbeiten, aber es wurden noch keine Seiten bereitgestellt. Bitte stellen Sie Seiten bereit, um mit der Bereitstellung von Inhalten zu beginnen.")
-	_ = catalogBuilder.SetString(language.German, "announcement.organization", "Organisation: %s")
 }
