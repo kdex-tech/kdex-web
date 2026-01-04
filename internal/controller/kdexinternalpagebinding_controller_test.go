@@ -201,9 +201,11 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 							Kind: "KDexPageHeader",
 							Name: "non-existent-header",
 						},
-						OverrideMainNavigationRef: &kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageNavigation",
-							Name: "non-existent-navigation",
+						OverrideNavigationRefs: map[string]*kdexv1alpha1.KDexObjectReference{
+							"main": {
+								Kind: "KDexPageNavigation",
+								Name: "non-existent-navigation",
+							},
 						},
 						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
 							Kind: "KDexPageArchetype",

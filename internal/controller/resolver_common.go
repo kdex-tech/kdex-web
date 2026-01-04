@@ -121,41 +121,12 @@ func ResolvePageNavigations(
 	c client.Client,
 	object client.Object,
 	objectConditions *[]metav1.Condition,
-	navigationRef *kdexv1alpha1.KDexObjectReference,
-	extraNavigations map[string]*kdexv1alpha1.KDexObjectReference,
+	navigationRefs map[string]*kdexv1alpha1.KDexObjectReference,
 	requeueDelay time.Duration,
 ) (map[string]page.ResolvedNavigation, bool, ctrl.Result, error) {
 	navigations := make(map[string]page.ResolvedNavigation)
 
-	navigation, shouldReturn, response, err := ResolveKDexObjectReference(
-		ctx, c, object, objectConditions, navigationRef, requeueDelay)
-
-	if shouldReturn {
-		return nil, true, response, err
-	}
-
-	if navigation != nil {
-		var navigationSpec *kdexv1alpha1.KDexPageNavigationSpec
-
-		switch v := navigation.(type) {
-		case *kdexv1alpha1.KDexPageNavigation:
-			navigationSpec = &v.Spec
-		case *kdexv1alpha1.KDexClusterPageNavigation:
-			navigationSpec = &v.Spec
-		}
-
-		navigations["main"] = page.ResolvedNavigation{
-			Generation: navigation.GetGeneration(),
-			Name:       navigation.GetName(),
-			Spec:       navigationSpec,
-		}
-	}
-
-	if extraNavigations == nil {
-		extraNavigations = map[string]*kdexv1alpha1.KDexObjectReference{}
-	}
-
-	for navigationName, navigationRef := range extraNavigations {
+	for navigationName, navigationRef := range navigationRefs {
 		navigation, shouldReturn, response, err := ResolveKDexObjectReference(
 			ctx, c, object, objectConditions, navigationRef, requeueDelay)
 

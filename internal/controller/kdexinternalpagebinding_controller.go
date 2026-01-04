@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -195,10 +196,10 @@ func (r *KDexInternalPageBindingReconciler) SetupWithManager(mgr ctrl.Manager) e
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideHeaderRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageNavigation{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideMainNavigationRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideNavigationRefs.*}")).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageNavigation{},
-			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideMainNavigationRef}")).
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.OverrideNavigationRefs.*}")).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}, "{.Spec.ScriptLibraryRef}")).
@@ -278,13 +279,16 @@ func (r *KDexInternalPageBindingReconciler) innerReconcile(
 		pageBinding.Status.Attributes["footer.generation"] = fmt.Sprintf("%d", footerObj.GetGeneration())
 	}
 
-	navigationRef := pageBinding.Spec.OverrideMainNavigationRef
-	if navigationRef == nil {
-		navigationRef = pageArchetypeSpec.DefaultMainNavigationRef
+	navigationRefs := pageArchetypeSpec.DefaultNavigationRefs
+	if len(pageBinding.Spec.OverrideNavigationRefs) > 0 {
+		if navigationRefs == nil {
+			navigationRefs = make(map[string]*kdexv1alpha1.KDexObjectReference)
+		}
+		maps.Copy(navigationRefs, pageBinding.Spec.OverrideNavigationRefs)
 	}
-	navigations, shouldReturn, response, err := ResolvePageNavigations(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, navigationRef, pageArchetypeSpec.ExtraNavigations, r.RequeueDelay)
+	navigations, shouldReturn, r1, err := ResolvePageNavigations(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, navigationRefs, r.RequeueDelay)
 	if shouldReturn {
-		return response, err
+		return r1, err
 	}
 
 	for k, navigation := range navigations {
