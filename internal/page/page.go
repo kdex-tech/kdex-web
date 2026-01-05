@@ -6,14 +6,15 @@ import (
 
 const (
 	customElementTemplate = `<%s id="content-%s" data-app-name="%s" data-app-generation="%s"%s></%s>`
-	navigationTemplate    = `<div id="navigation-%s"></div>
+	navigationTemplate    = `<nav id="navigation-%s">
 <script type="text/javascript">
 fetch('/~/navigation/%s/{{ .Language }}%s')
   .then(response => response.text())
   .then(data => {
-    document.getElementById('navigation-%s').innerHTML += data;
+    document.getElementById('navigation-%s').innerHTML = data;
   });
-</script>`
+</script>
+</nav>`
 	rawHTMLTemplate = `<div id="content-%s">%s</div>`
 )
 
