@@ -38,7 +38,7 @@ const (
 </html>`
 )
 
-func TestHostHandler_L10nRenderLocked(t *testing.T) {
+func TestHostHandler_L10nRender(t *testing.T) {
 	type THost struct {
 		name string
 		host kdexv1alpha1.KDexHostSpec
@@ -293,7 +293,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
-			got, gotErr := th.L10nRenderLocked(tt.pageHandler, map[string]any{}, language.Make(tt.lang), tt.extraTemplateData)
+			got, gotErr := th.L10nRender(tt.pageHandler, map[string]any{}, language.Make(tt.lang), tt.extraTemplateData, &th.Translations)
 
 			g.Expect(gotErr).NotTo(G.HaveOccurred())
 
@@ -304,7 +304,7 @@ func TestHostHandler_L10nRenderLocked(t *testing.T) {
 	}
 }
 
-func TestHostHandler_L10nRendersLocked(t *testing.T) {
+func TestHostHandler_L10nRenders(t *testing.T) {
 	type THost struct {
 		name string
 		host kdexv1alpha1.KDexHostSpec
@@ -387,7 +387,7 @@ func TestHostHandler_L10nRendersLocked(t *testing.T) {
 			th.SetHost(&tt.host.host, nil, nil, "")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
-			got := th.L10nRendersLocked(tt.pageHandler, map[language.Tag]map[string]any{})
+			got := th.L10nRenders(tt.pageHandler, map[language.Tag]map[string]any{}, &th.Translations)
 
 			for key, values := range tt.want {
 				l10nRender := got[key]

@@ -171,7 +171,7 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 		internalUtilityPage.Status.Attributes["footer.generation"] = fmt.Sprintf("%d", footerObj.GetGeneration())
 	}
 
-	navigationRefs := pageArchetypeSpec.DefaultNavigationRefs
+	navigationRefs := maps.Clone(pageArchetypeSpec.DefaultNavigationRefs)
 	if len(internalUtilityPage.Spec.OverrideNavigationRefs) > 0 {
 		if navigationRefs == nil {
 			navigationRefs = make(map[string]*kdexv1alpha1.KDexObjectReference)
@@ -227,8 +227,8 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 	}
 
 	navigationsMap := map[string]string{}
-	for _, navigation := range navigations {
-		navigationsMap[navigation.Name] = navigation.Spec.Content
+	for slot, navigation := range navigations {
+		navigationsMap[slot] = navigation.Spec.Content
 	}
 
 	r.HostHandler.AddOrUpdateUtilityPage(page.PageHandler{

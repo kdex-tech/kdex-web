@@ -73,21 +73,6 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 
 			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
-			assertResourceReady(
-				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalTranslation{}, false)
-
-			addOrUpdatePageArchetype(
-				ctx, k8sClient, kdexv1alpha1.KDexPageArchetype{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "default",
-						Namespace: namespace,
-					},
-					Spec: kdexv1alpha1.KDexPageArchetypeSpec{
-						Content: `<html></html>`,
-					},
-				},
-			)
 			addOrUpdateInternalHost(
 				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
 					ObjectMeta: metav1.ObjectMeta{
@@ -108,37 +93,6 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 						InternalTranslationRefs: []corev1.LocalObjectReference{
 							{
 								Name: resource.Name,
-							},
-						},
-					},
-				},
-			)
-			addOrUpdateInternalPageBinding(
-				ctx, k8sClient, kdexv1alpha1.KDexInternalPageBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "default",
-						Namespace: namespace,
-					},
-					Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-						KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-							ContentEntries: []kdexv1alpha1.ContentEntry{
-								{
-									ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-										RawHTML: `<p>Hello</p>`,
-									},
-									Slot: "main",
-								},
-							},
-							HostRef: corev1.LocalObjectReference{
-								Name: focalHost,
-							},
-							Label: "test",
-							PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-								Kind: "KDexPageArchetype",
-								Name: "default",
-							},
-							Paths: kdexv1alpha1.Paths{
-								BasePath: "/",
 							},
 						},
 					},

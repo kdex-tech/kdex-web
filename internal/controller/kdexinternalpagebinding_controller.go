@@ -279,7 +279,7 @@ func (r *KDexInternalPageBindingReconciler) innerReconcile(
 		pageBinding.Status.Attributes["footer.generation"] = fmt.Sprintf("%d", footerObj.GetGeneration())
 	}
 
-	navigationRefs := pageArchetypeSpec.DefaultNavigationRefs
+	navigationRefs := maps.Clone(pageArchetypeSpec.DefaultNavigationRefs)
 	if len(pageBinding.Spec.OverrideNavigationRefs) > 0 {
 		if navigationRefs == nil {
 			navigationRefs = make(map[string]*kdexv1alpha1.KDexObjectReference)

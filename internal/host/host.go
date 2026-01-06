@@ -191,11 +191,12 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	return buffer.String()
 }
 
-func (th *HostHandler) L10nRenderLocked(
+func (th *HostHandler) L10nRender(
 	handler page.PageHandler,
 	pageMap map[string]any,
 	l language.Tag,
 	extraTemplateData map[string]any,
+	translations *Translations,
 ) (string, error) {
 
 	// make sure everything passed to the renderer is mutation safe (i.e. copy it)
@@ -211,9 +212,9 @@ func (th *HostHandler) L10nRenderLocked(
 		Header:          handler.Header,
 		HeadScript:      th.HeadScriptToHTML(handler),
 		Language:        l.String(),
-		Languages:       th.availableLanguagesLocked(),
+		Languages:       th.availableLanguages(translations),
 		LastModified:    time.Now(),
-		MessagePrinter:  th.messagePrinterLocked(l),
+		MessagePrinter:  th.messagePrinter(translations, l),
 		Meta:            th.MetaToString(handler),
 		Navigations:     handler.NavigationToHTMLMap(),
 		Organization:    th.host.Organization,
@@ -228,13 +229,14 @@ func (th *HostHandler) L10nRenderLocked(
 	return renderer.RenderPage()
 }
 
-func (th *HostHandler) L10nRendersLocked(
+func (th *HostHandler) L10nRenders(
 	handler page.PageHandler,
 	pageMaps map[language.Tag]map[string]any,
+	translations *Translations,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
-	for _, l := range th.Translations.Languages() {
-		rendered, err := th.L10nRenderLocked(handler, pageMaps[l], l, map[string]any{})
+	for _, l := range translations.Languages() {
+		rendered, err := th.L10nRender(handler, pageMaps[l], l, map[string]any{}, translations)
 		if err != nil {
 			th.log.Error(err, "failed to render page for language", "page", handler.Name, "language", l)
 			continue
@@ -300,26 +302,41 @@ func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler
 
 func (th *HostHandler) RebuildMux() {
 	th.log.V(1).Info("rebuilding mux")
-	th.mu.Lock()
-	defer th.mu.Unlock()
+	th.mu.RLock()
 
 	if th.host == nil {
+		th.mu.RUnlock()
 		return
 	}
 
-	th.rebuildTranslationsLocked()
+	// copy fields that we need while under RLock
+	defaultLanguageResource := th.defaultLanguage
+	translationResources := maps.Clone(th.translationResources)
+
+	newTranslations, err := NewTranslations(defaultLanguageResource, translationResources)
+	if err != nil {
+		th.log.Error(err, "failed to rebuild translations")
+		th.mu.RUnlock()
+		return
+	}
+
 	mux := th.muxWithDefaultsLocked()
 
 	pageHandlers := th.Pages.List()
 
 	if len(pageHandlers) == 0 {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			if err != nil {
+				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				return
+			}
 
-			rendered := th.renderUtilityPageLocked(
+			rendered := th.renderUtilityPage(
 				kdexv1alpha1.AnnouncementUtilityPageType,
 				l,
 				map[string]any{},
+				&th.Translations,
 			)
 
 			if rendered == "" {
@@ -332,7 +349,7 @@ func (th *HostHandler) RebuildMux() {
 			w.Header().Set("Content-Language", l.String())
 			w.Header().Set("Content-Type", "text/html")
 
-			_, err := w.Write([]byte(rendered))
+			_, err = w.Write([]byte(rendered))
 			if err != nil {
 				th.serveError(w, r, http.StatusInternalServerError, err.Error())
 			}
@@ -341,10 +358,21 @@ func (th *HostHandler) RebuildMux() {
 		mux.HandleFunc("GET /{$}", handler)
 		mux.HandleFunc("GET /{l10n}/{$}", handler)
 
+		th.mu.RUnlock()
+		th.mu.Lock()
+		th.Translations = *newTranslations
 		th.Mux = mux
+		th.mu.Unlock()
 
 		return
 	}
+
+	type pageRender struct {
+		ph          page.PageHandler
+		l10nRenders map[string]string
+	}
+
+	var renderedPages []pageRender
 
 	for _, ph := range pageHandlers {
 		basePath := ph.BasePath()
@@ -354,7 +382,16 @@ func (th *HostHandler) RebuildMux() {
 			continue
 		}
 
-		l10nRenders := th.L10nRendersLocked(ph, nil)
+		l10nRenders := th.L10nRenders(ph, nil, newTranslations)
+		renderedPages = append(renderedPages, pageRender{ph: ph, l10nRenders: l10nRenders})
+	}
+
+	th.mu.RUnlock()
+
+	for _, pr := range renderedPages {
+		ph := pr.ph
+		basePath := ph.BasePath()
+		l10nRenders := pr.l10nRenders
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			// variables captured in scope of handler
@@ -362,7 +399,11 @@ func (th *HostHandler) RebuildMux() {
 			basePath := basePath
 			l10nRenders := l10nRenders
 
-			l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			if err != nil {
+				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				return
+			}
 
 			rendered, ok := l10nRenders[l.String()]
 
@@ -376,7 +417,7 @@ func (th *HostHandler) RebuildMux() {
 			w.Header().Set("Content-Language", l.String())
 			w.Header().Set("Content-Type", "text/html")
 
-			_, err := w.Write([]byte(rendered))
+			_, err = w.Write([]byte(rendered))
 			if err != nil {
 				th.serveError(w, r, http.StatusInternalServerError, err.Error())
 			}
@@ -392,7 +433,10 @@ func (th *HostHandler) RebuildMux() {
 		}
 	}
 
+	th.mu.Lock()
+	th.Translations = *newTranslations
 	th.Mux = mux
+	th.mu.Unlock()
 }
 
 func (th *HostHandler) RemoveTranslation(name string) {
@@ -488,10 +532,10 @@ func (ew *errorResponseWriter) WriteHeader(code int) {
 	ew.ResponseWriter.WriteHeader(code)
 }
 
-func (th *HostHandler) availableLanguagesLocked() []string {
+func (th *HostHandler) availableLanguages(translations *Translations) []string {
 	var availableLangs []string
 
-	for _, tag := range th.Translations.Languages() {
+	for _, tag := range translations.Languages() {
 		availableLangs = append(availableLangs, tag.String())
 	}
 
@@ -512,10 +556,10 @@ func (th *HostHandler) unimplementedHandler(path string, mux *http.ServeMux) {
 	)
 }
 
-func (th *HostHandler) messagePrinterLocked(tag language.Tag) *message.Printer {
+func (th *HostHandler) messagePrinter(translations *Translations, tag language.Tag) *message.Printer {
 	return message.NewPrinter(
 		tag,
-		message.Catalog(th.Translations.Catalog()),
+		message.Catalog(translations.Catalog()),
 	)
 }
 
@@ -579,9 +623,10 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux) {
 				return
 			}
 
-			langTag := language.Make(l10n)
-			if langTag.IsRoot() {
-				langTag = language.Make(th.defaultLanguage)
+			langTag, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			if err != nil {
+				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				return
 			}
 
 			rootEntry := &render.PageEntry{}
@@ -593,9 +638,9 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux) {
 				BrandName:       th.host.BrandName,
 				DefaultLanguage: th.defaultLanguage,
 				Language:        langTag.String(),
-				Languages:       th.availableLanguagesLocked(),
+				Languages:       th.availableLanguages(&th.Translations),
 				LastModified:    time.Now(),
-				MessagePrinter:  th.messagePrinterLocked(langTag),
+				MessagePrinter:  th.messagePrinter(&th.Translations, langTag),
 				Organization:    th.host.Organization,
 				PageMap:         pageMap,
 				PatternPath:     pageHandler.PatternPath(),
@@ -627,10 +672,10 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 	mux.HandleFunc(
 		"GET /~/translation/{l10n}",
 		func(w http.ResponseWriter, r *http.Request) {
-			l10n := r.PathValue("l10n")
-			langTag := language.Make(l10n)
-			if langTag.IsRoot() {
-				langTag = language.Make(th.defaultLanguage)
+			langTag, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			if err != nil {
+				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				return
 			}
 
 			// Get all the keys and values for the given language
@@ -643,7 +688,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 			}
 
 			keysAndValues := map[string]string{}
-			printer := th.messagePrinterLocked(langTag)
+			printer := th.messagePrinter(&th.Translations, langTag)
 			for _, key := range keys {
 				keysAndValues[key] = printer.Sprintf(key)
 				// replace each occurance of the string `%!s(MISSING)` with a placeholder `{{n}}` where `n` is the alphabetic index of the placeholder
@@ -668,7 +713,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			err := json.NewEncoder(w).Encode(keysAndValues)
+			err = json.NewEncoder(w).Encode(keysAndValues)
 			if err != nil {
 				th.serveError(w, r, http.StatusInternalServerError, err.Error())
 			}
@@ -676,23 +721,13 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 	)
 }
 
-func (th *HostHandler) rebuildTranslationsLocked() {
-	translations, err := NewTranslations(th.defaultLanguage, th.translationResources)
-	if err != nil {
-		th.log.Error(err, "failed to create translations")
-		return
-	}
-
-	th.Translations = *translations
-}
-
-func (th *HostHandler) renderUtilityPageLocked(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any) string {
+func (th *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any, translations *Translations) string {
 	ph, ok := th.utilityPages[utilityType]
 	if !ok {
 		return ""
 	}
 
-	rendered, err := th.L10nRenderLocked(ph, map[string]any{}, l, extraTemplateData)
+	rendered, err := th.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
 	if err != nil {
 		th.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
 		return ""
@@ -703,11 +738,15 @@ func (th *HostHandler) renderUtilityPageLocked(utilityType kdexv1alpha1.KDexUtil
 
 func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {
 	th.mu.RLock()
-	l := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
-	rendered := th.renderUtilityPageLocked(
+	l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+	if err != nil {
+		l = language.Make(th.defaultLanguage)
+	}
+	rendered := th.renderUtilityPage(
 		kdexv1alpha1.ErrorUtilityPageType,
 		l,
 		map[string]any{"ErrorCode": code, "ErrorMessage": msg},
+		&th.Translations,
 	)
 	th.mu.RUnlock()
 

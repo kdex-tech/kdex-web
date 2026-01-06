@@ -1,6 +1,8 @@
 package http
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -39,19 +41,29 @@ func GetParamArray(name string, defaultValue []string, r *http.Request) []string
 	}
 }
 
-func GetLang(r *http.Request, defaultLanguage string, languages []language.Tag) language.Tag {
+func GetLang(r *http.Request, defaultLanguage string, languages []language.Tag) (language.Tag, error) {
 	log := logf.FromContext(r.Context())
+
+	if len(languages) == 0 {
+		return language.Und, errors.New("no supported languages provided")
+	}
 
 	l10n := GetParam("l10n", "", r)
 
+	matcher := language.NewMatcher(languages)
+
 	if l10n != "" {
-		tag := language.Make(l10n)
-		if tag.IsRoot() {
-			log.V(1).Info("parsing user supplied 'l10n' parameter failed, falling back to default", "l10n", l10n, "defaultLang", defaultLanguage, "path", r.URL.Path)
-			return language.Make(defaultLanguage)
-		} else {
-			return tag
+		tag, err := language.Parse(l10n)
+		if err != nil {
+			return language.Und, fmt.Errorf("invalid language tag: %s", l10n)
 		}
+
+		_, index, confidence := matcher.Match(tag)
+		if confidence == language.No {
+			return language.Und, fmt.Errorf("language not supported: %s", l10n)
+		}
+
+		return languages[index], nil
 	}
 
 	preferredLanguages := []language.Tag{}
@@ -64,19 +76,26 @@ func GetLang(r *http.Request, defaultLanguage string, languages []language.Tag) 
 			continue
 		}
 		prefix := strings.SplitN(acceptLanguage, ";", 2)[0]
-		tag := language.Make(prefix)
+		tag, err := language.Parse(prefix)
+		if err != nil {
+			log.V(1).Info("failed to parse accept-language header part, skipping", "part", acceptLanguage, "err", err)
+			continue
+		}
 		preferredLanguages = append(preferredLanguages, tag)
 	}
-
-	matcher := language.NewMatcher(languages)
 
 	_, index, _ := matcher.Match(preferredLanguages...)
 
 	matchedTag := languages[index]
 
 	if matchedTag.IsRoot() {
-		return language.Make(defaultLanguage)
+		// If we matched root but languages has something else, this might be a fallback.
+		// If defaultLanguage is set, we return it.
+		if defaultLanguage != "" {
+			return language.Parse(defaultLanguage)
+		}
+		return language.Und, errors.New("no supported language found")
 	}
 
-	return matchedTag
+	return matchedTag, nil
 }

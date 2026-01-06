@@ -275,14 +275,43 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		},
 	}
 
-	shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &internalHost, internalPackageReferences, finalPackageReferences)
-	if shouldReturn {
-		log.V(2).Info("package references shouldReturn", "packageReferences", internalPackageReferences.Name, "result", r1, "err", err)
+	importMap := ""
 
-		return r1, err
+	if len(finalPackageReferences) == 0 {
+		log.V(2).Info("deleting host package references", "packageReferences", internalPackageReferences.Name)
+
+		if err := r.Delete(ctx, internalPackageReferences); err != nil {
+			if client.IgnoreNotFound(err) != nil {
+				kdexv1alpha1.SetConditions(
+					&internalHost.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileSuccess,
+					err.Error(),
+				)
+
+				log.V(2).Info("error deleting package references", "packageReferences", internalPackageReferences.Name, "err", err)
+
+				return ctrl.Result{}, err
+			}
+		}
+
+		internalPackageReferences = nil
+	} else {
+		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &internalHost, internalPackageReferences, finalPackageReferences)
+		if shouldReturn {
+			log.V(2).Info("package references shouldReturn", "packageReferences", internalPackageReferences.Name, "result", r1, "err", err)
+
+			return r1, err
+		}
+
+		importMap = internalPackageReferences.Status.Attributes["importmap"]
 	}
 
-	r.HostHandler.SetHost(&internalHost.Spec.KDexHostSpec, themeAssets, scriptLibraries, internalPackageReferences.Status.Attributes["importmap"])
+	r.HostHandler.SetHost(&internalHost.Spec.KDexHostSpec, themeAssets, scriptLibraries, importMap)
 
 	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, requiredBackends)
 }

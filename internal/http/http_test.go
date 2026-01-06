@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 
 func TestGetParam(t *testing.T) {
 	tests := []struct {
+		expectError    bool
 		headers        *map[string]string
 		name           string
 		parameterNames []string
@@ -114,13 +116,29 @@ func TestGetParam(t *testing.T) {
 				Lang: "fr",
 			},
 		},
+		{
+			name:           "get lang from query, unsupported",
+			parameterNames: []string{},
+			path:           "/one?l10n=de",
+			pattern:        "/{path...}",
+			supportedLangs: &[]language.Tag{
+				language.Make("en"),
+				language.Make("fr"),
+			},
+			expectError: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := NewGomegaWithT(t)
-			got := setupHandler(
-				g, tt.pattern, tt.parameterNames, tt.path, tt.supportedLangs, tt.headers)
-			g.Expect(got).To(Equal(tt.want))
+			got, err := setupHandler(
+				g, tt.pattern, tt.parameterNames, tt.path, tt.supportedLangs, tt.headers, tt.expectError)
+			if tt.expectError {
+				g.Expect(err).To(HaveOccurred())
+			} else {
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(got).To(Equal(tt.want))
+			}
 		})
 	}
 }
@@ -137,7 +155,8 @@ func setupHandler(
 	url string,
 	languages *[]language.Tag,
 	headers *map[string]string,
-) Results {
+	expectError bool,
+) (Results, error) {
 	server := MockServer(
 		func(mux *http.ServeMux) {
 			mux.HandleFunc(
@@ -160,7 +179,11 @@ func setupHandler(
 						}
 					}
 
-					lang := GetLang(r, "en", *languages)
+					lang, err := GetLang(r, "en", *languages)
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusBadRequest)
+						return
+					}
 
 					results.Lang = lang.String()
 
@@ -192,7 +215,9 @@ func setupHandler(
 	g.Expect(err).NotTo(HaveOccurred())
 	defer resp.Body.Close()
 
-	g.Expect(resp.StatusCode).To(Equal(http.StatusOK))
+	if resp.StatusCode != http.StatusOK {
+		return Results{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	g.Expect(err).NotTo(HaveOccurred())
@@ -201,7 +226,7 @@ func setupHandler(
 	err = json.Unmarshal(body, &results)
 	g.Expect(err).NotTo(HaveOccurred())
 
-	return results
+	return results, nil
 }
 
 func MockServer(setup func(mux *http.ServeMux)) *httptest.Server {
