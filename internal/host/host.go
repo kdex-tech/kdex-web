@@ -745,7 +745,7 @@ func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 	rendered := th.renderUtilityPage(
 		kdexv1alpha1.ErrorUtilityPageType,
 		l,
-		map[string]any{"ErrorCode": code, "ErrorMessage": msg},
+		map[string]any{"ErrorCode": code, "ErrorCodeString": http.StatusText(code), "ErrorMessage": msg},
 		&th.Translations,
 	)
 	th.mu.RUnlock()
