@@ -426,6 +426,9 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					},
 				}
 			})).
+		Watches(
+			&kdexv1alpha1.KDexInternalUtilityPage{},
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.AnnouncementRef}", "{.Spec.ErrorRef}", "{.Spec.LoginRef}")).
 		WithEventFilter(enabledFilter).
 		WithOptions(
 			controller.TypedOptions[reconcile.Request]{

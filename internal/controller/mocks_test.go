@@ -11,6 +11,7 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -117,7 +118,7 @@ func (r *MockPageArchetypeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageArchetype{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageArchetype{},
-			LikeNamedHandler).
+			&handler.EnqueueRequestForObject{}).
 		Watches(
 			&kdexv1alpha1.KDexPageFooter{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}, "{.Spec.DefaultFooterRef}")).
@@ -234,7 +235,7 @@ func (r *MockPageFooterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageFooter{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageFooter{},
-			LikeNamedHandler).
+			&handler.EnqueueRequestForObject{}).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}, "{.Spec.ScriptLibraryRef}")).
@@ -321,7 +322,7 @@ func (r *MockPageHeaderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexPageHeader{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageHeader{},
-			LikeNamedHandler).
+			&handler.EnqueueRequestForObject{}).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageHeader{}, &kdexv1alpha1.KDexPageHeaderList{}, "{.Spec.ScriptLibraryRef}")).
@@ -408,7 +409,7 @@ func (r *MockPageNavigationReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		For(&kdexv1alpha1.KDexPageNavigation{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterPageNavigation{},
-			LikeNamedHandler).
+			&handler.EnqueueRequestForObject{}).
 		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexPageNavigation{}, &kdexv1alpha1.KDexPageNavigationList{}, "{.Spec.ScriptLibraryRef}")).
@@ -497,7 +498,7 @@ func (r *MockScriptLibraryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kdexv1alpha1.KDexScriptLibrary{}).
 		Watches(
 			&kdexv1alpha1.KDexClusterScriptLibrary{},
-			LikeNamedHandler).
+			&handler.EnqueueRequestForObject{}).
 		Watches(
 			&corev1.Secret{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexScriptLibrary{}, &kdexv1alpha1.KDexScriptLibraryList{}, "{.Spec.PackageReference.SecretRef}")).
