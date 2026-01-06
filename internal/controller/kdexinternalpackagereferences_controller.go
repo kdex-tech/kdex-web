@@ -178,26 +178,25 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 	log := logf.FromContext(ctx).WithName("createOrUpdateJob").WithValues(
 		"job", job.Name, "configmap", configMap.Name, "secret", secret.Name)
 
-	if configMapOp == controllerutil.OperationResultNone &&
-		secretOp == controllerutil.OperationResultNone &&
-		internalPackageReferences.Generation == internalPackageReferences.Status.ObservedGeneration &&
-		internalPackageReferences.Status.Attributes["image"] != "" &&
-		internalPackageReferences.Status.Attributes["importmap"] != "" {
+	// try getting the job to see if it's already created
+	checkedJob := &batchv1.Job{}
+	if err := r.Get(
+		ctx,
+		client.ObjectKey{Namespace: internalPackageReferences.Namespace, Name: job.Name},
+		checkedJob,
+	); err == nil {
+		// if the job already succeeded but doesn't match the generation, delete it
+		if checkedJob.Status.Succeeded > 0 &&
+			checkedJob.Annotations["kdex.dev/generation"] != fmt.Sprintf("%d", internalPackageReferences.Generation) {
 
-		kdexv1alpha1.SetConditions(
-			&internalPackageReferences.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionFalse,
-				Progressing: metav1.ConditionFalse,
-				Ready:       metav1.ConditionTrue,
-			},
-			kdexv1alpha1.ConditionReasonReconcileSuccess,
-			"Reconciliation successful",
-		)
+			log.V(2).Info("job already succeeded but doesn't match the generation")
 
-		log.V(1).Info("up to date")
+			if err := r.Delete(ctx, checkedJob, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+				return ctrl.Result{}, err
+			}
 
-		return ctrl.Result{}, nil
+			return ctrl.Result{Requeue: true}, nil
+		}
 	}
 
 	jobOp, err := ctrl.CreateOrUpdate(
@@ -205,11 +204,7 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 		r.Client,
 		job,
 		func() error {
-			if job.CreationTimestamp.IsZero() {
-				r.setupJob(internalPackageReferences, job, configMap, secret)
-			}
-
-			job.Labels["kdex.dev/generation"] = fmt.Sprintf("%d", internalPackageReferences.Generation)
+			r.setupJob(internalPackageReferences, job, configMap, secret)
 
 			return ctrl.SetControllerReference(internalPackageReferences, job, r.Scheme)
 		},
@@ -238,7 +233,7 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 		"configMapOp", configMapOp,
 		"secretOp", secretOp,
 		"generation", internalPackageReferences.Generation,
-		"labelGeneration", job.Labels["kdex.dev/generation"],
+		"labelGeneration", job.Annotations["kdex.dev/generation"],
 		"observedGeneration", internalPackageReferences.Status.ObservedGeneration,
 		"attributes", internalPackageReferences.Status.Attributes,
 	)
@@ -284,14 +279,32 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 		}
 
-		imageRepo := r.Configuration.DefaultImageRegistry.Host
-		imageURL := fmt.Sprintf("%s/%s@%s", imageRepo, internalPackageReferences.Name, imageDigest)
-
-		internalPackageReferences.Status.Attributes["image"] = imageURL
+		internalPackageReferences.Status.Attributes["image"] = fmt.Sprintf(
+			"%s/%s@%s", r.Configuration.DefaultImageRegistry.Host, internalPackageReferences.Name, imageDigest,
+		)
 		internalPackageReferences.Status.Attributes["importmap"] = importmap
-	} else if job.Status.Failed > 0 {
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		internalPackageReferences.Status.Attributes["packageReferences"] = fmt.Sprintf(
+			"%v", internalPackageReferences.Spec.PackageReferences,
+		)
+
 	} else {
+		for _, condition := range job.Status.Conditions {
+			if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
+				kdexv1alpha1.SetConditions(
+					&internalPackageReferences.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileError,
+					fmt.Sprintf("Job failed: %s", condition.Message),
+				)
+
+				return ctrl.Result{}, nil
+			}
+		}
+
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
@@ -320,11 +333,14 @@ func (r *KDexInternalPackageReferencesReconciler) getPodForJob(
 		return nil, err
 	}
 
-	if len(podList.Items) == 0 {
-		return nil, fmt.Errorf("no pods found for job %s", job.Name)
+	// find pod with matching generation
+	for _, pod := range podList.Items {
+		if pod.Annotations["kdex.dev/generation"] == job.Annotations["kdex.dev/generation"] {
+			return &pod, nil
+		}
 	}
 
-	return &podList.Items[0], nil
+	return nil, fmt.Errorf("no pods found for job %s", job.Name)
 }
 
 func (r *KDexInternalPackageReferencesReconciler) setupJob(
@@ -333,113 +349,105 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 	configMap *corev1.ConfigMap,
 	npmrcSecret *corev1.Secret,
 ) {
-	job.Annotations = make(map[string]string)
-	for key, value := range internalPackageReferences.Annotations {
-		job.Annotations[key] = value
-	}
-	job.Labels = make(map[string]string)
-	for key, value := range internalPackageReferences.Labels {
-		job.Labels[key] = value
-	}
+	if job.CreationTimestamp.IsZero() {
+		job.Annotations = make(map[string]string)
+		for key, value := range internalPackageReferences.Annotations {
+			job.Annotations[key] = value
+		}
+		job.Labels = make(map[string]string)
+		for key, value := range internalPackageReferences.Labels {
+			job.Labels[key] = value
+		}
 
-	job.Labels["kdex.dev/packages"] = internalPackageReferences.Name
+		job.Annotations["kdex.dev/packages"] = internalPackageReferences.Name
 
-	imageRepo := r.Configuration.DefaultImageRegistry.Host
-	imageTag := fmt.Sprintf("%d", internalPackageReferences.Generation)
-	imageURL := fmt.Sprintf("%s/%s:%s", imageRepo, internalPackageReferences.Name, imageTag)
-
-	volumes := []corev1.Volume{
-		{
-			Name: "workspace",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
-		{
-			Name: "build-scripts",
-			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: configMap.Name,
-					},
+		volumes := []corev1.Volume{
+			{
+				Name: "workspace",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{},
 				},
 			},
-		},
-	}
-
-	npmInstallVolumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "workspace",
-			MountPath: "/workspace",
-		},
-		{
-			Name:      "build-scripts",
-			MountPath: "/scripts",
-			ReadOnly:  true,
-		},
-	}
-
-	if npmrcSecret != nil {
-		volumes = append(volumes, corev1.Volume{
-			Name: "npmrc",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: npmrcSecret.Name,
-				},
-			},
-		})
-		npmInstallVolumeMounts = append(npmInstallVolumeMounts, corev1.VolumeMount{
-			Name:      "npmrc",
-			MountPath: "/workspace/.npmrc",
-			SubPath:   ".npmrc",
-			ReadOnly:  true,
-		})
-	}
-
-	kanikoArgs := []string{
-		"--dockerfile=/scripts/Dockerfile",
-		"--context=dir:///workspace",
-		"--destination=" + imageURL,
-		"--digest-file=/dev/termination-log",
-	}
-
-	if r.Configuration.DefaultImageRegistry.InSecure {
-		kanikoArgs = append(kanikoArgs, "--insecure")
-	}
-
-	backoffLimit := int32(4)
-
-	job.Spec = batchv1.JobSpec{
-		BackoffLimit: &backoffLimit,
-		Template: corev1.PodTemplateSpec{
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:  "kaniko",
-						Image: "gcr.io/kaniko-project/executor:latest",
-						Args:  kanikoArgs,
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "build-scripts",
-								MountPath: "/scripts",
-								ReadOnly:  true,
-							},
-							{
-								Name:      "workspace",
-								MountPath: "/workspace",
-								ReadOnly:  true,
-							},
+			{
+				Name: "build-scripts",
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: configMap.Name,
 						},
 					},
 				},
-				InitContainers: []corev1.Container{
-					{
-						Name:  "importmap-generator",
-						Image: "node:25-alpine",
-						Command: []string{
-							"sh",
-							"-c",
-							`
+			},
+		}
+
+		npmInstallVolumeMounts := []corev1.VolumeMount{
+			{
+				Name:      "workspace",
+				MountPath: "/workspace",
+			},
+			{
+				Name:      "build-scripts",
+				MountPath: "/scripts",
+				ReadOnly:  true,
+			},
+		}
+
+		if npmrcSecret != nil {
+			volumes = append(volumes, corev1.Volume{
+				Name: "npmrc",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: npmrcSecret.Name,
+					},
+				},
+			})
+			npmInstallVolumeMounts = append(npmInstallVolumeMounts, corev1.VolumeMount{
+				Name:      "npmrc",
+				MountPath: "/workspace/.npmrc",
+				SubPath:   ".npmrc",
+				ReadOnly:  true,
+			})
+		}
+
+		backoffLimit := int32(3)
+		completions := int32(1)
+
+		job.Spec = batchv1.JobSpec{
+			BackoffLimit: &backoffLimit,
+			Completions:  &completions,
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"kdex.dev/packages": internalPackageReferences.Name,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "kaniko",
+							Image: "gcr.io/kaniko-project/executor:latest",
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "build-scripts",
+									MountPath: "/scripts",
+									ReadOnly:  true,
+								},
+								{
+									Name:      "workspace",
+									MountPath: "/workspace",
+									ReadOnly:  true,
+								},
+							},
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:  "importmap-generator",
+							Image: "node:25-alpine",
+							Command: []string{
+								"sh",
+								"-c",
+								`
 							set -e
 							
 							cp /scripts/package.json /workspace/package.json
@@ -452,15 +460,36 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 							node generate.js
 							cat importmap.json > /dev/termination-log
 							`,
+							},
+							VolumeMounts: npmInstallVolumeMounts,
 						},
-						VolumeMounts: npmInstallVolumeMounts,
 					},
+					RestartPolicy: "Never",
+					Volumes:       volumes,
 				},
-				RestartPolicy: "Never",
-				Volumes:       volumes,
 			},
-		},
+		}
 	}
+
+	job.Annotations["kdex.dev/generation"] = fmt.Sprintf("%d", internalPackageReferences.Generation)
+
+	imageRepo := r.Configuration.DefaultImageRegistry.Host
+	imageTag := fmt.Sprintf("%d", internalPackageReferences.Generation)
+	imageURL := fmt.Sprintf("%s/%s:%s", imageRepo, internalPackageReferences.Name, imageTag)
+
+	kanikoArgs := []string{
+		"--dockerfile=/scripts/Dockerfile",
+		"--context=dir:///workspace",
+		"--destination=" + imageURL,
+		"--digest-file=/dev/termination-log",
+	}
+
+	if r.Configuration.DefaultImageRegistry.InSecure {
+		kanikoArgs = append(kanikoArgs, "--insecure")
+	}
+
+	job.Spec.Template.ObjectMeta.Annotations["kdex.dev/generation"] = fmt.Sprintf("%d", internalPackageReferences.Generation)
+	job.Spec.Template.Spec.Containers[0].Args = kanikoArgs
 }
 
 func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJobConfigMap(
@@ -535,16 +564,16 @@ try {
   "type": "module",
   "devDependencies": {
     "@jspm/generator": "^2.7.6",
-	"esbuild": "^0.27.0"
+    "esbuild": "^0.27.0"
   },
   "dependencies": {`
 			for i, pkg := range internalPackageReferences.Spec.PackageReferences {
 				if i > 0 {
 					packageJSON += ","
 				}
-				packageJSON += fmt.Sprintf(`"%s": "%s"`, pkg.Name, pkg.Version)
+				packageJSON += fmt.Sprintf("\n    \"%s\": \"%s\"", pkg.Name, pkg.Version)
 			}
-			packageJSON += `}}`
+			packageJSON += "\n  }\n}"
 
 			configmap.Data = map[string]string{
 				"Dockerfile":   dockerfile,

@@ -164,7 +164,7 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	if len(packageReferences) > 0 {
 		buffer.WriteString("<script type=\"importmap\">\n")
 		buffer.WriteString(th.importmap)
-		buffer.WriteString("</script>\n")
+		buffer.WriteString("\n</script>\n")
 
 		buffer.WriteString("<script type=\"module\">\n")
 		for _, pr := range packageReferences {
@@ -172,7 +172,7 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 			buffer.WriteString(pr.ToImportStatement())
 			separator = "\n"
 		}
-		buffer.WriteString("</script>")
+		buffer.WriteString("\n</script>")
 	}
 
 	for _, scriptLibrary := range th.ScriptLibraries {

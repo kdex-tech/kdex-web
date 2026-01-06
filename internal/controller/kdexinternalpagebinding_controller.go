@@ -313,11 +313,6 @@ func (r *KDexInternalPageBindingReconciler) innerReconcile(
 		pageBinding.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
 	}
 
-	_, shouldReturn, r1, err = ResolveHost(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, &pageBinding.Spec.HostRef, r.RequeueDelay)
-	if shouldReturn {
-		return r1, err
-	}
-
 	contentsMap := map[string]page.PackedContent{}
 	for slot, content := range contents {
 		contentsMap[slot] = content.Content

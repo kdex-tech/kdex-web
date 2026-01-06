@@ -109,11 +109,6 @@ func (r *KDexInternalTranslationReconciler) Reconcile(ctx context.Context, req c
 		"Reconciling",
 	)
 
-	_, shouldReturn, r1, err := ResolveHost(ctx, r.Client, &translation, &translation.Status.Conditions, &translation.Spec.HostRef, r.RequeueDelay)
-	if shouldReturn {
-		return r1, err
-	}
-
 	r.HostHandler.AddOrUpdateTranslation(translation.Name, &translation.Spec.KDexTranslationSpec)
 
 	kdexv1alpha1.SetConditions(

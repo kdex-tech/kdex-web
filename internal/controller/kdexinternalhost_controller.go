@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +27,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -252,6 +254,20 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		finalPackageReferences = append(finalPackageReferences, pkgRef)
 	}
 
+	// sort the final package references by name and version
+	sort.Slice(finalPackageReferences, func(i, j int) bool {
+		if finalPackageReferences[i].Name != finalPackageReferences[j].Name {
+			return finalPackageReferences[i].Name < finalPackageReferences[j].Name
+		}
+		return finalPackageReferences[i].Version < finalPackageReferences[j].Version
+	})
+
+	log.V(2).Info(
+		"package references",
+		"allPackageReferences", allPackageReferences,
+		"finalPackageReferences", finalPackageReferences,
+	)
+
 	internalPackageReferences := &kdexv1alpha1.KDexInternalPackageReferences{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-packages", internalHost.Name),
@@ -259,43 +275,14 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		},
 	}
 
-	var importmap string
+	shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &internalHost, internalPackageReferences, finalPackageReferences)
+	if shouldReturn {
+		log.V(2).Info("package references shouldReturn", "packageReferences", internalPackageReferences.Name, "result", r1, "err", err)
 
-	if len(finalPackageReferences) == 0 {
-		log.V(2).Info("deleting host package references", "packageReferences", internalPackageReferences.Name)
-
-		if err := r.Delete(ctx, internalPackageReferences); err != nil {
-			if client.IgnoreNotFound(err) != nil {
-				kdexv1alpha1.SetConditions(
-					&internalHost.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionFalse,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconcileSuccess,
-					err.Error(),
-				)
-
-				log.V(2).Info("error deleting package references", "packageReferences", internalPackageReferences.Name, "err", err)
-
-				return ctrl.Result{}, err
-			}
-		}
-
-		internalPackageReferences = nil
-	} else {
-		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &internalHost, internalPackageReferences, finalPackageReferences)
-		if shouldReturn {
-			log.V(2).Info("package references shouldReturn", "packageReferences", internalPackageReferences.Name, "result", r1, "err", err)
-
-			return r1, err
-		}
-
-		importmap = internalPackageReferences.Status.Attributes["importmap"]
+		return r1, err
 	}
 
-	r.HostHandler.SetHost(&internalHost.Spec.KDexHostSpec, themeAssets, scriptLibraries, importmap)
+	r.HostHandler.SetHost(&internalHost.Spec.KDexHostSpec, themeAssets, scriptLibraries, internalPackageReferences.Status.Attributes["importmap"])
 
 	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, requiredBackends)
 }
@@ -604,9 +591,7 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 		return true, ctrl.Result{}, err
 	}
 
-	if internalPackageReferences.Status.Attributes["image"] == "" ||
-		internalPackageReferences.Status.Attributes["importmap"] == "" {
-
+	if meta.IsStatusConditionFalse(internalPackageReferences.Status.Conditions, string(kdexv1alpha1.ConditionTypeReady)) {
 		kdexv1alpha1.SetConditions(
 			&internalHost.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
