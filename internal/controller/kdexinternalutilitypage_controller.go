@@ -47,10 +47,6 @@ type KDexInternalUtilityPageReconciler struct {
 	Scheme              *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalutilitypages,           verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalutilitypages/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalutilitypages/status,    verbs=get;update;patch
-
 // nolint:gocyclo
 func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)

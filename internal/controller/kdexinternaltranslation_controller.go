@@ -45,11 +45,6 @@ type KDexInternalTranslationReconciler struct {
 	Scheme              *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternaltranslations,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternaltranslations/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternaltranslations/status,verbs=get;update;patch
-
 func (r *KDexInternalTranslationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 

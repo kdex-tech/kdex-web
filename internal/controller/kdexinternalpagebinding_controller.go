@@ -47,23 +47,6 @@ type KDexInternalPageBindingReconciler struct {
 	Scheme              *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexapps,                           verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterapps,                    verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpagearchetypes,          verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpagefooters,             verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpageheaders,             verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpagenavigations,         verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterscriptlibraries,         verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts,                  verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings,           verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings/status,    verbs=get;update;patch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagearchetypes,                 verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagefooters,                    verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpageheaders,                    verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagenavigations,                verbs=get;list;watch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,                verbs=get;list;watch
-
 func (r *KDexInternalPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 
