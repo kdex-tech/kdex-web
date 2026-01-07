@@ -78,7 +78,6 @@ func main() {
 	var serviceName string
 	var webserverAddr string
 
-	var announcementTemplate string
 	var metricsAddr string
 	var metricsCertPath, metricsCertName, metricsCertKey string
 	var webhookCertPath, webhookCertName, webhookCertKey string
@@ -88,7 +87,6 @@ func main() {
 	var tlsOpts []func(*tls.Config)
 
 	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file.")
-	flag.StringVar(&announcementTemplate, "announcement-template", "/templates/announcement.html.tmpl", "The path to the announcement template file.")
 	flag.StringVar(&focalHost, "focal-host", "", "The name of a KDexHost resource to focus the controller instance's "+
 		"attention on.")
 	flag.Var(&namedLogLevels, "named-log-level", "Specify a named log level pair (format: NAME=LEVEL) (can be used "+
