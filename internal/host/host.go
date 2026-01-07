@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -328,7 +329,7 @@ func (th *HostHandler) RebuildMux() {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
-				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
@@ -340,7 +341,7 @@ func (th *HostHandler) RebuildMux() {
 			)
 
 			if rendered == "" {
-				th.serveError(w, r, http.StatusNotFound, "not found")
+				http.Error(w, "not found", http.StatusNotFound)
 				return
 			}
 
@@ -351,7 +352,7 @@ func (th *HostHandler) RebuildMux() {
 
 			_, err = w.Write([]byte(rendered))
 			if err != nil {
-				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		}
 
@@ -401,14 +402,14 @@ func (th *HostHandler) RebuildMux() {
 
 			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
-				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
 			rendered, ok := l10nRenders[l.String()]
 
 			if !ok {
-				th.serveError(w, r, http.StatusNotFound, "not found")
+				http.Error(w, "not found", http.StatusNotFound)
 				return
 			}
 
@@ -419,7 +420,7 @@ func (th *HostHandler) RebuildMux() {
 
 			_, err = w.Write([]byte(rendered))
 			if err != nil {
-				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		}
 
@@ -510,6 +511,7 @@ func (th *HostHandler) ThemeAssetsToString() string {
 func (ew *errorResponseWriter) Write(b []byte) (int, error) {
 	if ew.statusCode >= 400 {
 		// Drop original error body, we will render our own
+		ew.statusMsg = string(b)
 		return len(b), nil
 	}
 	if !ew.wroteHeader {
@@ -524,8 +526,6 @@ func (ew *errorResponseWriter) WriteHeader(code int) {
 	}
 	ew.statusCode = code
 	if code >= 400 {
-		// Intercept error
-		ew.statusMsg = http.StatusText(code)
 		return
 	}
 	ew.wroteHeader = true
@@ -550,7 +550,7 @@ func (th *HostHandler) unimplementedHandler(path string, mux *http.ServeMux) {
 			w.Header().Set("Content-Type", "application/json")
 			_, err := fmt.Fprintf(w, `{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
 			if err != nil {
-				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		},
 	)
@@ -605,7 +605,7 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux) {
 			}
 
 			if pageHandler == nil {
-				th.serveError(w, r, http.StatusNotFound, "page not found")
+				http.Error(w, "page not found", http.StatusNotFound)
 				return
 			}
 
@@ -619,13 +619,13 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux) {
 			}
 
 			if nav == "" {
-				th.serveError(w, r, http.StatusNotFound, "navigation not found")
+				http.Error(w, "navigation not found", http.StatusNotFound)
 				return
 			}
 
 			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
-				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
@@ -649,20 +649,20 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux) {
 
 			templateData, err := renderer.TemplateData()
 			if err != nil {
-				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
 			rendered, err := renderer.RenderOne(navKey, nav, templateData)
 			if err != nil {
-				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 
 			w.Header().Set("Content-Type", "text/html")
 			_, err = w.Write([]byte(rendered))
 			if err != nil {
-				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		},
 	)
@@ -674,7 +674,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 		func(w http.ResponseWriter, r *http.Request) {
 			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
-				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
@@ -715,7 +715,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 			w.Header().Set("Content-Type", "application/json")
 			err = json.NewEncoder(w).Encode(keysAndValues)
 			if err != nil {
-				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		},
 	)
@@ -742,6 +742,12 @@ func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 	if err != nil {
 		l = language.Make(th.defaultLanguage)
 	}
+
+	// collect stacktrace
+	stacktrace := string(debug.Stack())
+
+	th.log.V(2).Info("generating error page", "code", code, "msg", msg, "language", l, "stacktrace", stacktrace)
+
 	rendered := th.renderUtilityPage(
 		kdexv1alpha1.ErrorUtilityPageType,
 		l,
@@ -752,7 +758,7 @@ func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 
 	if rendered == "" {
 		// Fallback to standard http error if no custom error page
-		http.Error(w, http.StatusText(code), code)
+		http.Error(w, msg, code)
 		return
 	}
 
