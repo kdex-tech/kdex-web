@@ -623,24 +623,24 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux) {
 				return
 			}
 
-			langTag, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
 				th.serveError(w, r, http.StatusBadRequest, err.Error())
 				return
 			}
 
 			rootEntry := &render.PageEntry{}
-			th.Pages.BuildMenuEntries(rootEntry, &langTag, langTag.String() == th.defaultLanguage, nil)
+			th.Pages.BuildMenuEntries(rootEntry, &l, l.String() == th.defaultLanguage, nil)
 			pageMap := *rootEntry.Children
 
 			renderer := render.Renderer{
 				BasePath:        pageHandler.Page.BasePath,
 				BrandName:       th.host.BrandName,
 				DefaultLanguage: th.defaultLanguage,
-				Language:        langTag.String(),
+				Language:        l.String(),
 				Languages:       th.availableLanguages(&th.Translations),
 				LastModified:    time.Now(),
-				MessagePrinter:  th.messagePrinter(&th.Translations, langTag),
+				MessagePrinter:  th.messagePrinter(&th.Translations, l),
 				Organization:    th.host.Organization,
 				PageMap:         pageMap,
 				PatternPath:     pageHandler.PatternPath(),
@@ -672,7 +672,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 	mux.HandleFunc(
 		"GET /~/translation/{l10n}",
 		func(w http.ResponseWriter, r *http.Request) {
-			langTag, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
 				th.serveError(w, r, http.StatusBadRequest, err.Error())
 				return
@@ -688,7 +688,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 			}
 
 			keysAndValues := map[string]string{}
-			printer := th.messagePrinter(&th.Translations, langTag)
+			printer := th.messagePrinter(&th.Translations, l)
 			for _, key := range keys {
 				keysAndValues[key] = printer.Sprintf(key)
 				// replace each occurance of the string `%!s(MISSING)` with a placeholder `{{n}}` where `n` is the alphabetic index of the placeholder
