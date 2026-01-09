@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -109,15 +108,19 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		"Reconciling",
 	)
 
+	backendReferences := []kdexv1alpha1.KDexObjectReference{}
+	packageReferences := []kdexv1alpha1.PackageReference{}
+	scripts := []kdexv1alpha1.ScriptDef{}
+	themeAssets := []kdexv1alpha1.Asset{}
+
 	themeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, internalHost.Spec.ThemeRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
 
-	var scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec
-	var themeAssets []kdexv1alpha1.Asset
-
 	if themeObj != nil {
+		CollectBackend(r.Configuration, &backendReferences, themeObj)
+
 		internalHost.Status.Attributes["theme.generation"] = fmt.Sprintf("%d", themeObj.GetGeneration())
 
 		var themeSpec *kdexv1alpha1.KDexThemeSpec
@@ -147,7 +150,10 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				scriptLibrary = v.Spec
 			}
 
-			scriptLibraries = append(scriptLibraries, scriptLibrary)
+			if scriptLibrary.PackageReference != nil {
+				packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
+			}
+			scripts = append(scripts, scriptLibrary.Scripts...)
 		}
 	}
 
@@ -157,6 +163,8 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if scriptLibraryObj != nil {
+		CollectBackend(r.Configuration, &backendReferences, scriptLibraryObj)
+
 		internalHost.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
 
 		var scriptLibrary kdexv1alpha1.KDexScriptLibrarySpec
@@ -168,41 +176,39 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			scriptLibrary = v.Spec
 		}
 
-		scriptLibraries = append(scriptLibraries, scriptLibrary)
-	}
-
-	allPackageReferences := []kdexv1alpha1.PackageReference{}
-	for _, scriptLibrary := range scriptLibraries {
 		if scriptLibrary.PackageReference != nil {
-			allPackageReferences = append(allPackageReferences, *scriptLibrary.PackageReference)
+			packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
 		}
+		scripts = append(scripts, scriptLibrary.Scripts...)
 	}
 
-	allBackendReferences := []kdexv1alpha1.KDexObjectReference{}
-	allBackendReferences = append(allBackendReferences, internalHost.Spec.RequiredBackends...)
+	for _, utilityPageType := range []kdexv1alpha1.KDexUtilityPageType{
+		kdexv1alpha1.AnnouncementUtilityPageType,
+		kdexv1alpha1.ErrorUtilityPageType,
+		kdexv1alpha1.LoginUtilityPageType,
+	} {
+		pageHandler := r.HostHandler.GetUtilityPageHandler(utilityPageType)
+		packageReferences = append(packageReferences, pageHandler.PackageReferences...)
+		backendReferences = append(backendReferences, pageHandler.RequiredBackends...)
+		// we don't add page scripts here, because they are added by the pages
+	}
 
 	seenPaths := map[string]bool{}
+
 	for _, pageHandler := range r.HostHandler.Pages.List() {
 		if seenPaths[pageHandler.Page.BasePath] {
 			return ctrl.Result{}, fmt.Errorf("duplicated path %s, paths must be unique across backends and pages", pageHandler.Page.BasePath)
 		}
 		seenPaths[pageHandler.Page.BasePath] = true
 
-		allPackageReferences = append(allPackageReferences, pageHandler.PackageReferences...)
-		allBackendReferences = append(allBackendReferences, pageHandler.RequiredBackends...)
+		packageReferences = append(packageReferences, pageHandler.PackageReferences...)
+		backendReferences = append(backendReferences, pageHandler.RequiredBackends...)
+		// we don't add page scripts here, because they are added by the pages
 	}
 
-	// Deduplicate
-	uniqueBackendRefs := []kdexv1alpha1.KDexObjectReference{}
-	seen := map[string]bool{}
-	for _, backend := range allBackendReferences {
-		key := fmt.Sprintf("%s/%s/%s", backend.Kind, backend.Namespace, backend.Name)
-		if seen[key] {
-			continue
-		}
-		seen[key] = true
-		uniqueBackendRefs = append(uniqueBackendRefs, backend)
-	}
+	uniqueBackendRefs := UniqueBackendRefs(backendReferences)
+	uniquePackageReferences := UniquePackageRefs(packageReferences)
+	uniqueScripts := UniqueScripts(scripts)
 
 	requiredBackends := []resolvedBackend{}
 	for _, ref := range uniqueBackendRefs {
@@ -242,30 +248,6 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			Namespace: obj.GetNamespace(),
 		})
 	}
-
-	packageReferenceMap := map[string]kdexv1alpha1.PackageReference{}
-	for _, pkgRef := range allPackageReferences {
-		packageReferenceMap[pkgRef.Name+"@"+pkgRef.Version] = pkgRef
-	}
-
-	uniquePackageReferences := []kdexv1alpha1.PackageReference{}
-	for _, pkgRef := range packageReferenceMap {
-		uniquePackageReferences = append(uniquePackageReferences, pkgRef)
-	}
-
-	// sort the final package references by name and version
-	sort.Slice(uniquePackageReferences, func(i, j int) bool {
-		if uniquePackageReferences[i].Name != uniquePackageReferences[j].Name {
-			return uniquePackageReferences[i].Name < uniquePackageReferences[j].Name
-		}
-		return uniquePackageReferences[i].Version < uniquePackageReferences[j].Version
-	})
-
-	log.V(2).Info(
-		"references",
-		"uniqueBackendRefs", uniqueBackendRefs,
-		"uniquePackageReferences", uniquePackageReferences,
-	)
 
 	internalPackageReferences := &kdexv1alpha1.KDexInternalPackageReferences{
 		ObjectMeta: metav1.ObjectMeta{
@@ -310,7 +292,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		importMap = internalPackageReferences.Status.Attributes["importmap"]
 	}
 
-	r.HostHandler.SetHost(&internalHost.Spec.KDexHostSpec, themeAssets, scriptLibraries, importMap)
+	r.HostHandler.SetHost(&internalHost.Spec.KDexHostSpec, uniquePackageReferences, themeAssets, uniqueScripts, importMap)
 
 	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, requiredBackends)
 }

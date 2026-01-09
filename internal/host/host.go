@@ -22,17 +22,19 @@ import (
 )
 
 type HostHandler struct {
-	Mux                  *http.ServeMux
-	Name                 string
-	Namespace            string
-	Pages                *page.PageStore
-	ScriptLibraries      []kdexv1alpha1.KDexScriptLibrarySpec
+	Mux       *http.ServeMux
+	Name      string
+	Namespace string
+	Pages     *page.PageStore
+
 	Translations         Translations
 	defaultLanguage      string
 	host                 *kdexv1alpha1.KDexHostSpec
 	importmap            string
 	log                  logr.Logger
 	mu                   sync.RWMutex
+	packageReferences    []kdexv1alpha1.PackageReference
+	scripts              []kdexv1alpha1.ScriptDef
 	themeAssets          []kdexv1alpha1.Asset
 	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
@@ -134,12 +136,10 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 	separator := ""
 
-	for _, scriptLibrary := range th.ScriptLibraries {
-		for _, script := range scriptLibrary.Scripts {
-			buffer.WriteString(separator)
-			buffer.WriteString(script.ToFootTag())
-			separator = "\n"
-		}
+	for _, script := range th.scripts {
+		buffer.WriteString(separator)
+		buffer.WriteString(script.ToFootTag())
+		separator = "\n"
 	}
 	for _, script := range handler.Scripts {
 		buffer.WriteString(separator)
@@ -150,13 +150,19 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	return buffer.String()
 }
 
+func (th *HostHandler) GetUtilityPageHandler(name kdexv1alpha1.KDexUtilityPageType) page.PageHandler {
+	th.mu.RLock()
+	defer th.mu.RUnlock()
+	ph, ok := th.utilityPages[name]
+	if !ok {
+		return page.PageHandler{}
+	}
+	return ph
+}
+
 func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	packageReferences := []kdexv1alpha1.PackageReference{}
-	for _, scriptLibrary := range th.ScriptLibraries {
-		if scriptLibrary.PackageReference != nil {
-			packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
-		}
-	}
+	packageReferences = append(packageReferences, th.packageReferences...)
 	packageReferences = append(packageReferences, handler.PackageReferences...)
 
 	var buffer bytes.Buffer
@@ -176,12 +182,10 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 		buffer.WriteString("\n</script>")
 	}
 
-	for _, scriptLibrary := range th.ScriptLibraries {
-		for _, script := range scriptLibrary.Scripts {
-			buffer.WriteString(separator)
-			buffer.WriteString(script.ToHeadTag())
-			separator = "\n"
-		}
+	for _, script := range th.scripts {
+		buffer.WriteString(separator)
+		buffer.WriteString(script.ToHeadTag())
+		separator = "\n"
 	}
 	for _, script := range handler.Scripts {
 		buffer.WriteString(separator)
@@ -373,7 +377,7 @@ func (th *HostHandler) RebuildMux() {
 		l10nRenders map[string]string
 	}
 
-	var renderedPages []pageRender
+	renderedPages := []pageRender{}
 
 	for _, ph := range pageHandlers {
 		basePath := ph.BasePath()
@@ -483,15 +487,17 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (th *HostHandler) SetHost(
 	host *kdexv1alpha1.KDexHostSpec,
+	packageReferences []kdexv1alpha1.PackageReference,
 	themeAssets []kdexv1alpha1.Asset,
-	scriptLibraries []kdexv1alpha1.KDexScriptLibrarySpec,
+	scripts []kdexv1alpha1.ScriptDef,
 	importmap string,
 ) {
 	th.mu.Lock()
 	th.defaultLanguage = host.DefaultLang
 	th.host = host
-	th.ScriptLibraries = scriptLibraries
+	th.packageReferences = packageReferences
 	th.themeAssets = themeAssets
+	th.scripts = scripts
 	th.importmap = importmap
 	th.mu.Unlock()
 	th.RebuildMux()
@@ -533,7 +539,7 @@ func (ew *errorResponseWriter) WriteHeader(code int) {
 }
 
 func (th *HostHandler) availableLanguages(translations *Translations) []string {
-	var availableLangs []string
+	availableLangs := []string{}
 
 	for _, tag := range translations.Languages() {
 		availableLangs = append(availableLangs, tag.String())
@@ -691,7 +697,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux) {
 			printer := th.messagePrinter(&th.Translations, l)
 			for _, key := range keys {
 				keysAndValues[key] = printer.Sprintf(key)
-				// replace each occurance of the string `%!s(MISSING)` with a placeholder `{{n}}` where `n` is the alphabetic index of the placeholder
+				// replace each occurrence of the string `%!s(MISSING)` with a placeholder `{{n}}` where `n` is the alphabetic index of the placeholder
 				parts := strings.Split(keysAndValues[key], "%!s(MISSING)")
 				if len(parts) > 1 {
 					var builder strings.Builder

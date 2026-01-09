@@ -252,6 +252,7 @@ func main() {
 	}
 	if err := (&controller.KDexInternalUtilityPageReconciler{
 		Client:              mgr.GetClient(),
+		Configuration:       conf,
 		ControllerNamespace: controllerNamespace,
 		FocalHost:           focalHost,
 		HostHandler:         hostHandler,

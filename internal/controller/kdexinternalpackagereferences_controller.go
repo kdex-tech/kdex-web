@@ -478,7 +478,7 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 		kanikoArgs = append(kanikoArgs, "--insecure")
 	}
 
-	job.Spec.Template.ObjectMeta.Annotations["kdex.dev/generation"] = fmt.Sprintf("%d", internalPackageReferences.Generation)
+	job.Spec.Template.Annotations["kdex.dev/generation"] = fmt.Sprintf("%d", internalPackageReferences.Generation)
 	job.Spec.Template.Spec.Containers[0].Args = kanikoArgs
 }
 

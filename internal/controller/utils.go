@@ -2,8 +2,11 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -62,6 +65,12 @@ func CollectBackend(conf configuration.NexusConfiguration, requiredBackends *[]k
 	}
 }
 
+func HashScriptDef(script kdexv1alpha1.ScriptDef) string {
+	hash := sha256.Sum256([]byte(script.ToTag()))
+	return hex.EncodeToString(hash[:])
+}
+
+// nolint:gocyclo
 func MakeHandlerByReferencePath(
 	c client.Client,
 	scheme *runtime.Scheme,
@@ -218,6 +227,61 @@ func ControllerNamespace() string {
 	}
 
 	return string(in)
+}
+
+func UniqueBackendRefs(backends []kdexv1alpha1.KDexObjectReference) []kdexv1alpha1.KDexObjectReference {
+	seen := map[string]bool{}
+	unique := []kdexv1alpha1.KDexObjectReference{}
+	for _, backend := range backends {
+		if seen[backend.Name] {
+			continue
+		}
+		seen[backend.Name] = true
+		unique = append(unique, backend)
+	}
+
+	sort.Slice(unique, func(i, j int) bool {
+		return unique[i].Name < unique[j].Name
+	})
+
+	return unique
+}
+
+func UniquePackageRefs(packages []kdexv1alpha1.PackageReference) []kdexv1alpha1.PackageReference {
+	packageReferenceMap := map[string]kdexv1alpha1.PackageReference{}
+	for _, pkgRef := range packages {
+		packageReferenceMap[pkgRef.Name+"@"+pkgRef.Version] = pkgRef
+	}
+
+	uniquePackageReferences := []kdexv1alpha1.PackageReference{}
+	for _, pkgRef := range packageReferenceMap {
+		uniquePackageReferences = append(uniquePackageReferences, pkgRef)
+	}
+
+	sort.Slice(uniquePackageReferences, func(i, j int) bool {
+		if uniquePackageReferences[i].Name != uniquePackageReferences[j].Name {
+			return uniquePackageReferences[i].Name < uniquePackageReferences[j].Name
+		}
+		return uniquePackageReferences[i].Version < uniquePackageReferences[j].Version
+	})
+
+	return uniquePackageReferences
+}
+
+func UniqueScripts(scripts []kdexv1alpha1.ScriptDef) []kdexv1alpha1.ScriptDef {
+	uniqueScripts := []kdexv1alpha1.ScriptDef{}
+
+	seenScripts := map[string]bool{}
+	for _, script := range scripts {
+		hash := HashScriptDef(script)
+		if seenScripts[hash] {
+			continue
+		}
+		seenScripts[hash] = true
+		uniqueScripts = append(uniqueScripts, script)
+	}
+
+	return uniqueScripts
 }
 
 func getKind(obj client.Object, scheme *runtime.Scheme) (string, error) {
