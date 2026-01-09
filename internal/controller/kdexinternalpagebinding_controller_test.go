@@ -26,7 +26,7 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
-var _ = Describe("KDexInternalPageBinding Controller", func() {
+var _ = Describe("KDexPageBinding Controller", func() {
 	Context("When reconciling a resource", func() {
 		const namespace = "default"
 		const resourceName = "test-resource"
@@ -38,25 +38,23 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 		})
 
 		It("with empty content entries should not succeed", func() {
-			resource := &kdexv1alpha1.KDexInternalPageBinding{
+			resource := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{},
-						HostRef: corev1.LocalObjectReference{
-							Name: "non-existent-host",
-						},
-						Label: "foo",
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageArchetype",
-							Name: "non-existent-page-archetype",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/foo",
-						},
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{},
+					HostRef: corev1.LocalObjectReference{
+						Name: "non-existent-host",
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/foo",
 					},
 				},
 			}
@@ -65,32 +63,30 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 		})
 
 		It("with content entries should succeed", func() {
-			resource := &kdexv1alpha1.KDexInternalPageBinding{
+			resource := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: "<h1>Hello, World!</h1>",
-								},
-								Slot: "main",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
 							},
+							Slot: "main",
 						},
-						HostRef: corev1.LocalObjectReference{
-							Name: "non-existent-host",
-						},
-						Label: "foo",
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageArchetype",
-							Name: "non-existent-page-archetype",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/foo",
-						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: "non-existent-host",
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/foo",
 					},
 				},
 			}
@@ -99,32 +95,30 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 		})
 
 		It("with missing references should not succeed", func() {
-			resource := &kdexv1alpha1.KDexInternalPageBinding{
+			resource := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: "<h1>Hello, World!</h1>",
-								},
-								Slot: "main",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
 							},
+							Slot: "main",
 						},
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
-						Label: "foo",
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageArchetype",
-							Name: "non-existent-page-archetype",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/",
-						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
 					},
 				},
 			}
@@ -133,7 +127,7 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, false)
+				&kdexv1alpha1.KDexPageBinding{}, false)
 
 			addOrUpdatePageArchetype(
 				ctx, k8sClient,
@@ -170,50 +164,48 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, true)
+				&kdexv1alpha1.KDexPageBinding{}, true)
 		})
 
 		It("with override references", func() {
-			resource := &kdexv1alpha1.KDexInternalPageBinding{
+			resource := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: "<h1>Hello, World!</h1>",
-								},
-								Slot: "main",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
 							},
+							Slot: "main",
 						},
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					OverrideFooterRef: &kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageFooter",
+						Name: "non-existent-footer",
+					},
+					OverrideHeaderRef: &kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageHeader",
+						Name: "non-existent-header",
+					},
+					OverrideNavigationRefs: map[string]*kdexv1alpha1.KDexObjectReference{
+						"main": {
+							Kind: "KDexPageNavigation",
+							Name: "non-existent-navigation",
 						},
-						Label: "foo",
-						OverrideFooterRef: &kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageFooter",
-							Name: "non-existent-footer",
-						},
-						OverrideHeaderRef: &kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageHeader",
-							Name: "non-existent-header",
-						},
-						OverrideNavigationRefs: map[string]*kdexv1alpha1.KDexObjectReference{
-							"main": {
-								Kind: "KDexPageNavigation",
-								Name: "non-existent-navigation",
-							},
-						},
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageArchetype",
-							Name: "non-existent-page-archetype",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/foo",
-						},
+					},
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/foo",
 					},
 				},
 			}
@@ -222,7 +214,7 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, false)
+				&kdexv1alpha1.KDexPageBinding{}, false)
 
 			addOrUpdatePageArchetype(
 				ctx, k8sClient,
@@ -294,39 +286,37 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, true)
+				&kdexv1alpha1.KDexPageBinding{}, true)
 		})
 
 		It("with parent page reference", func() {
-			resource := &kdexv1alpha1.KDexInternalPageBinding{
+			resource := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: "<h1>Hello, World!</h1>",
-								},
-								Slot: "main",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
 							},
+							Slot: "main",
 						},
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
-						Label: "foo",
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageArchetype",
-							Name: "non-existent-page-archetype",
-						},
-						ParentPageRef: &corev1.LocalObjectReference{
-							Name: "non-existent-page-binding",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/child",
-						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					ParentPageRef: &corev1.LocalObjectReference{
+						Name: "non-existent-page-binding",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/child",
 					},
 				},
 			}
@@ -368,34 +358,32 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, false)
+				&kdexv1alpha1.KDexPageBinding{}, false)
 
-			referencedPage := &kdexv1alpha1.KDexInternalPageBinding{
+			referencedPage := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "non-existent-page-binding",
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: "<h1>Hello, World!</h1>",
-								},
-								Slot: "main",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
 							},
+							Slot: "main",
 						},
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
-						Label: "foo",
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageArchetype",
-							Name: "non-existent-page-archetype",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/",
-						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/",
 					},
 				},
 			}
@@ -404,40 +392,38 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, true)
+				&kdexv1alpha1.KDexPageBinding{}, true)
 		})
 
 		It("updates when a dependency is updated", func() {
-			resource := &kdexv1alpha1.KDexInternalPageBinding{
+			resource := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: "<h1>Hello, World!</h1>",
-								},
-								Slot: "main",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
 							},
+							Slot: "main",
 						},
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
-						Label: "foo",
-						OverrideHeaderRef: &kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageHeader",
-							Name: "non-existent-header",
-						},
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageArchetype",
-							Name: "non-existent-page-archetype",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/foo",
-						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					OverrideHeaderRef: &kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageHeader",
+						Name: "non-existent-header",
+					},
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/foo",
 					},
 				},
 			}
@@ -446,7 +432,7 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, false)
+				&kdexv1alpha1.KDexPageBinding{}, false)
 
 			addOrUpdatePageArchetype(
 				ctx, k8sClient,
@@ -495,7 +481,7 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, true)
+				&kdexv1alpha1.KDexPageBinding{}, true)
 
 			pageHandler, ok := hostHandler.Pages.Get(resource.Name)
 			Expect(ok).To(BeTrue())
@@ -526,32 +512,30 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 		})
 
 		It("updates when an indirect dependency is updated", func() {
-			resource := &kdexv1alpha1.KDexInternalPageBinding{
+			resource := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: "<h1>Hello, World!</h1>",
-								},
-								Slot: "main",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
 							},
+							Slot: "main",
 						},
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
-						Label: "foo",
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexPageArchetype",
-							Name: "non-existent-page-archetype",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/foo",
-						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/foo",
 					},
 				},
 			}
@@ -560,7 +544,7 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, false)
+				&kdexv1alpha1.KDexPageBinding{}, false)
 
 			addOrUpdatePageHeader(
 				ctx, k8sClient,
@@ -627,7 +611,7 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, true)
+				&kdexv1alpha1.KDexPageBinding{}, true)
 
 			pageHandler, ok := hostHandler.Pages.Get(resource.Name)
 			Expect(ok).To(BeTrue())
@@ -662,33 +646,31 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 		})
 
 		It("cross namespace reference", func() {
-			resource := &kdexv1alpha1.KDexInternalPageBinding{
+			resource := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: "<h1>Hello, World!</h1>",
-								},
-								Slot: "main",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
 							},
+							Slot: "main",
 						},
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
-						Label: "foo",
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind:      "KDexPageArchetype",
-							Name:      "non-existent-page-archetype",
-							Namespace: secondNamespace,
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/foo",
-						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind:      "KDexPageArchetype",
+						Name:      "non-existent-page-archetype",
+						Namespace: secondNamespace,
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/foo",
 					},
 				},
 			}
@@ -697,7 +679,7 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, false)
+				&kdexv1alpha1.KDexPageBinding{}, false)
 
 			addOrUpdateInternalHost(
 				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
@@ -743,36 +725,34 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, true)
+				&kdexv1alpha1.KDexPageBinding{}, true)
 		})
 
 		It("cluster reference", func() {
-			resource := &kdexv1alpha1.KDexInternalPageBinding{
+			resource := &kdexv1alpha1.KDexPageBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: namespace,
 				},
-				Spec: kdexv1alpha1.KDexInternalPageBindingSpec{
-					KDexPageBindingSpec: kdexv1alpha1.KDexPageBindingSpec{
-						ContentEntries: []kdexv1alpha1.ContentEntry{
-							{
-								ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
-									RawHTML: "<h1>Hello, World!</h1>",
-								},
-								Slot: "main",
+				Spec: kdexv1alpha1.KDexPageBindingSpec{
+					ContentEntries: []kdexv1alpha1.ContentEntry{
+						{
+							ContentEntryStatic: kdexv1alpha1.ContentEntryStatic{
+								RawHTML: "<h1>Hello, World!</h1>",
 							},
+							Slot: "main",
 						},
-						HostRef: corev1.LocalObjectReference{
-							Name: focalHost,
-						},
-						Label: "foo",
-						PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
-							Kind: "KDexClusterPageArchetype",
-							Name: "non-existent-page-archetype",
-						},
-						Paths: kdexv1alpha1.Paths{
-							BasePath: "/foo",
-						},
+					},
+					HostRef: corev1.LocalObjectReference{
+						Name: focalHost,
+					},
+					Label: "foo",
+					PageArchetypeRef: kdexv1alpha1.KDexObjectReference{
+						Kind: "KDexClusterPageArchetype",
+						Name: "non-existent-page-archetype",
+					},
+					Paths: kdexv1alpha1.Paths{
+						BasePath: "/foo",
 					},
 				},
 			}
@@ -781,7 +761,7 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, false)
+				&kdexv1alpha1.KDexPageBinding{}, false)
 
 			addOrUpdateInternalHost(
 				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
@@ -826,7 +806,7 @@ var _ = Describe("KDexInternalPageBinding Controller", func() {
 
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
-				&kdexv1alpha1.KDexInternalPageBinding{}, true)
+				&kdexv1alpha1.KDexPageBinding{}, true)
 		})
 	})
 })

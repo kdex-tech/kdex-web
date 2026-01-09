@@ -171,9 +171,41 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		scriptLibraries = append(scriptLibraries, scriptLibrary)
 	}
 
-	requiredBackends := []resolvedBackend{}
+	allPackageReferences := []kdexv1alpha1.PackageReference{}
+	for _, scriptLibrary := range scriptLibraries {
+		if scriptLibrary.PackageReference != nil {
+			allPackageReferences = append(allPackageReferences, *scriptLibrary.PackageReference)
+		}
+	}
+
+	allBackendReferences := []kdexv1alpha1.KDexObjectReference{}
+	allBackendReferences = append(allBackendReferences, internalHost.Spec.RequiredBackends...)
+
 	seenPaths := map[string]bool{}
-	for _, ref := range internalHost.Spec.RequiredBackends {
+	for _, pageHandler := range r.HostHandler.Pages.List() {
+		if seenPaths[pageHandler.Page.BasePath] {
+			return ctrl.Result{}, fmt.Errorf("duplicated path %s, paths must be unique across backends and pages", pageHandler.Page.BasePath)
+		}
+		seenPaths[pageHandler.Page.BasePath] = true
+
+		allPackageReferences = append(allPackageReferences, pageHandler.PackageReferences...)
+		allBackendReferences = append(allBackendReferences, pageHandler.RequiredBackends...)
+	}
+
+	// Deduplicate
+	uniqueBackendRefs := []kdexv1alpha1.KDexObjectReference{}
+	seen := map[string]bool{}
+	for _, backend := range allBackendReferences {
+		key := fmt.Sprintf("%s/%s/%s", backend.Kind, backend.Namespace, backend.Name)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		uniqueBackendRefs = append(uniqueBackendRefs, backend)
+	}
+
+	requiredBackends := []resolvedBackend{}
+	for _, ref := range uniqueBackendRefs {
 		obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
 		if shouldReturn {
 			return r1, err
@@ -211,46 +243,28 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		})
 	}
 
-	for _, pageHandler := range r.HostHandler.Pages.List() {
-		if seenPaths[pageHandler.Page.BasePath] {
-			return ctrl.Result{}, fmt.Errorf("duplicated path %s, paths must be unique across backends and pages", pageHandler.Page.BasePath)
-		}
-		seenPaths[pageHandler.Page.BasePath] = true
-	}
-
-	allPackageReferences := []kdexv1alpha1.PackageReference{}
-	for _, scriptLibrary := range scriptLibraries {
-		if scriptLibrary.PackageReference != nil {
-			allPackageReferences = append(allPackageReferences, *scriptLibrary.PackageReference)
-		}
-	}
-
-	for _, p := range r.HostHandler.Pages.List() {
-		allPackageReferences = append(allPackageReferences, p.PackageReferences...)
-	}
-
-	uniquePackageReferences := map[string]kdexv1alpha1.PackageReference{}
+	packageReferenceMap := map[string]kdexv1alpha1.PackageReference{}
 	for _, pkgRef := range allPackageReferences {
-		uniquePackageReferences[pkgRef.Name+"@"+pkgRef.Version] = pkgRef
+		packageReferenceMap[pkgRef.Name+"@"+pkgRef.Version] = pkgRef
 	}
 
-	finalPackageReferences := []kdexv1alpha1.PackageReference{}
-	for _, pkgRef := range uniquePackageReferences {
-		finalPackageReferences = append(finalPackageReferences, pkgRef)
+	uniquePackageReferences := []kdexv1alpha1.PackageReference{}
+	for _, pkgRef := range packageReferenceMap {
+		uniquePackageReferences = append(uniquePackageReferences, pkgRef)
 	}
 
 	// sort the final package references by name and version
-	sort.Slice(finalPackageReferences, func(i, j int) bool {
-		if finalPackageReferences[i].Name != finalPackageReferences[j].Name {
-			return finalPackageReferences[i].Name < finalPackageReferences[j].Name
+	sort.Slice(uniquePackageReferences, func(i, j int) bool {
+		if uniquePackageReferences[i].Name != uniquePackageReferences[j].Name {
+			return uniquePackageReferences[i].Name < uniquePackageReferences[j].Name
 		}
-		return finalPackageReferences[i].Version < finalPackageReferences[j].Version
+		return uniquePackageReferences[i].Version < uniquePackageReferences[j].Version
 	})
 
 	log.V(2).Info(
-		"package references",
-		"allPackageReferences", allPackageReferences,
-		"finalPackageReferences", finalPackageReferences,
+		"references",
+		"uniqueBackendRefs", uniqueBackendRefs,
+		"uniquePackageReferences", uniquePackageReferences,
 	)
 
 	internalPackageReferences := &kdexv1alpha1.KDexInternalPackageReferences{
@@ -262,7 +276,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	importMap := ""
 
-	if len(finalPackageReferences) == 0 {
+	if len(uniquePackageReferences) == 0 {
 		log.V(2).Info("deleting host package references", "packageReferences", internalPackageReferences.Name)
 
 		if err := r.Delete(ctx, internalPackageReferences); err != nil {
@@ -286,7 +300,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 		internalPackageReferences = nil
 	} else {
-		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &internalHost, internalPackageReferences, finalPackageReferences)
+		shouldReturn, r1, err = r.createOrUpdatePackageReferences(ctx, &internalHost, internalPackageReferences, uniquePackageReferences)
 		if shouldReturn {
 			log.V(2).Info("package references shouldReturn", "packageReferences", internalPackageReferences.Name, "result", r1, "err", err)
 
@@ -316,21 +330,11 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return t.Name == r.FocalHost
 		case *kdexv1alpha1.KDexInternalPackageReferences:
 			return t.Name == fmt.Sprintf("%s-packages", r.FocalHost)
-		case *kdexv1alpha1.KDexInternalPageBinding:
+		case *kdexv1alpha1.KDexPageBinding:
 			return t.Spec.HostRef.Name == r.FocalHost
 		default:
 			return true
 		}
-	}
-
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexInternalPageBinding{}, HOST_INDEX_KEY, func(rawObj client.Object) []string {
-		pageBinding := rawObj.(*kdexv1alpha1.KDexInternalPageBinding)
-		if pageBinding.Spec.HostRef.Name == "" {
-			return nil
-		}
-		return []string{pageBinding.Spec.HostRef.Name}
-	}); err != nil {
-		return err
 	}
 
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexInternalTranslation{}, HOST_INDEX_KEY, func(rawObj client.Object) []string {
@@ -339,6 +343,16 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return nil
 		}
 		return []string{translation.Spec.HostRef.Name}
+	}); err != nil {
+		return err
+	}
+
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexPageBinding{}, HOST_INDEX_KEY, func(rawObj client.Object) []string {
+		pageBinding := rawObj.(*kdexv1alpha1.KDexPageBinding)
+		if pageBinding.Spec.HostRef.Name == "" {
+			return nil
+		}
+		return []string{pageBinding.Spec.HostRef.Name}
 	}); err != nil {
 		return err
 	}
@@ -378,23 +392,6 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&kdexv1alpha1.KDexClusterTheme{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.ThemeRef}")).
 		Watches(
-			&kdexv1alpha1.KDexInternalPageBinding{},
-			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-				pageBinding, ok := obj.(*kdexv1alpha1.KDexInternalPageBinding)
-				if !ok || pageBinding.Spec.HostRef.Name != r.FocalHost {
-					return nil
-				}
-
-				return []reconcile.Request{
-					{
-						NamespacedName: types.NamespacedName{
-							Name:      pageBinding.Spec.HostRef.Name,
-							Namespace: pageBinding.Namespace,
-						},
-					},
-				}
-			})).
-		Watches(
 			&kdexv1alpha1.KDexInternalTranslation{},
 			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 				translation, ok := o.(*kdexv1alpha1.KDexInternalTranslation)
@@ -414,6 +411,23 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&kdexv1alpha1.KDexInternalUtilityPage{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.AnnouncementRef}", "{.Spec.ErrorRef}", "{.Spec.LoginRef}")).
+		Watches(
+			&kdexv1alpha1.KDexPageBinding{},
+			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				pageBinding, ok := obj.(*kdexv1alpha1.KDexPageBinding)
+				if !ok || pageBinding.Spec.HostRef.Name != r.FocalHost {
+					return nil
+				}
+
+				return []reconcile.Request{
+					{
+						NamespacedName: types.NamespacedName{
+							Name:      pageBinding.Spec.HostRef.Name,
+							Namespace: pageBinding.Namespace,
+						},
+					},
+				}
+			})).
 		WithEventFilter(enabledFilter).
 		WithOptions(
 			controller.TypedOptions[reconcile.Request]{

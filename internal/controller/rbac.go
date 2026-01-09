@@ -21,9 +21,6 @@ package controller
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpackagereferences,           verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpackagereferences/finalizers,verbs=update
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpackagereferences/status,    verbs=get;update;patch
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings,                verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings/finalizers,     verbs=update
-// +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalpagebindings/status,         verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternaltranslations,                verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternaltranslations/finalizers,     verbs=update
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternaltranslations/status,         verbs=get;update;patch
@@ -31,6 +28,9 @@ package controller
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalutilitypages/finalizers,     verbs=update
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalutilitypages/status,         verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagearchetypes,                      verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings,                        verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings/finalizers,             verbs=update
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagebindings/status,                 verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagefooters,                         verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpageheaders,                         verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagenavigations,                     verbs=get;list;watch

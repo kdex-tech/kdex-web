@@ -94,7 +94,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	logger, err := kdexlog.New(&opts, map[string]string{
-		"kdexinternalpagebinding": "2",
+		"kdexpagebinding": "2",
 	})
 	if err != nil {
 		panic(err)
@@ -223,7 +223,7 @@ var _ = BeforeSuite(func() {
 	err = internalHostReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
-	internalPageBindingReconciler := &KDexInternalPageBindingReconciler{
+	internalPageBindingReconciler := &KDexPageBindingReconciler{
 		Client:              k8sManager.GetClient(),
 		ControllerNamespace: namespace,
 		FocalHost:           focalHost,

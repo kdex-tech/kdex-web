@@ -163,12 +163,12 @@ func ResolvePageBinding(
 	objectConditions *[]metav1.Condition,
 	pageBindingRef *corev1.LocalObjectReference,
 	requeueDelay time.Duration,
-) (*kdexv1alpha1.KDexInternalPageBinding, bool, ctrl.Result, error) {
+) (*kdexv1alpha1.KDexPageBinding, bool, ctrl.Result, error) {
 	if pageBindingRef == nil {
 		return nil, false, ctrl.Result{}, nil
 	}
 
-	var pageBinding kdexv1alpha1.KDexInternalPageBinding
+	var pageBinding kdexv1alpha1.KDexPageBinding
 	pageBindingName := types.NamespacedName{
 		Name:      pageBindingRef.Name,
 		Namespace: object.GetNamespace(),

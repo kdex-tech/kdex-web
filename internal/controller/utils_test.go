@@ -88,13 +88,13 @@ func addOrUpdatePageArchetype(
 	}).Should(Succeed())
 }
 
-func addOrUpdateInternalPageBinding(
+func addOrUpdatePageBinding(
 	ctx context.Context,
 	k8sClient client.Client,
-	pageBinding kdexv1alpha1.KDexInternalPageBinding,
+	pageBinding kdexv1alpha1.KDexPageBinding,
 ) {
 	Eventually(func(g Gomega) error {
-		list := &kdexv1alpha1.KDexInternalPageBindingList{}
+		list := &kdexv1alpha1.KDexPageBindingList{}
 		err := k8sClient.List(ctx, list, &client.ListOptions{
 			Namespace:     pageBinding.Namespace,
 			FieldSelector: fields.OneTermEqualSelector("metadata.name", pageBinding.Name),
@@ -272,15 +272,20 @@ func cleanupResources(namespace string) {
 		{&kdexv1alpha1.KDexClusterPageNavigation{}, &kdexv1alpha1.KDexClusterPageNavigationList{}},
 		{&kdexv1alpha1.KDexClusterScriptLibrary{}, &kdexv1alpha1.KDexClusterScriptLibraryList{}},
 		{&kdexv1alpha1.KDexClusterTheme{}, &kdexv1alpha1.KDexClusterThemeList{}},
+		{&kdexv1alpha1.KDexClusterUtilityPage{}, &kdexv1alpha1.KDexClusterUtilityPageList{}},
 		{&kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}},
 		{&kdexv1alpha1.KDexInternalPackageReferences{}, &kdexv1alpha1.KDexInternalPackageReferencesList{}},
+		{&kdexv1alpha1.KDexInternalTranslation{}, &kdexv1alpha1.KDexInternalTranslationList{}},
+		{&kdexv1alpha1.KDexInternalUtilityPage{}, &kdexv1alpha1.KDexInternalUtilityPageList{}},
 		{&kdexv1alpha1.KDexPageArchetype{}, &kdexv1alpha1.KDexPageArchetypeList{}},
-		{&kdexv1alpha1.KDexInternalPageBinding{}, &kdexv1alpha1.KDexInternalPageBindingList{}},
+		{&kdexv1alpha1.KDexPageBinding{}, &kdexv1alpha1.KDexPageBindingList{}},
 		{&kdexv1alpha1.KDexPageFooter{}, &kdexv1alpha1.KDexPageFooterList{}},
 		{&kdexv1alpha1.KDexPageHeader{}, &kdexv1alpha1.KDexPageHeaderList{}},
 		{&kdexv1alpha1.KDexPageNavigation{}, &kdexv1alpha1.KDexPageNavigationList{}},
 		{&kdexv1alpha1.KDexScriptLibrary{}, &kdexv1alpha1.KDexScriptLibraryList{}},
 		{&kdexv1alpha1.KDexTheme{}, &kdexv1alpha1.KDexThemeList{}},
+		{&kdexv1alpha1.KDexTranslation{}, &kdexv1alpha1.KDexTranslationList{}},
+		{&kdexv1alpha1.KDexUtilityPage{}, &kdexv1alpha1.KDexUtilityPageList{}},
 		{&corev1.Secret{}, &corev1.SecretList{}},
 	} {
 		err := k8sClient.DeleteAllOf(ctx, pair.resource, client.InNamespace(namespace))

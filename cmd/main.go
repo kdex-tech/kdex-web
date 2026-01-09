@@ -228,15 +228,15 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalHost")
 		os.Exit(1)
 	}
-	if err := (&controller.KDexInternalPageBindingReconciler{
+	if err := (&controller.KDexInternalPackageReferencesReconciler{
 		Client:              mgr.GetClient(),
+		Configuration:       conf,
 		ControllerNamespace: controllerNamespace,
 		FocalHost:           focalHost,
-		HostHandler:         hostHandler,
 		RequeueDelay:        requeueDelay,
 		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalPageBinding")
+		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalPackageReferences")
 		os.Exit(1)
 	}
 	if err := (&controller.KDexInternalTranslationReconciler{
@@ -250,17 +250,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalTranslation")
 		os.Exit(1)
 	}
-	if err := (&controller.KDexInternalPackageReferencesReconciler{
-		Client:              mgr.GetClient(),
-		Configuration:       conf,
-		ControllerNamespace: controllerNamespace,
-		FocalHost:           focalHost,
-		RequeueDelay:        requeueDelay,
-		Scheme:              mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalPackageReferences")
-		os.Exit(1)
-	}
 	if err := (&controller.KDexInternalUtilityPageReconciler{
 		Client:              mgr.GetClient(),
 		ControllerNamespace: controllerNamespace,
@@ -270,6 +259,18 @@ func main() {
 		Scheme:              mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KDexInternalUtilityPage")
+		os.Exit(1)
+	}
+	if err := (&controller.KDexPageBindingReconciler{
+		Client:              mgr.GetClient(),
+		Configuration:       conf,
+		ControllerNamespace: controllerNamespace,
+		FocalHost:           focalHost,
+		HostHandler:         hostHandler,
+		RequeueDelay:        requeueDelay,
+		Scheme:              mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KDexPageBinding")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

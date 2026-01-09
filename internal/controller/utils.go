@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/jsonpath"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/crds/configuration"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -22,27 +23,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func CollectBackend(requiredBackends *[]kdexv1alpha1.KDexObjectReference, obj client.Object) {
+func CollectBackend(conf configuration.NexusConfiguration, requiredBackends *[]kdexv1alpha1.KDexObjectReference, obj client.Object) {
 	if obj == nil {
 		return
 	}
-	var ingressPath string
+	var backend kdexv1alpha1.Backend
 	switch v := obj.(type) {
-	case *kdexv1alpha1.KDexApp:
-		ingressPath = v.Spec.IngressPath
 	case *kdexv1alpha1.KDexClusterApp:
-		ingressPath = v.Spec.IngressPath
-	case *kdexv1alpha1.KDexScriptLibrary:
-		ingressPath = v.Spec.IngressPath
+		backend = v.Spec.Backend
 	case *kdexv1alpha1.KDexClusterScriptLibrary:
-		ingressPath = v.Spec.IngressPath
-	case *kdexv1alpha1.KDexTheme:
-		ingressPath = v.Spec.IngressPath
+		backend = v.Spec.Backend
 	case *kdexv1alpha1.KDexClusterTheme:
-		ingressPath = v.Spec.IngressPath
+		backend = v.Spec.Backend
+	case *kdexv1alpha1.KDexApp:
+		backend = v.Spec.Backend
+	case *kdexv1alpha1.KDexScriptLibrary:
+		backend = v.Spec.Backend
+	case *kdexv1alpha1.KDexTheme:
+		backend = v.Spec.Backend
 	}
 
-	if ingressPath != "" {
+	if backend.StaticImage != "" || backend.ServerImage != conf.BackendDefault.ServerImage {
 		ref := kdexv1alpha1.KDexObjectReference{
 			Kind:      obj.GetObjectKind().GroupVersionKind().Kind,
 			Name:      obj.GetName(),
