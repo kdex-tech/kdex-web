@@ -2,6 +2,7 @@ package page
 
 import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type PageHandler struct {
@@ -13,6 +14,7 @@ type PageHandler struct {
 	Navigations       map[string]string
 	PackageReferences []kdexv1alpha1.PackageReference
 	Page              *kdexv1alpha1.KDexPageBindingSpec
+	RequiredBackends  []kdexv1alpha1.KDexObjectReference
 	Scripts           []kdexv1alpha1.ScriptDef
 	UtilityPage       *kdexv1alpha1.KDexUtilityPageSpec
 }
@@ -28,6 +30,7 @@ type PackedContent struct {
 
 type ResolvedContentEntry struct {
 	App     *kdexv1alpha1.KDexAppSpec
+	AppObj  client.Object
 	Content PackedContent
 }
 

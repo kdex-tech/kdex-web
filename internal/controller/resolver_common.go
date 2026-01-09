@@ -58,7 +58,8 @@ func ResolveContents(
 		}
 
 		contents[contentEntry.Slot] = page.ResolvedContentEntry{
-			App: appSpec,
+			App:    appSpec,
+			AppObj: app,
 			Content: page.PackedContent{
 				AppName:           app.GetName(),
 				AppGeneration:     fmt.Sprintf("%d", app.GetGeneration()),
