@@ -268,7 +268,7 @@ func UniquePackageRefs(packages []kdexv1alpha1.PackageReference) []kdexv1alpha1.
 	return uniquePackageReferences
 }
 
-func UniqueScripts(scripts []kdexv1alpha1.ScriptDef) []kdexv1alpha1.ScriptDef {
+func UniqueScriptDefs(scripts []kdexv1alpha1.ScriptDef) []kdexv1alpha1.ScriptDef {
 	uniqueScripts := []kdexv1alpha1.ScriptDef{}
 
 	seenScripts := map[string]bool{}

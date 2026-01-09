@@ -216,16 +216,16 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 ) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	requiredBackends := []kdexv1alpha1.KDexObjectReference{}
-	packageReferences := []kdexv1alpha1.PackageReference{}
-	scripts := []kdexv1alpha1.ScriptDef{}
+	backendRefs := []kdexv1alpha1.KDexObjectReference{}
+	packageRefs := []kdexv1alpha1.PackageReference{}
+	scriptDefs := []kdexv1alpha1.ScriptDef{}
 
 	archetypeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, &pageBinding.Spec.PageArchetypeRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
 
-	CollectBackend(r.Configuration, &requiredBackends, archetypeObj)
+	CollectBackend(r.Configuration, &backendRefs, archetypeObj)
 
 	pageBinding.Status.Attributes["archetype.generation"] = fmt.Sprintf("%d", archetypeObj.GetGeneration())
 
@@ -244,7 +244,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 	}
 
 	if archetypeScriptLibraryObj != nil {
-		CollectBackend(r.Configuration, &requiredBackends, archetypeScriptLibraryObj)
+		CollectBackend(r.Configuration, &backendRefs, archetypeScriptLibraryObj)
 
 		pageBinding.Status.Attributes["archetype.scriptLibrary.generation"] = fmt.Sprintf("%d", archetypeScriptLibraryObj.GetGeneration())
 
@@ -258,9 +258,9 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		}
 
 		if scriptLibrary.PackageReference != nil {
-			packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
+			packageRefs = append(packageRefs, *scriptLibrary.PackageReference)
 		}
-		scripts = append(scripts, scriptLibrary.Scripts...)
+		scriptDefs = append(scriptDefs, scriptLibrary.Scripts...)
 	}
 
 	contents, shouldReturn, r1, err := ResolveContents(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, pageBinding.Spec.ContentEntries, r.RequeueDelay)
@@ -273,17 +273,17 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		contentsMap[slot] = content.Content
 
 		if content.App != nil {
-			CollectBackend(r.Configuration, &requiredBackends, content.AppObj)
+			CollectBackend(r.Configuration, &backendRefs, content.AppObj)
 
 			pageBinding.Status.Attributes[slot+".content.generation"] = content.Content.AppGeneration
 
 			switch v := content.AppObj.(type) {
 			case *kdexv1alpha1.KDexApp:
-				packageReferences = append(packageReferences, v.Spec.PackageReference)
-				scripts = append(scripts, v.Spec.Scripts...)
+				packageRefs = append(packageRefs, v.Spec.PackageReference)
+				scriptDefs = append(scriptDefs, v.Spec.Scripts...)
 			case *kdexv1alpha1.KDexClusterApp:
-				packageReferences = append(packageReferences, v.Spec.PackageReference)
-				scripts = append(scripts, v.Spec.Scripts...)
+				packageRefs = append(packageRefs, v.Spec.PackageReference)
+				scriptDefs = append(scriptDefs, v.Spec.Scripts...)
 			}
 		}
 	}
@@ -317,7 +317,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		}
 
 		if footerScriptLibraryObj != nil {
-			CollectBackend(r.Configuration, &requiredBackends, footerScriptLibraryObj)
+			CollectBackend(r.Configuration, &backendRefs, footerScriptLibraryObj)
 
 			pageBinding.Status.Attributes["footer.scriptLibrary.generation"] = fmt.Sprintf("%d", footerScriptLibraryObj.GetGeneration())
 
@@ -331,9 +331,9 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 			}
 
 			if scriptLibrary.PackageReference != nil {
-				packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
+				packageRefs = append(packageRefs, *scriptLibrary.PackageReference)
 			}
-			scripts = append(scripts, scriptLibrary.Scripts...)
+			scriptDefs = append(scriptDefs, scriptLibrary.Scripts...)
 		}
 	}
 
@@ -366,7 +366,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		}
 
 		if headerScriptLibraryObj != nil {
-			CollectBackend(r.Configuration, &requiredBackends, headerScriptLibraryObj)
+			CollectBackend(r.Configuration, &backendRefs, headerScriptLibraryObj)
 
 			pageBinding.Status.Attributes["header.scriptLibrary.generation"] = fmt.Sprintf("%d", headerScriptLibraryObj.GetGeneration())
 
@@ -380,9 +380,9 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 			}
 
 			if scriptLibrary.PackageReference != nil {
-				packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
+				packageRefs = append(packageRefs, *scriptLibrary.PackageReference)
 			}
-			scripts = append(scripts, scriptLibrary.Scripts...)
+			scriptDefs = append(scriptDefs, scriptLibrary.Scripts...)
 		}
 	}
 
@@ -410,7 +410,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		}
 
 		if navigationScriptLibraryObj != nil {
-			CollectBackend(r.Configuration, &requiredBackends, navigationScriptLibraryObj)
+			CollectBackend(r.Configuration, &backendRefs, navigationScriptLibraryObj)
 
 			pageBinding.Status.Attributes[slot+".navigation.scriptLibrary.generation"] = fmt.Sprintf("%d", navigationScriptLibraryObj.GetGeneration())
 
@@ -424,9 +424,9 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 			}
 
 			if scriptLibrary.PackageReference != nil {
-				packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
+				packageRefs = append(packageRefs, *scriptLibrary.PackageReference)
 			}
-			scripts = append(scripts, scriptLibrary.Scripts...)
+			scriptDefs = append(scriptDefs, scriptLibrary.Scripts...)
 		}
 	}
 
@@ -445,7 +445,7 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 	}
 
 	if scriptLibraryObj != nil {
-		CollectBackend(r.Configuration, &requiredBackends, scriptLibraryObj)
+		CollectBackend(r.Configuration, &backendRefs, scriptLibraryObj)
 
 		pageBinding.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
 
@@ -459,15 +459,26 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		}
 
 		if scriptLibrary.PackageReference != nil {
-			packageReferences = append(packageReferences, *scriptLibrary.PackageReference)
+			packageRefs = append(packageRefs, *scriptLibrary.PackageReference)
 		}
-		scripts = append(scripts, scriptLibrary.Scripts...)
+		scriptDefs = append(scriptDefs, scriptLibrary.Scripts...)
 	}
 
 	_, shouldReturn, r1, err = ResolveHost(ctx, r.Client, pageBinding, &pageBinding.Status.Conditions, &pageBinding.Spec.HostRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
+
+	uniqueBackendRefs := UniqueBackendRefs(backendRefs)
+	uniquePackageRefs := UniquePackageRefs(packageRefs)
+	uniqueScriptDefs := UniqueScriptDefs(scriptDefs)
+
+	log.V(2).Info(
+		"collected references",
+		"uniqueBackendRefs", uniqueBackendRefs,
+		"uniquePackageRefs", uniquePackageRefs,
+		"uniqueScriptDefs", uniqueScriptDefs,
+	)
 
 	r.HostHandler.Pages.Set(page.PageHandler{
 		Content:           contentsMap,
@@ -476,10 +487,10 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		MainTemplate:      pageArchetypeSpec.Content,
 		Name:              pageBinding.Name,
 		Navigations:       navigationsMap,
-		PackageReferences: UniquePackageRefs(packageReferences),
+		PackageReferences: uniquePackageRefs,
 		Page:              &pageBinding.Spec,
-		RequiredBackends:  UniqueBackendRefs(requiredBackends),
-		Scripts:           UniqueScripts(scripts),
+		RequiredBackends:  uniqueBackendRefs,
+		Scripts:           uniqueScriptDefs,
 	})
 
 	kdexv1alpha1.SetConditions(
