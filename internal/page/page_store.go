@@ -34,6 +34,10 @@ func (s *PageStore) Count() int {
 func (s *PageStore) Delete(name string) {
 	s.log.V(2).Info("delete", "name", name)
 	s.mu.Lock()
+	if _, ok := s.handlers[name]; !ok {
+		s.mu.Unlock()
+		return
+	}
 	delete(s.handlers, name)
 	s.mu.Unlock()
 	if s.onUpdate != nil {
