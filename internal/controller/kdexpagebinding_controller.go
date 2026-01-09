@@ -225,8 +225,6 @@ func (r *KDexPageBindingReconciler) innerReconcile(
 		return r1, err
 	}
 
-	CollectBackend(r.Configuration, &backendRefs, archetypeObj)
-
 	pageBinding.Status.Attributes["archetype.generation"] = fmt.Sprintf("%d", archetypeObj.GetGeneration())
 
 	var pageArchetypeSpec kdexv1alpha1.KDexPageArchetypeSpec

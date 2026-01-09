@@ -81,13 +81,14 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 		internalUtilityPage.Status.ObservedGeneration = internalUtilityPage.Generation
 		if updateErr := r.Status().Update(ctx, &internalUtilityPage); updateErr != nil {
 			err = updateErr
+			res = ctrl.Result{}
 		}
 
 		if meta.IsStatusConditionFalse(internalUtilityPage.Status.Conditions, string(kdexv1alpha1.ConditionTypeReady)) {
 			r.HostHandler.RemoveUtilityPage(internalUtilityPage.Name)
 		}
 
-		log.V(1).Info("status", "status", internalUtilityPage.Status, "err", err)
+		log.V(1).Info("status", "status", internalUtilityPage.Status, "err", err, "res", res)
 	}()
 
 	if internalUtilityPage.DeletionTimestamp.IsZero() {
@@ -129,8 +130,6 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 	if shouldReturn {
 		return r1, err
 	}
-
-	CollectBackend(r.Configuration, &backendRefs, archetypeObj)
 
 	internalUtilityPage.Status.Attributes["archetype.generation"] = fmt.Sprintf("%d", archetypeObj.GetGeneration())
 
@@ -360,10 +359,8 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 		scriptDefs = append(scriptDefs, scriptLibrary.Scripts...)
 	}
 
-	_, shouldReturn, r1, err = ResolveHost(ctx, r.Client, &internalUtilityPage, &internalUtilityPage.Status.Conditions, &internalUtilityPage.Spec.HostRef, r.RequeueDelay)
-	if shouldReturn {
-		return r1, err
-	}
+	// Utility pages must not resolve the host otherwise the host cannot start
+	// successfully.
 
 	uniqueBackendRefs := UniqueBackendRefs(backendRefs)
 	uniquePackageRefs := UniquePackageRefs(packageRefs)

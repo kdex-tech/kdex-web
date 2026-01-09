@@ -253,7 +253,7 @@ func ResolveKDexObjectReference(
 				err.Error(),
 			)
 
-			return nil, true, ctrl.Result{RequeueAfter: requeueDelay}, nil
+			return nil, true, ctrl.Result{}, nil
 		}
 	}
 
