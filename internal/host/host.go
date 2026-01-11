@@ -220,7 +220,7 @@ func (th *HostHandler) L10nRender(
 		Languages:       th.availableLanguages(translations),
 		LastModified:    time.Now(),
 		MessagePrinter:  th.messagePrinter(translations, l),
-		Meta:            th.MetaToString(handler),
+		Meta:            th.MetaToString(handler, l),
 		Navigations:     handler.NavigationToHTMLMap(),
 		Organization:    th.host.Organization,
 		PageMap:         maps.Clone(pageMap),
@@ -251,7 +251,7 @@ func (th *HostHandler) L10nRenders(
 	return l10nRenders
 }
 
-func (th *HostHandler) MetaToString(handler page.PageHandler) string {
+func (th *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) string {
 	var buffer bytes.Buffer
 
 	if len(th.host.Assets) > 0 {
@@ -259,11 +259,20 @@ func (th *HostHandler) MetaToString(handler page.PageHandler) string {
 		buffer.WriteRune('\n')
 	}
 
+	basePath := handler.BasePath()
+	if l.String() != th.defaultLanguage {
+		basePath = "/" + l.String() + basePath
+	}
+	patternPath := handler.PatternPath()
+	if l.String() != th.defaultLanguage {
+		patternPath = "/" + l.String() + patternPath
+	}
+
 	fmt.Fprintf(
 		&buffer,
 		kdexUIMetaTemplate,
-		handler.BasePath(),
-		handler.PatternPath(),
+		basePath,
+		patternPath,
 	)
 
 	// data-check-batch-endpoint="/~/check/batch"
@@ -401,8 +410,6 @@ func (th *HostHandler) RebuildMux() {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			// variables captured in scope of handler
 			name := ph.Name
-			basePath := basePath
-			l10nRenders := l10nRenders
 
 			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
@@ -426,6 +433,12 @@ func (th *HostHandler) RebuildMux() {
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
+		}
+
+		if strings.HasSuffix(basePath, "/") {
+			basePath = basePath + "{$}"
+		} else {
+			basePath = basePath + "/{$}"
 		}
 
 		mux.HandleFunc("GET "+basePath, handler)
