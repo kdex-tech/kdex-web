@@ -408,8 +408,9 @@ func (th *HostHandler) RebuildMux() {
 		l10nRenders := pr.l10nRenders
 
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			// variables captured in scope of handler
+			rend := l10nRenders
 			name := ph.Name
+			bp := basePath
 
 			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
@@ -417,14 +418,14 @@ func (th *HostHandler) RebuildMux() {
 				return
 			}
 
-			rendered, ok := l10nRenders[l.String()]
+			rendered, ok := rend[l.String()]
 
 			if !ok {
 				http.Error(w, "not found", http.StatusNotFound)
 				return
 			}
 
-			th.log.V(1).Info("serving", "page", name, "basePath", basePath, "language", l.String())
+			th.log.V(1).Info("serving", "page", name, "basePath", bp, "language", l.String())
 
 			w.Header().Set("Content-Language", l.String())
 			w.Header().Set("Content-Type", "text/html")
@@ -435,14 +436,15 @@ func (th *HostHandler) RebuildMux() {
 			}
 		}
 
-		if strings.HasSuffix(basePath, "/") {
-			basePath = basePath + "{$}"
+		finalPath := basePath
+		if strings.HasSuffix(finalPath, "/") {
+			finalPath = finalPath + "{$}"
 		} else {
-			basePath = basePath + "/{$}"
+			finalPath = finalPath + "/{$}"
 		}
 
-		mux.HandleFunc("GET "+basePath, handler)
-		mux.HandleFunc("GET /{l10n}"+basePath, handler)
+		mux.HandleFunc("GET "+finalPath, handler)
+		mux.HandleFunc("GET /{l10n}"+finalPath, handler)
 
 		patternPath := ph.Page.PatternPath
 		if patternPath != "" {
