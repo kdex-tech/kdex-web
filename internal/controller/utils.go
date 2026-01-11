@@ -114,7 +114,7 @@ func MakeHandlerByReferencePath(
 		}
 
 		if err := c.List(ctx, list, &client.ListOptions{
-			Namespace: o.GetNamespace(),
+			Namespace: ControllerNamespace(),
 		}); err != nil {
 			return []reconcile.Request{}
 		}
@@ -142,7 +142,7 @@ func MakeHandlerByReferencePath(
 					continue
 				}
 
-				log.V(2).Info("found", "path", curPath, "object", item.GetName(), "namespace", item.GetNamespace())
+				log.V(2).Info("field found", "path", curPath, "object", item.GetName(), "namespace", item.GetNamespace())
 
 				for idx, node := range jsonPathReference {
 					for _, curRef := range node {
@@ -165,7 +165,7 @@ func MakeHandlerByReferencePath(
 
 						switch v := theReferenceStruct.(type) {
 						case corev1.LocalObjectReference:
-							if v.Name == o.GetName() {
+							if v.Name == o.GetName() && item.GetNamespace() == o.GetNamespace() {
 								requests = append(requests, reconcile.Request{
 									NamespacedName: types.NamespacedName{
 										Name:      item.GetName(),
@@ -174,7 +174,7 @@ func MakeHandlerByReferencePath(
 								})
 							}
 						case *corev1.LocalObjectReference:
-							if v.Name == o.GetName() {
+							if v.Name == o.GetName() && item.GetNamespace() == o.GetNamespace() {
 								requests = append(requests, reconcile.Request{
 									NamespacedName: types.NamespacedName{
 										Name:      item.GetName(),
@@ -187,7 +187,13 @@ func MakeHandlerByReferencePath(
 							if v.Namespace != "" {
 								namespace = v.Namespace
 							}
-							if v.Kind == objKind && v.Name == o.GetName() && item.GetNamespace() == namespace {
+
+							isMatch := v.Kind == objKind && v.Name == o.GetName()
+							if isMatch && !strings.Contains(objKind, "Cluster") {
+								isMatch = o.GetNamespace() == namespace
+							}
+
+							if isMatch {
 								requests = append(requests, reconcile.Request{
 									NamespacedName: types.NamespacedName{
 										Name:      item.GetName(),
@@ -200,7 +206,13 @@ func MakeHandlerByReferencePath(
 							if v.Namespace != "" {
 								namespace = v.Namespace
 							}
-							if v.Kind == objKind && v.Name == o.GetName() && item.GetNamespace() == namespace {
+
+							isMatch := v.Kind == objKind && v.Name == o.GetName()
+							if isMatch && !strings.Contains(objKind, "Cluster") {
+								isMatch = o.GetNamespace() == namespace
+							}
+
+							if isMatch {
 								requests = append(requests, reconcile.Request{
 									NamespacedName: types.NamespacedName{
 										Name:      item.GetName(),
