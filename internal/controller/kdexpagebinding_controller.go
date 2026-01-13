@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
+	"kdex.dev/web/internal"
 	"kdex.dev/web/internal/host"
 	"kdex.dev/web/internal/page"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -88,18 +89,18 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}()
 
 	if pageBinding.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&pageBinding, PAGE_BINDING_FINALIZER) {
-			controllerutil.AddFinalizer(&pageBinding, PAGE_BINDING_FINALIZER)
+		if !controllerutil.ContainsFinalizer(&pageBinding, internal.PAGE_BINDING_FINALIZER) {
+			controllerutil.AddFinalizer(&pageBinding, internal.PAGE_BINDING_FINALIZER)
 			if err := r.Update(ctx, &pageBinding); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{Requeue: true}, nil
 		}
 	} else {
-		if controllerutil.ContainsFinalizer(&pageBinding, PAGE_BINDING_FINALIZER) {
+		if controllerutil.ContainsFinalizer(&pageBinding, internal.PAGE_BINDING_FINALIZER) {
 			r.HostHandler.Pages.Delete(pageBinding.Name)
 
-			controllerutil.RemoveFinalizer(&pageBinding, PAGE_BINDING_FINALIZER)
+			controllerutil.RemoveFinalizer(&pageBinding, internal.PAGE_BINDING_FINALIZER)
 			if err := r.Update(ctx, &pageBinding); err != nil {
 				return ctrl.Result{}, err
 			}

@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/web/internal"
 	"kdex.dev/web/internal/host"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,18 +76,18 @@ func (r *KDexInternalTranslationReconciler) Reconcile(ctx context.Context, req c
 	}()
 
 	if translation.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(&translation, TRANSLATION_FINALIZER) {
-			controllerutil.AddFinalizer(&translation, TRANSLATION_FINALIZER)
+		if !controllerutil.ContainsFinalizer(&translation, internal.TRANSLATION_FINALIZER) {
+			controllerutil.AddFinalizer(&translation, internal.TRANSLATION_FINALIZER)
 			if err := r.Update(ctx, &translation); err != nil {
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{Requeue: true}, nil
 		}
 	} else {
-		if controllerutil.ContainsFinalizer(&translation, TRANSLATION_FINALIZER) {
+		if controllerutil.ContainsFinalizer(&translation, internal.TRANSLATION_FINALIZER) {
 			r.HostHandler.RemoveTranslation(translation.Name)
 
-			controllerutil.RemoveFinalizer(&translation, TRANSLATION_FINALIZER)
+			controllerutil.RemoveFinalizer(&translation, internal.TRANSLATION_FINALIZER)
 			if err := r.Update(ctx, &translation); err != nil {
 				return ctrl.Result{}, err
 			}
