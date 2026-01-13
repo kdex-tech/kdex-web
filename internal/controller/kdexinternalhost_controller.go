@@ -34,6 +34,7 @@ import (
 	"kdex.dev/crds/configuration"
 	"kdex.dev/web/internal"
 	"kdex.dev/web/internal/host"
+	"kdex.dev/web/internal/sniffer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -489,6 +490,13 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		GenericFunc: func(e event.GenericEvent) bool {
 			return hasFocalHost(e.Object)
 		},
+	}
+
+	r.HostHandler.Sniffer = &sniffer.RequestSniffer{
+		Client:      r.Client,
+		HostHandler: r.HostHandler,
+		Namespace:   r.ControllerNamespace,
+		HostName:    r.FocalHost,
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).

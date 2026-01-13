@@ -40,7 +40,10 @@ type HostHandler struct {
 	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 
-	// TODO: register all routes added to the mux so that we can map them in openapi
+	Sniffer interface {
+		DocsHandler(w http.ResponseWriter, r *http.Request)
+		Sniff(r *http.Request) error
+	}
 }
 
 type Translations struct {
@@ -135,6 +138,21 @@ func (th *HostHandler) Domains() []string {
 		return []string{}
 	}
 	return th.host.Routing.Domains
+}
+
+func (th *HostHandler) SecurityModes() []string {
+	// For now we assume that if a login page is specified we want to default to bearer auth
+	// as the preferred mode of authentication for auto-generated functions.
+	if th.host != nil && th.host.UtilityPages != nil && th.host.UtilityPages.LoginRef != nil {
+		return []string{"bearer"}
+	}
+
+	// Fallback to bearer if we have a host at all, better than nothing for signaling auth intent.
+	if th.host != nil {
+		return []string{"bearer"}
+	}
+
+	return []string{}
 }
 
 func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
@@ -515,6 +533,12 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mux.ServeHTTP(ew, r)
 
 	if ew.statusCode >= 400 {
+		if ew.statusCode == http.StatusNotFound && th.Sniffer != nil {
+			w.Header().Set("X-KDex-Sniffer-Docs", "/~/sniffer/docs")
+			if err := th.Sniffer.Sniff(r); err != nil {
+				th.log.Error(err, "failed to sniff request", "path", r.URL.Path)
+			}
+		}
 		th.serveError(w, r, ew.statusCode, ew.statusMsg)
 	}
 }
@@ -608,6 +632,10 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 
 	th.navigationHandler(mux)
 	th.translationHandler(mux)
+
+	if th.Sniffer != nil {
+		mux.HandleFunc("GET /~/sniffer/docs", th.Sniffer.DocsHandler)
+	}
 
 	// TODO: implement a state handler
 	// TODO: implement an oauth handler
