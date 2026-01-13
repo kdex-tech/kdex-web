@@ -123,11 +123,12 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	)
 
 	backendRefs := []kdexv1alpha1.KDexObjectReference{}
+	defaultBackendServerImage := r.Configuration.BackendDefault.ServerImage
 	packageRefs := []kdexv1alpha1.PackageReference{}
+	requiredBackends := []resolvedBackend{}
 	scriptDefs := []kdexv1alpha1.ScriptDef{}
+	seenPaths := map[string]bool{}
 	themeAssets := []kdexv1alpha1.Asset{}
-
-	CollectBackend(r.Configuration, &backendRefs, &internalHost)
 
 	themeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, internalHost.Spec.ThemeRef, r.RequeueDelay)
 	if shouldReturn {
@@ -135,7 +136,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if themeObj != nil {
-		CollectBackend(r.Configuration, &backendRefs, themeObj)
+		CollectBackend(defaultBackendServerImage, &backendRefs, themeObj)
 
 		internalHost.Status.Attributes["theme.generation"] = fmt.Sprintf("%d", themeObj.GetGeneration())
 
@@ -179,7 +180,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if scriptLibraryObj != nil {
-		CollectBackend(r.Configuration, &backendRefs, scriptLibraryObj)
+		CollectBackend(defaultBackendServerImage, &backendRefs, scriptLibraryObj)
 
 		internalHost.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
 
@@ -209,30 +210,64 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// we don't add page scripts here, because they are added by the pages
 	}
 
-	seenPaths := map[string]bool{}
+	if internalHost.Spec.Backend.IsConfigured(defaultBackendServerImage) {
+		seenPaths[internalHost.Spec.Backend.IngressPath] = true
+		requiredBackends = append(requiredBackends, resolvedBackend{
+			Backend:   internalHost.Spec.Backend,
+			Kind:      "KDexHost",
+			Name:      internalHost.Name,
+			Namespace: internalHost.Namespace,
+		})
+	}
 
 	for _, pageHandler := range r.HostHandler.Pages.List() {
 		if seenPaths[pageHandler.Page.BasePath] {
-			return ctrl.Result{}, fmt.Errorf("duplicated path %s, paths must be unique across backends and pages", pageHandler.Page.BasePath)
+			err = fmt.Errorf(
+				"duplicated path %s, paths must be unique across backends and pages, obj: %s/%s, kind: %s",
+				pageHandler.Page.BasePath, r.ControllerNamespace, pageHandler.Name, "KDexPageBinding",
+			)
+
+			kdexv1alpha1.SetConditions(
+				&internalHost.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				err.Error(),
+			)
+
+			return ctrl.Result{}, err
 		}
 		seenPaths[pageHandler.Page.BasePath] = true
+
+		if pageHandler.Page.PatternPath != "" {
+			if seenPaths[pageHandler.Page.PatternPath] {
+				err = fmt.Errorf(
+					"duplicated path %s, paths must be unique across backends and pages, obj: %s/%s, kind: %s",
+					pageHandler.Page.PatternPath, r.ControllerNamespace, pageHandler.Name, "KDexPageBinding",
+				)
+
+				kdexv1alpha1.SetConditions(
+					&internalHost.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileSuccess,
+					err.Error(),
+				)
+
+				return ctrl.Result{}, err
+			}
+			seenPaths[pageHandler.Page.PatternPath] = true
+		}
 
 		packageRefs = append(packageRefs, pageHandler.PackageReferences...)
 		backendRefs = append(backendRefs, pageHandler.RequiredBackends...)
 		// we don't add page scripts here, because they are added by the pages
-	}
-
-	var functions kdexv1alpha1.KDexFunctionList
-	if err := r.List(ctx, &functions, client.InNamespace(r.ControllerNamespace), client.MatchingFields{internal.HOST_INDEX_KEY: r.FocalHost}); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to list functions: %w", err)
-	}
-
-	for _, fn := range functions.Items {
-		backendRefs = append(backendRefs, kdexv1alpha1.KDexObjectReference{
-			Kind:      "KDexFunction",
-			Name:      fn.Name,
-			Namespace: fn.Namespace,
-		})
 	}
 
 	uniqueBackendRefs := UniqueBackendRefs(backendRefs)
@@ -246,119 +281,35 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		"uniqueScriptDefs", uniqueScriptDefs,
 	)
 
-	requiredBackends := []resolvedBackend{}
 	for _, ref := range uniqueBackendRefs {
 		var backend kdexv1alpha1.Backend
-		var api *kdexv1alpha1.KDexOpenAPI
 
-		switch ref.Kind {
-		case "KDexClusterApp":
-			obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
-			if shouldReturn {
-				log.Error(
-					err,
-					"failed to resolve backend",
-					"backendRef", ref,
-				)
-				return r1, err
-			}
-			if obj == nil {
-				continue
-			}
+		obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
+		if shouldReturn {
+			log.Error(
+				err,
+				"failed to resolve backend",
+				"backendRef", ref,
+			)
+			return r1, err
+		}
+		if obj == nil {
+			continue
+		}
 
-			backend = obj.(*kdexv1alpha1.KDexClusterApp).Spec.Backend
-		case "KDexClusterScriptLibrary":
-			obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
-			if shouldReturn {
-				log.Error(
-					err,
-					"failed to resolve backend",
-					"backendRef", ref,
-				)
-				return r1, err
-			}
-			if obj == nil {
-				continue
-			}
-
-			backend = obj.(*kdexv1alpha1.KDexClusterScriptLibrary).Spec.Backend
-		case "KDexClusterTheme":
-			obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
-			if shouldReturn {
-				log.Error(
-					err,
-					"failed to resolve backend",
-					"backendRef", ref,
-				)
-				return r1, err
-			}
-			if obj == nil {
-				continue
-			}
-
-			backend = obj.(*kdexv1alpha1.KDexClusterTheme).Spec.Backend
-		case "KDexApp":
-			obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
-			if shouldReturn {
-				log.Error(
-					err,
-					"failed to resolve backend",
-					"backendRef", ref,
-				)
-				return r1, err
-			}
-			if obj == nil {
-				continue
-			}
-
-			backend = obj.(*kdexv1alpha1.KDexApp).Spec.Backend
-		case "KDexFunction":
-			var function *kdexv1alpha1.KDexFunction
-			for _, fn := range functions.Items {
-				if ref.Name == fn.Name {
-					function = &fn
-					break
-				}
-			}
-			if function == nil {
-				continue
-			}
-
-			api = &function.Spec.API
-			backend = *function.Spec.Backend
-		case "KDexInternalHost":
-			obj := &internalHost
-			backend = obj.Spec.Backend
-		case "KDexScriptLibrary":
-			obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
-			if shouldReturn {
-				log.Error(
-					err,
-					"failed to resolve backend",
-					"backendRef", ref,
-				)
-				return r1, err
-			}
-			if obj == nil {
-				continue
-			}
-
-			backend = obj.(*kdexv1alpha1.KDexScriptLibrary).Spec.Backend
-		case "KDexTheme":
-			obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
-			if shouldReturn {
-				log.Error(
-					err,
-					"failed to resolve backend",
-					"backendRef", ref,
-				)
-				return r1, err
-			}
-			if obj == nil {
-				continue
-			}
-
-			backend = obj.(*kdexv1alpha1.KDexTheme).Spec.Backend
+		switch v := obj.(type) {
+		case *kdexv1alpha1.KDexClusterApp:
+			backend = v.Spec.Backend
+		case *kdexv1alpha1.KDexClusterScriptLibrary:
+			backend = v.Spec.Backend
+		case *kdexv1alpha1.KDexClusterTheme:
+			backend = v.Spec.Backend
+		case *kdexv1alpha1.KDexApp:
+			backend = v.Spec.Backend
+		case *kdexv1alpha1.KDexScriptLibrary:
+			backend = v.Spec.Backend
+		case *kdexv1alpha1.KDexTheme:
+			backend = v.Spec.Backend
 		default:
 			continue
 		}
@@ -386,7 +337,6 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 		requiredBackends = append(requiredBackends, resolvedBackend{
 			Backend:   backend,
-			API:       api,
 			Kind:      ref.Kind,
 			Name:      ref.Name,
 			Namespace: ref.Namespace,
@@ -397,6 +347,34 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		"collected backends",
 		"requiredBackends", requiredBackends,
 	)
+
+	var functions kdexv1alpha1.KDexFunctionList
+	if err := r.List(ctx, &functions, client.InNamespace(r.ControllerNamespace), client.MatchingFields{internal.HOST_INDEX_KEY: r.FocalHost}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list functions: %w", err)
+	}
+
+	for _, function := range functions.Items {
+		if seenPaths[function.Spec.API.Path] {
+			err = fmt.Errorf(
+				"duplicated path %s, paths must be unique across backends and pages, obj: %s/%s, kind: %s",
+				function.Spec.API.Path, function.Namespace, function.Name, "KDexFunction",
+			)
+
+			kdexv1alpha1.SetConditions(
+				&internalHost.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				err.Error(),
+			)
+
+			return ctrl.Result{}, err
+		}
+		seenPaths[function.Spec.API.Path] = true
+	}
 
 	internalPackageReferences := &kdexv1alpha1.KDexInternalPackageReferences{
 		ObjectMeta: metav1.ObjectMeta{
@@ -445,7 +423,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		themeAssets,
 		uniqueScriptDefs,
 		importMap,
-		r.collectInitialPaths(requiredBackends),
+		r.collectInitialPaths(requiredBackends, functions),
 	)
 
 	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, requiredBackends)
@@ -453,46 +431,18 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 type resolvedBackend struct {
 	Backend   kdexv1alpha1.Backend
-	API       *kdexv1alpha1.KDexOpenAPI
 	Kind      string
 	Name      string
 	Namespace string
 }
 
-func (r *KDexInternalHostReconciler) collectInitialPaths(backends []resolvedBackend) map[string]host.PathInfo {
+func (r *KDexInternalHostReconciler) collectInitialPaths(
+	backends []resolvedBackend, functions kdexv1alpha1.KDexFunctionList,
+) map[string]host.PathInfo {
 	initialPaths := map[string]host.PathInfo{}
 
 	for _, backend := range backends {
 		if backend.Backend.IngressPath == "" {
-			continue
-		}
-
-		// Handle explicit API definition (e.g. from KDexFunction)
-		if backend.API != nil {
-			path := backend.API.Path
-			if path == "" {
-				path = backend.Backend.IngressPath
-			}
-
-			apiInfo := *backend.API
-			if apiInfo.Path == "" {
-				apiInfo.Path = path
-			}
-
-			// Determine summary if missing
-			if apiInfo.Summary == "" {
-				apiInfo.Summary = fmt.Sprintf("Function: %s", backend.Name)
-			}
-			if apiInfo.Description == "" {
-				apiInfo.Description = fmt.Sprintf("Backend service for KDex function %s", backend.Name)
-			}
-
-			pathInfo := host.PathInfo{
-				API:  apiInfo,
-				Type: host.FunctionPathType,
-			}
-
-			initialPaths[pathInfo.API.Path] = pathInfo
 			continue
 		}
 
@@ -574,6 +524,15 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(backends []resolvedBack
 		}
 
 		initialPaths[pathInfo.API.Path] = pathInfo
+	}
+
+	for _, function := range functions.Items {
+		pathInfo := host.PathInfo{
+			API:  function.Spec.API,
+			Type: host.FunctionPathType,
+		}
+
+		initialPaths[function.Spec.API.Path] = pathInfo
 	}
 
 	return initialPaths

@@ -123,6 +123,7 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 	)
 
 	backendRefs := []kdexv1alpha1.KDexObjectReference{}
+	defaultBackendServerImage := r.Configuration.BackendDefault.ServerImage
 	packageRefs := []kdexv1alpha1.PackageReference{}
 	scriptDefs := []kdexv1alpha1.ScriptDef{}
 
@@ -148,7 +149,7 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 	}
 
 	if archetypeScriptLibraryObj != nil {
-		CollectBackend(r.Configuration, &backendRefs, archetypeScriptLibraryObj)
+		CollectBackend(defaultBackendServerImage, &backendRefs, archetypeScriptLibraryObj)
 
 		internalUtilityPage.Status.Attributes["archetype.scriptLibrary.generation"] = fmt.Sprintf("%d", archetypeScriptLibraryObj.GetGeneration())
 
@@ -177,7 +178,7 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 		contentsMap[slot] = content.Content
 
 		if content.App != nil {
-			CollectBackend(r.Configuration, &backendRefs, content.AppObj)
+			CollectBackend(defaultBackendServerImage, &backendRefs, content.AppObj)
 
 			internalUtilityPage.Status.Attributes[slot+".content.generation"] = content.Content.AppGeneration
 
@@ -221,7 +222,7 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 		}
 
 		if footerScriptLibraryObj != nil {
-			CollectBackend(r.Configuration, &backendRefs, footerScriptLibraryObj)
+			CollectBackend(defaultBackendServerImage, &backendRefs, footerScriptLibraryObj)
 
 			internalUtilityPage.Status.Attributes["footer.scriptLibrary.generation"] = fmt.Sprintf("%d", footerScriptLibraryObj.GetGeneration())
 
@@ -270,7 +271,7 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 		}
 
 		if headerScriptLibraryObj != nil {
-			CollectBackend(r.Configuration, &backendRefs, headerScriptLibraryObj)
+			CollectBackend(defaultBackendServerImage, &backendRefs, headerScriptLibraryObj)
 
 			internalUtilityPage.Status.Attributes["header.scriptLibrary.generation"] = fmt.Sprintf("%d", headerScriptLibraryObj.GetGeneration())
 
@@ -314,7 +315,7 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 		}
 
 		if navigationScriptLibraryObj != nil {
-			CollectBackend(r.Configuration, &backendRefs, navigationScriptLibraryObj)
+			CollectBackend(defaultBackendServerImage, &backendRefs, navigationScriptLibraryObj)
 
 			internalUtilityPage.Status.Attributes[slot+".navigation.scriptLibrary.generation"] = fmt.Sprintf("%d", navigationScriptLibraryObj.GetGeneration())
 
@@ -340,7 +341,7 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 	}
 
 	if scriptLibraryObj != nil {
-		CollectBackend(r.Configuration, &backendRefs, scriptLibraryObj)
+		CollectBackend(defaultBackendServerImage, &backendRefs, scriptLibraryObj)
 
 		internalUtilityPage.Status.Attributes["scriptLibrary.generation"] = fmt.Sprintf("%d", scriptLibraryObj.GetGeneration())
 
