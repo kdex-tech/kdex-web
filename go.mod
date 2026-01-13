@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.25.0
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.42
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.43
 
 require (
 	github.com/getkin/kin-openapi v0.133.0
