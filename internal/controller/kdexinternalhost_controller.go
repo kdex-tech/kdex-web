@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	cr_handler "sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -222,6 +222,19 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// we don't add page scripts here, because they are added by the pages
 	}
 
+	var functions kdexv1alpha1.KDexFunctionList
+	if err := r.List(ctx, &functions, client.InNamespace(r.ControllerNamespace), client.MatchingFields{internal.HOST_INDEX_KEY: r.FocalHost}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list functions: %w", err)
+	}
+
+	for _, fn := range functions.Items {
+		backendRefs = append(backendRefs, kdexv1alpha1.KDexObjectReference{
+			Kind:      "KDexFunction",
+			Name:      fn.Name,
+			Namespace: fn.Namespace,
+		})
+	}
+
 	uniqueBackendRefs := UniqueBackendRefs(backendRefs)
 	uniquePackageRefs := UniquePackageRefs(packageRefs)
 	uniqueScriptDefs := UniqueScriptDefs(scriptDefs)
@@ -236,6 +249,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	requiredBackends := []resolvedBackend{}
 	for _, ref := range uniqueBackendRefs {
 		var backend kdexv1alpha1.Backend
+		var api *kdexv1alpha1.KDexOpenAPI
 
 		switch ref.Kind {
 		case "KDexClusterApp":
@@ -299,20 +313,19 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 			backend = obj.(*kdexv1alpha1.KDexApp).Spec.Backend
 		case "KDexFunction":
-			obj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, &ref, r.RequeueDelay)
-			if shouldReturn {
-				log.Error(
-					err,
-					"failed to resolve backend",
-					"backendRef", ref,
-				)
-				return r1, err
+			var function *kdexv1alpha1.KDexFunction
+			for _, fn := range functions.Items {
+				if ref.Name == fn.Name {
+					function = &fn
+					break
+				}
 			}
-			if obj == nil {
+			if function == nil {
 				continue
 			}
 
-			backend = *(obj.(*kdexv1alpha1.KDexFunction).Spec.Backend)
+			api = &function.Spec.API
+			backend = *function.Spec.Backend
 		case "KDexInternalHost":
 			obj := &internalHost
 			backend = obj.Spec.Backend
@@ -373,6 +386,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 		requiredBackends = append(requiredBackends, resolvedBackend{
 			Backend:   backend,
+			API:       api,
 			Kind:      ref.Kind,
 			Name:      ref.Name,
 			Namespace: ref.Namespace,
@@ -425,21 +439,60 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		importMap = internalPackageReferences.Status.Attributes["importmap"]
 	}
 
-	r.HostHandler.SetHost(&internalHost.Spec.KDexHostSpec, uniquePackageRefs, themeAssets, uniqueScriptDefs, importMap)
+	r.HostHandler.SetHost(
+		&internalHost.Spec.KDexHostSpec,
+		uniquePackageRefs,
+		themeAssets,
+		uniqueScriptDefs,
+		importMap,
+		r.collectInitialPaths(requiredBackends),
+	)
 
 	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, requiredBackends)
 }
 
 type resolvedBackend struct {
 	Backend   kdexv1alpha1.Backend
+	API       *kdexv1alpha1.KDexOpenAPI
 	Kind      string
 	Name      string
 	Namespace string
 }
 
-func (r *KDexInternalHostReconciler) registerBackendPaths(backends []resolvedBackend) {
+func (r *KDexInternalHostReconciler) collectInitialPaths(backends []resolvedBackend) map[string]host.PathInfo {
+	initialPaths := map[string]host.PathInfo{}
+
 	for _, backend := range backends {
 		if backend.Backend.IngressPath == "" {
+			continue
+		}
+
+		// Handle explicit API definition (e.g. from KDexFunction)
+		if backend.API != nil {
+			path := backend.API.Path
+			if path == "" {
+				path = backend.Backend.IngressPath
+			}
+
+			apiInfo := *backend.API
+			if apiInfo.Path == "" {
+				apiInfo.Path = path
+			}
+
+			// Determine summary if missing
+			if apiInfo.Summary == "" {
+				apiInfo.Summary = fmt.Sprintf("Function: %s", backend.Name)
+			}
+			if apiInfo.Description == "" {
+				apiInfo.Description = fmt.Sprintf("Backend service for KDex function %s", backend.Name)
+			}
+
+			pathInfo := host.PathInfo{
+				API:  apiInfo,
+				Type: host.FunctionPathType,
+			}
+
+			initialPaths[pathInfo.API.Path] = pathInfo
 			continue
 		}
 
@@ -520,8 +573,10 @@ func (r *KDexInternalHostReconciler) registerBackendPaths(backends []resolvedBac
 			Type: host.BackendPathType,
 		}
 
-		r.HostHandler.RegisterPath(wildcardPath, pathInfo)
+		initialPaths[pathInfo.API.Path] = pathInfo
 	}
+
+	return initialPaths
 }
 
 func ptr(s string) *string { return &s }
@@ -601,6 +656,23 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&kdexv1alpha1.KDexInternalPackageReferences{}).
 		Owns(&networkingv1.Ingress{}).
 		Watches(
+			&kdexv1alpha1.KDexFunction{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+				fn, ok := o.(*kdexv1alpha1.KDexFunction)
+				if !ok || fn.Spec.HostRef.Name != r.FocalHost {
+					return nil
+				}
+
+				return []reconcile.Request{
+					{
+						NamespacedName: types.NamespacedName{
+							Name:      fn.Spec.HostRef.Name,
+							Namespace: fn.Namespace,
+						},
+					},
+				}
+			})).
+		Watches(
 			&kdexv1alpha1.KDexScriptLibrary{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.ScriptLibraryRef}")).
 		Watches(
@@ -614,7 +686,7 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.ThemeRef}")).
 		Watches(
 			&kdexv1alpha1.KDexInternalTranslation{},
-			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
 				translation, ok := o.(*kdexv1alpha1.KDexInternalTranslation)
 				if !ok || translation.Spec.HostRef.Name != r.FocalHost {
 					return nil
@@ -634,7 +706,7 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.AnnouncementRef}", "{.Spec.ErrorRef}", "{.Spec.LoginRef}")).
 		Watches(
 			&kdexv1alpha1.KDexPageBinding{},
-			cr_handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				pageBinding, ok := obj.(*kdexv1alpha1.KDexPageBinding)
 				if !ok || pageBinding.Spec.HostRef.Name != r.FocalHost {
 					return nil
@@ -752,9 +824,6 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 	if err := r.cleanupObsoleteBackends(ctx, internalHost, backends); err != nil {
 		return err
 	}
-
-	// Register backend paths in the host handler for OpenAPI documentation
-	r.registerBackendPaths(backends)
 
 	var ingressOrHTTPRouteOp controllerutil.OperationResult
 	if internalHost.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {

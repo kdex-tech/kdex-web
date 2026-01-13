@@ -281,7 +281,7 @@ func TestRequestSniffer_mergeFunction(t *testing.T) {
 func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 	hh := host.NewHostHandler("test", "test", logr.Discard())
 	// Set a mock host so SecurityModes returns something
-	hh.SetHost(&kdexv1alpha1.KDexHostSpec{}, nil, nil, nil, "")
+	hh.SetHost(&kdexv1alpha1.KDexHostSpec{}, nil, nil, nil, "", map[string]host.PathInfo{})
 
 	s := &RequestSniffer{HostHandler: hh}
 

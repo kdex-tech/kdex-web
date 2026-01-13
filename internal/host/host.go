@@ -30,17 +30,18 @@ type HostHandler struct {
 	Pages        *page.PageStore
 	Translations Translations
 
-	defaultLanguage      string
-	host                 *kdexv1alpha1.KDexHostSpec
-	importmap            string
-	log                  logr.Logger
-	mu                   sync.RWMutex
-	packageReferences    []kdexv1alpha1.PackageReference
-	registeredPaths      map[string]PathInfo
-	scripts              []kdexv1alpha1.ScriptDef
-	themeAssets          []kdexv1alpha1.Asset
-	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
-	utilityPages         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
+	defaultLanguage           string
+	host                      *kdexv1alpha1.KDexHostSpec
+	importmap                 string
+	log                       logr.Logger
+	mu                        sync.RWMutex
+	packageReferences         []kdexv1alpha1.PackageReference
+	registeredPaths           map[string]PathInfo
+	pathsCollectedInReconcile map[string]PathInfo
+	scripts                   []kdexv1alpha1.ScriptDef
+	themeAssets               []kdexv1alpha1.Asset
+	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec
+	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 
 	Sniffer interface {
 		DocsHandler(w http.ResponseWriter, r *http.Request)
@@ -127,10 +128,6 @@ func (th *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
 	th.utilityPages[ph.UtilityPage.Type] = ph
 	th.mu.Unlock()
 	th.RebuildMux()
-}
-
-func (th *HostHandler) DeregisterPath(path string) {
-	delete(th.registeredPaths, path)
 }
 
 func (th *HostHandler) Domains() []string {
@@ -316,13 +313,14 @@ func (th *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 
 func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler {
 	th := &HostHandler{
-		Name:                 name,
-		Namespace:            namespace,
-		defaultLanguage:      "en",
-		log:                  log.WithValues("host", name),
-		translationResources: map[string]kdexv1alpha1.KDexTranslationSpec{},
-		utilityPages:         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
-		registeredPaths:      map[string]PathInfo{},
+		Name:                      name,
+		Namespace:                 namespace,
+		defaultLanguage:           "en",
+		log:                       log.WithValues("host", name),
+		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
+		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
+		registeredPaths:           map[string]PathInfo{},
+		pathsCollectedInReconcile: map[string]PathInfo{},
 	}
 
 	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
@@ -361,6 +359,8 @@ func (th *HostHandler) RebuildMux() {
 	}
 
 	registeredPaths := map[string]PathInfo{}
+	maps.Copy(registeredPaths, th.pathsCollectedInReconcile)
+
 	mux := th.muxWithDefaultsLocked(registeredPaths)
 
 	pageHandlers := th.Pages.List()
@@ -544,12 +544,6 @@ func (th *HostHandler) RebuildMux() {
 	th.Mux = mux
 	th.registeredPaths = registeredPaths
 	th.mu.Unlock()
-}
-
-func (th *HostHandler) RegisterPath(path string, pathInfo PathInfo) {
-	th.mu.Lock()
-	defer th.mu.Unlock()
-	th.registerPath(path, pathInfo, th.registeredPaths)
 }
 
 func (th *HostHandler) registerPath(path string, info PathInfo, m map[string]PathInfo) {
@@ -759,16 +753,6 @@ func (th *HostHandler) registerPathFromPattern(pattern string, registeredPaths m
 	th.registerPath(path, info, registeredPaths)
 }
 
-func (th *HostHandler) RegisteredPaths() map[string]PathInfo {
-	th.mu.RLock()
-	defer th.mu.RUnlock()
-	out := make(map[string]PathInfo, len(th.registeredPaths))
-	for p, i := range th.registeredPaths {
-		out[p] = i
-	}
-	return out
-}
-
 func (th *HostHandler) RemoveTranslation(name string) {
 	th.log.V(1).Info("delete translation", "translation", name)
 	th.mu.Lock()
@@ -822,11 +806,13 @@ func (th *HostHandler) SetHost(
 	themeAssets []kdexv1alpha1.Asset,
 	scripts []kdexv1alpha1.ScriptDef,
 	importmap string,
+	paths map[string]PathInfo,
 ) {
 	th.mu.Lock()
 	th.defaultLanguage = host.DefaultLang
 	th.host = host
 	th.packageReferences = packageReferences
+	th.pathsCollectedInReconcile = paths
 	th.themeAssets = themeAssets
 	th.scripts = scripts
 	th.importmap = importmap
@@ -895,6 +881,117 @@ func (th *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, 
 	th.registerPathFromPattern(pattern, registeredPaths, InternalPathType)
 }
 
+func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
+	const path = "/~/openapi/"
+
+	// Register the path itself so it appears in the spec
+	th.registerPath(path, PathInfo{
+		API: kdexv1alpha1.KDexOpenAPI{
+			Description: "Serves the generated OpenAPI 3.0 specification for this host.",
+			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
+				Get: &openapi3.Operation{},
+			},
+			Path:    path,
+			Summary: "OpenAPI Specification",
+		},
+		Type: InternalPathType,
+	}, registeredPaths)
+
+	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
+		th.mu.RLock()
+		defer th.mu.RUnlock()
+
+		spec := th.buildOpenAPI(th.registeredPaths)
+
+		jsonBytes, err := json.Marshal(spec)
+		if err != nil {
+			http.Error(w, "Failed to marshal OpenAPI spec", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonBytes)
+	})
+}
+
+func (th *HostHandler) buildOpenAPI(registeredPaths map[string]PathInfo) *openapi3.T {
+	doc := &openapi3.T{
+		OpenAPI: "3.0.0",
+		Info: &openapi3.Info{
+			Title:       fmt.Sprintf("KDex Host: %s", th.Name),
+			Description: "Auto-generated OpenAPI specification for KDex Host",
+			Version:     "1.0.0",
+		},
+		Paths: &openapi3.Paths{},
+	}
+
+	for _, info := range registeredPaths {
+		path := info.API.Path
+		if path == "" {
+			continue
+		}
+
+		pathItem := &openapi3.PathItem{
+			Summary:     info.API.Summary,
+			Description: info.API.Description,
+		}
+
+		// Fill path item operations
+		ensureOpMetadata := func(op *openapi3.Operation) {
+			if op == nil {
+				return
+			}
+			if op.Summary == "" {
+				op.Summary = info.API.Summary
+			}
+			if op.Description == "" {
+				op.Description = info.API.Description
+			}
+		}
+
+		if info.API.Get != nil {
+			ensureOpMetadata(info.API.Get)
+			pathItem.Get = info.API.Get
+		}
+		if info.API.Put != nil {
+			ensureOpMetadata(info.API.Put)
+			pathItem.Put = info.API.Put
+		}
+		if info.API.Post != nil {
+			ensureOpMetadata(info.API.Post)
+			pathItem.Post = info.API.Post
+		}
+		if info.API.Delete != nil {
+			ensureOpMetadata(info.API.Delete)
+			pathItem.Delete = info.API.Delete
+		}
+		if info.API.Options != nil {
+			ensureOpMetadata(info.API.Options)
+			pathItem.Options = info.API.Options
+		}
+		if info.API.Head != nil {
+			ensureOpMetadata(info.API.Head)
+			pathItem.Head = info.API.Head
+		}
+		if info.API.Patch != nil {
+			ensureOpMetadata(info.API.Patch)
+			pathItem.Patch = info.API.Patch
+		}
+		if info.API.Trace != nil {
+			ensureOpMetadata(info.API.Trace)
+			pathItem.Trace = info.API.Trace
+		}
+		if info.API.Connect != nil {
+			ensureOpMetadata(info.API.Connect)
+			pathItem.Connect = info.API.Connect
+		}
+
+		doc.Paths.Set(path, pathItem)
+	}
+
+	return doc
+}
+
 func (th *HostHandler) messagePrinter(translations *Translations, tag language.Tag) *message.Printer {
 	return message.NewPrinter(
 		tag,
@@ -908,16 +1005,15 @@ func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]PathInfo
 	th.navigationHandler(mux, registeredPaths)
 	th.translationHandler(mux, registeredPaths)
 	th.snifferHandler(mux, registeredPaths)
+	th.openapiHandler(mux, registeredPaths)
 
 	// TODO: implement a state handler
 	// TODO: implement an oauth handler
 	// TODO: implement a check handler
-	// TODO: implement an openapi handler
 
 	th.unimplementedHandler("GET /~/check/", mux, registeredPaths)
 	th.unimplementedHandler("GET /~/oauth/", mux, registeredPaths)
 	th.unimplementedHandler("GET /~/state/", mux, registeredPaths)
-	th.unimplementedHandler("GET /~/openapi/", mux, registeredPaths)
 
 	return mux
 }
@@ -1048,6 +1144,9 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 	mux.HandleFunc(
 		"GET "+path,
 		func(w http.ResponseWriter, r *http.Request) {
+			th.mu.RLock()
+			defer th.mu.RUnlock()
+
 			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)

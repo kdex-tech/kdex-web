@@ -87,7 +87,7 @@ func TestHostHandler_extractPathParameters(t *testing.T) {
 				Routing: kdexv1alpha1.Routing{
 					Domains: []string{"test.example.com"},
 				},
-			}, nil, nil, nil, "")
+			}, nil, nil, nil, "", map[string]PathInfo{})
 
 			params := th.extractParameters(tt.path, tt.query)
 
