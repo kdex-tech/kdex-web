@@ -84,6 +84,17 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	if internalHost.Spec.DevMode {
+		r.HostHandler.Sniffer = &sniffer.RequestSniffer{
+			Client:      r.Client,
+			HostHandler: r.HostHandler,
+			Namespace:   r.ControllerNamespace,
+			HostName:    r.FocalHost,
+		}
+	} else {
+		r.HostHandler.Sniffer = nil
+	}
+
 	if internalHost.Status.Attributes == nil {
 		internalHost.Status.Attributes = make(map[string]string)
 	}
@@ -490,13 +501,6 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		GenericFunc: func(e event.GenericEvent) bool {
 			return hasFocalHost(e.Object)
 		},
-	}
-
-	r.HostHandler.Sniffer = &sniffer.RequestSniffer{
-		Client:      r.Client,
-		HostHandler: r.HostHandler,
-		Namespace:   r.ControllerNamespace,
-		HostName:    r.FocalHost,
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
