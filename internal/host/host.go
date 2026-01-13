@@ -34,6 +34,7 @@ type HostHandler struct {
 	log                  logr.Logger
 	mu                   sync.RWMutex
 	packageReferences    []kdexv1alpha1.PackageReference
+	registeredPaths      map[string]PathInfo
 	scripts              []kdexv1alpha1.ScriptDef
 	themeAssets          []kdexv1alpha1.Asset
 	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
@@ -121,6 +122,10 @@ func (th *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
 	th.utilityPages[ph.UtilityPage.Type] = ph
 	th.mu.Unlock()
 	th.RebuildMux()
+}
+
+func (th *HostHandler) DeregisterPath(path string) {
+	delete(th.registeredPaths, path)
 }
 
 func (th *HostHandler) Domains() []string {
@@ -457,6 +462,20 @@ func (th *HostHandler) RebuildMux() {
 	th.Translations = *newTranslations
 	th.Mux = mux
 	th.mu.Unlock()
+}
+
+func (th *HostHandler) RegisterPath(path string, pathInfo PathInfo) {
+	th.registeredPaths[path] = pathInfo
+}
+
+func (th *HostHandler) RegisteredPaths() map[string]PathInfo {
+	th.mu.RLock()
+	defer th.mu.RUnlock()
+	out := make(map[string]PathInfo, len(th.registeredPaths))
+	for p, i := range th.registeredPaths {
+		out[p] = i
+	}
+	return out
 }
 
 func (th *HostHandler) RemoveTranslation(name string) {
