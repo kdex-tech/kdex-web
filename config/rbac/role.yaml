@@ -86,6 +86,7 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
+  - kdexfunctions
   - kdexinternalhosts
   - kdexinternalpackagereferences
   - kdexinternaltranslations
@@ -102,6 +103,7 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
+  - kdexfunctions/finalizers
   - kdexinternalhosts/finalizers
   - kdexinternalpackagereferences/finalizers
   - kdexinternaltranslations/finalizers
@@ -112,6 +114,7 @@ rules:
 - apiGroups:
   - kdex.dev
   resources:
+  - kdexfunctions/status
   - kdexinternalhosts/status
   - kdexinternalpackagereferences/status
   - kdexinternaltranslations/status

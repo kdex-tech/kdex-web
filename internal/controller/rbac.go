@@ -15,6 +15,9 @@ package controller
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpagenavigations,              verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterscriptlibraries,              verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterthemes,                       verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexfunctions,                           verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexfunctions/status,                    verbs=get;update;patch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexfunctions/finalizers,                verbs=update
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts,                       verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/finalizers,            verbs=update
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexinternalhosts/status,                verbs=get;update;patch
