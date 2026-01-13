@@ -22,12 +22,12 @@ import (
 )
 
 type HostHandler struct {
-	Mux       *http.ServeMux
-	Name      string
-	Namespace string
-	Pages     *page.PageStore
+	Mux          *http.ServeMux
+	Name         string
+	Namespace    string
+	Pages        *page.PageStore
+	Translations Translations
 
-	Translations         Translations
 	defaultLanguage      string
 	host                 *kdexv1alpha1.KDexHostSpec
 	importmap            string
