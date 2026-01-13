@@ -632,10 +632,7 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 
 	th.navigationHandler(mux)
 	th.translationHandler(mux)
-
-	if th.Sniffer != nil {
-		mux.HandleFunc("GET /~/sniffer/docs", th.Sniffer.DocsHandler)
-	}
+	th.snifferHandler(mux)
 
 	// TODO: implement a state handler
 	// TODO: implement an oauth handler
@@ -648,6 +645,12 @@ func (th *HostHandler) muxWithDefaultsLocked() *http.ServeMux {
 	th.unimplementedHandler("GET /~/openapi/", mux)
 
 	return mux
+}
+
+func (th *HostHandler) snifferHandler(mux *http.ServeMux) {
+	if th.Sniffer != nil {
+		mux.HandleFunc("GET /~/sniffer/docs", th.Sniffer.DocsHandler)
+	}
 }
 
 func (th *HostHandler) navigationHandler(mux *http.ServeMux) {
