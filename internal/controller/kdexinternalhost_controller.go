@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -436,6 +437,95 @@ type resolvedBackend struct {
 	Namespace string
 }
 
+func (r *KDexInternalHostReconciler) registerBackendPaths(backends []resolvedBackend) {
+	for _, backend := range backends {
+		if backend.Backend.IngressPath == "" {
+			continue
+		}
+
+		// Determine description based on backend kind
+		var description string
+		var summary string
+
+		switch backend.Kind {
+		case "KDexApp", "KDexClusterApp":
+			summary = fmt.Sprintf("Application: %s", backend.Name)
+			description = fmt.Sprintf("Backend service for KDex application %s", backend.Name)
+		case "KDexFunction":
+			summary = fmt.Sprintf("Function: %s", backend.Name)
+			description = fmt.Sprintf("Backend service for KDex function %s", backend.Name)
+		case "KDexTheme", "KDexClusterTheme":
+			summary = fmt.Sprintf("Theme Assets: %s", backend.Name)
+			description = fmt.Sprintf("Backend service for KDex theme %s assets", backend.Name)
+		case "KDexScriptLibrary", "KDexClusterScriptLibrary":
+			summary = fmt.Sprintf("Script Library: %s", backend.Name)
+			description = fmt.Sprintf("Backend service for KDex script library %s", backend.Name)
+		case "KDexInternalPackageReferences":
+			summary = "Package Modules"
+			description = "Backend service for serving npm package modules"
+		default:
+			summary = fmt.Sprintf("Backend: %s", backend.Name)
+			description = fmt.Sprintf("Backend service for %s", backend.Name)
+		}
+
+		// Register wildcard path for static assets
+		// Ensure path ends with slash before appending wildcard
+		basePath := backend.Backend.IngressPath
+		if !strings.HasSuffix(basePath, "/") {
+			basePath += "/"
+		}
+		wildcardPath := basePath + "{path...}"
+
+		// Create generic GET operation for static content
+		op := &openapi3.Operation{
+			Summary:     summary,
+			Description: description,
+			Responses:   openapi3.NewResponses(),
+		}
+
+		// Add 200 OK response for any content type
+		op.AddResponse(200, &openapi3.Response{
+			Description: ptr("Static content"),
+			Content: openapi3.NewContentWithSchema(
+				openapi3.NewSchema().WithAnyAdditionalProperties(),
+				[]string{"*/*"},
+			),
+		})
+
+		// Add 404 Not Found response
+		op.AddResponse(404, &openapi3.Response{
+			Description: ptr("Resource not found"),
+		})
+
+		// Add wildcard parameter manually since we are outside the host package
+		op.Parameters = append(op.Parameters, &openapi3.ParameterRef{
+			Value: &openapi3.Parameter{
+				Name:        "path",
+				In:          "path",
+				Required:    true,
+				Description: "Wildcard path parameter: path (captures remaining path segments)",
+				Schema:      openapi3.NewSchemaRef("", &openapi3.Schema{Type: &openapi3.Types{"string"}, Description: "May contain multiple path segments separated by slashes"}),
+			},
+		})
+
+		pathInfo := host.PathInfo{
+			API: kdexv1alpha1.KDexOpenAPI{
+				Description: description,
+				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
+					Get: op,
+				},
+				Path:    wildcardPath,
+				Summary: summary,
+			},
+			Type: host.BackendPathType,
+		}
+
+		r.HostHandler.RegisterPath(wildcardPath, pathInfo)
+	}
+}
+
+func ptr(s string) *string { return &s }
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	hasFocalHost := func(o client.Object) bool {
@@ -662,6 +752,9 @@ func (r *KDexInternalHostReconciler) innerReconcile(
 	if err := r.cleanupObsoleteBackends(ctx, internalHost, backends); err != nil {
 		return err
 	}
+
+	// Register backend paths in the host handler for OpenAPI documentation
+	r.registerBackendPaths(backends)
 
 	var ingressOrHTTPRouteOp controllerutil.OperationResult
 	if internalHost.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
