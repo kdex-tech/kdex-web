@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	openapi "github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-logr/logr"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
@@ -402,6 +402,7 @@ func (th *HostHandler) RebuildMux() {
 		th.mu.RUnlock()
 		th.mu.Lock()
 		th.Translations = *newTranslations
+		th.registeredPaths = registeredPaths
 		th.Mux = mux
 		th.mu.Unlock()
 
@@ -477,7 +478,7 @@ func (th *HostHandler) RebuildMux() {
 			API: kdexv1alpha1.KDexOpenAPI{
 				Description: fmt.Sprintf("Rendered HTML page for %s", ph.Label()),
 				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-					Get: &openapi3.Operation{
+					Get: &openapi.Operation{
 						Parameters: th.extractParameters(finalPath, ""),
 					},
 				},
@@ -492,7 +493,7 @@ func (th *HostHandler) RebuildMux() {
 			API: kdexv1alpha1.KDexOpenAPI{
 				Description: fmt.Sprintf("Localized rendered HTML page for %s", ph.Label()),
 				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-					Get: &openapi3.Operation{
+					Get: &openapi.Operation{
 						Parameters: th.extractParameters(l10nPath, ""),
 					},
 				},
@@ -513,7 +514,7 @@ func (th *HostHandler) RebuildMux() {
 				API: kdexv1alpha1.KDexOpenAPI{
 					Description: fmt.Sprintf("Rendered HTML page for %s using pattern %s", ph.Label(), patternPath),
 					KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-						Get: &openapi3.Operation{
+						Get: &openapi.Operation{
 							Parameters: th.extractParameters(patternPath, ""),
 						},
 					},
@@ -527,7 +528,7 @@ func (th *HostHandler) RebuildMux() {
 				API: kdexv1alpha1.KDexOpenAPI{
 					Description: fmt.Sprintf("Localized rendered HTML page for %s using pattern %s", ph.Label(), l10nPatternPath),
 					KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-						Get: &openapi3.Operation{
+						Get: &openapi.Operation{
 							Parameters: th.extractParameters(l10nPatternPath, ""),
 						},
 					},
@@ -541,8 +542,8 @@ func (th *HostHandler) RebuildMux() {
 
 	th.mu.Lock()
 	th.Translations = *newTranslations
-	th.Mux = mux
 	th.registeredPaths = registeredPaths
+	th.Mux = mux
 	th.mu.Unlock()
 }
 
@@ -601,9 +602,9 @@ func (th *HostHandler) mergeOperations(dest, src *kdexv1alpha1.KDexOpenAPI) {
 	}
 }
 
-func (th *HostHandler) setOperation(api *kdexv1alpha1.KDexOpenAPI, method string, op *openapi3.Operation) {
+func (th *HostHandler) setOperation(api *kdexv1alpha1.KDexOpenAPI, method string, op *openapi.Operation) {
 	if op == nil {
-		op = &openapi3.Operation{}
+		op = &openapi.Operation{}
 	}
 
 	// Extract and set parameters from the path if not already set
@@ -633,8 +634,8 @@ func (th *HostHandler) setOperation(api *kdexv1alpha1.KDexOpenAPI, method string
 	}
 }
 
-func (th *HostHandler) extractParameters(path string, query string) openapi3.Parameters {
-	var params openapi3.Parameters
+func (th *HostHandler) extractParameters(path string, query string) openapi.Parameters {
+	var params openapi.Parameters
 
 	// Regular expression to match path parameters: {name} or {name...}
 	paramRegex := regexp.MustCompile(`\{([^}]+)\}`)
@@ -658,21 +659,21 @@ func (th *HostHandler) extractParameters(path string, query string) openapi3.Par
 		}
 
 		// Determine schema type
-		schema := openapi3.NewStringSchema()
+		schema := openapi.NewStringSchema()
 		if isWildcard {
 			// Wildcard parameters can contain slashes and multiple segments
 			schema.Description = "May contain multiple path segments separated by slashes"
 		}
 
-		param := &openapi3.Parameter{
+		param := &openapi.Parameter{
 			Name:        cleanName,
 			In:          "path",
 			Description: description,
 			Required:    true,
-			Schema:      openapi3.NewSchemaRef("", schema),
+			Schema:      openapi.NewSchemaRef("", schema),
 		}
 
-		params = append(params, &openapi3.ParameterRef{
+		params = append(params, &openapi.ParameterRef{
 			Value: param,
 		})
 	}
@@ -706,23 +707,23 @@ func (th *HostHandler) extractParameters(path string, query string) openapi3.Par
 			}
 
 			// Determine schema type
-			var schema *openapi3.Schema
+			var schema *openapi.Schema
 			if isArray {
-				schema = openapi3.NewArraySchema()
-				schema.Items = openapi3.NewSchemaRef("", openapi3.NewStringSchema())
+				schema = openapi.NewArraySchema()
+				schema.Items = openapi.NewSchemaRef("", openapi.NewStringSchema())
 			} else {
-				schema = openapi3.NewStringSchema()
+				schema = openapi.NewStringSchema()
 			}
 
-			param := &openapi3.Parameter{
+			param := &openapi.Parameter{
 				Name:        paramName,
 				In:          "query",
 				Description: description,
 				Required:    false, // Query parameters are typically optional
-				Schema:      openapi3.NewSchemaRef("", schema),
+				Schema:      openapi.NewSchemaRef("", schema),
 			}
 
-			params = append(params, &openapi3.ParameterRef{
+			params = append(params, &openapi.ParameterRef{
 				Value: param,
 			})
 		}
@@ -742,7 +743,7 @@ func (th *HostHandler) registerPathFromPattern(pattern string, registeredPaths m
 
 	info := PathInfo{
 		API: kdexv1alpha1.KDexOpenAPI{
-			Description: fmt.Sprintf("Internal system endpoint providing %s functionality.", path),
+			Description: fmt.Sprintf("Internal system endpoint providing %s functionality. NOT YET IMPLEMENTED!", path),
 			Path:        path,
 			Summary:     fmt.Sprintf("System Endpoint: %s", path),
 		},
@@ -889,7 +890,20 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 		API: kdexv1alpha1.KDexOpenAPI{
 			Description: "Serves the generated OpenAPI 3.0 specification for this host.",
 			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-				Get: &openapi3.Operation{},
+				Get: &openapi.Operation{
+					Responses: openapi.NewResponses(
+						openapi.WithName("200", &openapi.Response{
+							Description: openapi.Ptr("OpenAPI documentation"),
+							Content: openapi.NewContentWithSchema(
+								openapi.NewSchema().WithAnyAdditionalProperties(),
+								[]string{"application/json"},
+							),
+						}),
+						openapi.WithName("500", &openapi.Response{
+							Description: openapi.Ptr("Failed to marshal OpenAPI spec"),
+						}),
+					),
+				},
 			},
 			Path:    path,
 			Summary: "OpenAPI Specification",
@@ -914,15 +928,15 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 	})
 }
 
-func (th *HostHandler) buildOpenAPI(registeredPaths map[string]PathInfo) *openapi3.T {
-	doc := &openapi3.T{
+func (th *HostHandler) buildOpenAPI(registeredPaths map[string]PathInfo) *openapi.T {
+	doc := &openapi.T{
 		OpenAPI: "3.0.0",
-		Info: &openapi3.Info{
+		Info: &openapi.Info{
 			Title:       fmt.Sprintf("KDex Host: %s", th.Name),
 			Description: "Auto-generated OpenAPI specification for KDex Host",
 			Version:     "1.0.0",
 		},
-		Paths: &openapi3.Paths{},
+		Paths: &openapi.Paths{},
 	}
 
 	for _, info := range registeredPaths {
@@ -931,13 +945,13 @@ func (th *HostHandler) buildOpenAPI(registeredPaths map[string]PathInfo) *openap
 			continue
 		}
 
-		pathItem := &openapi3.PathItem{
+		pathItem := &openapi.PathItem{
 			Summary:     info.API.Summary,
 			Description: info.API.Description,
 		}
 
 		// Fill path item operations
-		ensureOpMetadata := func(op *openapi3.Operation) {
+		ensureOpMetadata := func(op *openapi.Operation) {
 			if op == nil {
 				return
 			}
@@ -1026,7 +1040,7 @@ func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 			API: kdexv1alpha1.KDexOpenAPI{
 				Description: "Provides Markdown documentation for the Request Sniffer's supported headers and behaviors.",
 				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-					Get: &openapi3.Operation{
+					Get: &openapi.Operation{
 						Parameters: th.extractParameters(path, ""),
 					},
 				},
@@ -1128,8 +1142,26 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 		API: kdexv1alpha1.KDexOpenAPI{
 			Description: "Provides dynamic HTML fragments for page navigation components, supporting localization and breadcrumb contexts.",
 			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-				Get: &openapi3.Operation{
+				Get: &openapi.Operation{
 					Parameters: th.extractParameters(path, ""),
+					Responses: openapi.NewResponses(
+						openapi.WithName("200", &openapi.Response{
+							Description: openapi.Ptr("HTML navigation fragment"),
+							Content: openapi.NewContentWithSchema(
+								openapi.NewSchema().WithAnyAdditionalProperties(),
+								[]string{"text/html"},
+							),
+						}),
+						openapi.WithName("400", &openapi.Response{
+							Description: openapi.Ptr("Unable to acertain the locale from {l10n} parameter"),
+						}),
+						openapi.WithName("404", &openapi.Response{
+							Description: openapi.Ptr("Resource not found"),
+						}),
+						openapi.WithName("500", &openapi.Response{
+							Description: openapi.Ptr("Internal server error"),
+						}),
+					),
 				},
 			},
 			Path:    path,
@@ -1195,13 +1227,27 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 		},
 	)
 
+	op := &openapi.Operation{
+		Parameters: th.extractParameters(path, "key=one&key=two"),
+		Responses: openapi.NewResponses(
+			openapi.WithName("200", &openapi.Response{
+				Description: openapi.Ptr("JSON translation map"),
+				Content: openapi.NewContentWithSchema(
+					openapi.NewSchema().WithAnyAdditionalProperties(),
+					[]string{"application/json"},
+				),
+			}),
+			openapi.WithName("500", &openapi.Response{
+				Description: openapi.Ptr("Internal server error"),
+			}),
+		),
+	}
+
 	th.registerPath(path, PathInfo{
 		API: kdexv1alpha1.KDexOpenAPI{
 			Description: "Provides a JSON map of localization keys and their translated values for a given language tag.",
 			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-				Get: &openapi3.Operation{
-					Parameters: th.extractParameters(path, "key=one&key=two"),
-				},
+				Get: op,
 			},
 			Path:    path,
 			Summary: "Localization Key Provider",
@@ -1235,7 +1281,7 @@ func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 	// collect stacktrace
 	stacktrace := string(debug.Stack())
 
-	th.log.V(2).Info("generating error page", "code", code, "msg", msg, "language", l, "stacktrace", stacktrace)
+	th.log.V(2).Info("generating error page", "requestURI", r.URL.Path, "code", code, "msg", msg, "language", l, "stacktrace", stacktrace)
 
 	rendered := th.renderUtilityPage(
 		kdexv1alpha1.ErrorUtilityPageType,

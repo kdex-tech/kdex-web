@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	openapi "github.com/getkin/kin-openapi/openapi3"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -480,34 +480,31 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 		wildcardPath := basePath + "{path...}"
 
 		// Create generic GET operation for static content
-		op := &openapi3.Operation{
+		op := &openapi.Operation{
 			Summary:     summary,
 			Description: description,
-			Responses:   openapi3.NewResponses(),
+			Responses: openapi.NewResponses(
+				openapi.WithName("200", &openapi.Response{
+					Description: openapi.Ptr("Static content"),
+					Content: openapi.NewContentWithSchema(
+						openapi.NewSchema().WithAnyAdditionalProperties(),
+						[]string{"*/*"},
+					),
+				}),
+				openapi.WithName("404", &openapi.Response{
+					Description: openapi.Ptr("Resource not found"),
+				}),
+			),
 		}
 
-		// Add 200 OK response for any content type
-		op.AddResponse(200, &openapi3.Response{
-			Description: ptr("Static content"),
-			Content: openapi3.NewContentWithSchema(
-				openapi3.NewSchema().WithAnyAdditionalProperties(),
-				[]string{"*/*"},
-			),
-		})
-
-		// Add 404 Not Found response
-		op.AddResponse(404, &openapi3.Response{
-			Description: ptr("Resource not found"),
-		})
-
 		// Add wildcard parameter manually since we are outside the host package
-		op.Parameters = append(op.Parameters, &openapi3.ParameterRef{
-			Value: &openapi3.Parameter{
+		op.Parameters = append(op.Parameters, &openapi.ParameterRef{
+			Value: &openapi.Parameter{
 				Name:        "path",
 				In:          "path",
 				Required:    true,
 				Description: "Wildcard path parameter: path (captures remaining path segments)",
-				Schema:      openapi3.NewSchemaRef("", &openapi3.Schema{Type: &openapi3.Types{"string"}, Description: "May contain multiple path segments separated by slashes"}),
+				Schema:      openapi.NewSchemaRef("", &openapi.Schema{Type: &openapi.Types{"string"}, Description: "May contain multiple path segments separated by slashes"}),
 			},
 		})
 
@@ -537,8 +534,6 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 
 	return initialPaths
 }
-
-func ptr(s string) *string { return &s }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
