@@ -1,9 +1,13 @@
 package ico
 
 import (
-	"fmt"
+	"bytes"
 	"net/http"
 	"sync"
+	"text/template"
+
+	"github.com/Masterminds/sprig/v3"
+	"kdex.dev/crds/render"
 )
 
 var (
@@ -11,8 +15,7 @@ var (
 	faviconCache sync.Map
 )
 
-const svgTemplate = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+const svgTemplateDefault = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
     <circle cx="50" cy="50" r="48" fill="#000" />
     <text x="50" y="50" 
           font-family="Arial, sans-serif" 
@@ -20,26 +23,43 @@ const svgTemplate = `
           font-weight="bold"
           fill="white" 
           text-anchor="middle" 
-          dominant-baseline="central">%s</text>
+          dominant-baseline="central">{{ slice .BrandName 0 1 }}</text>
 </svg>`
 
 type Ico struct {
-	Char string
+	data     render.TemplateData
+	template *template.Template
+}
+
+func NewICO(svgTemplate string, data render.TemplateData) *Ico {
+	if svgTemplate == "" {
+		svgTemplate = svgTemplateDefault
+	}
+
+	return &Ico{
+		data:     data,
+		template: template.Must(template.New("favicon").Parse(svgTemplate)),
+	}
 }
 
 func (i *Ico) FaviconHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Check Cache
-	if val, ok := faviconCache.Load(i.Char); ok {
+	if val, ok := faviconCache.Load("favicon"); ok {
 		serveSVG(w, val.([]byte))
 		return
 	}
 
 	// 2. Generate SVG
-	svgContent := fmt.Sprintf(svgTemplate, i.Char)
+	var buf bytes.Buffer
+	if err := i.template.Funcs(sprig.TxtFuncMap()).Execute(&buf, i.data); err != nil {
+		http.Error(w, "Template error", 500)
+		return
+	}
+	svgContent := buf.Bytes()
 	svgBytes := []byte(svgContent)
 
 	// 3. Store and Serve
-	faviconCache.Store(i.Char, svgBytes)
+	faviconCache.Store("favicon", svgBytes)
 	serveSVG(w, svgBytes)
 }
 

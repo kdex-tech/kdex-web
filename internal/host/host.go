@@ -517,8 +517,13 @@ func (th *HostHandler) SetHost(
 	paths map[string]PathInfo,
 ) {
 	th.mu.Lock()
-	th.defaultLanguage = host.DefaultLang
 	th.host = host
+	th.defaultLanguage = host.DefaultLang
+	th.favicon = ico.NewICO(host.FaviconSVGTemplate, render.TemplateData{
+		BrandName:       host.BrandName,
+		DefaultLanguage: host.DefaultLang,
+		Organization:    host.Organization,
+	})
 	th.packageReferences = packageReferences
 	th.pathsCollectedInReconcile = paths
 	th.themeAssets = themeAssets
@@ -727,10 +732,7 @@ func (th *HostHandler) extractParameters(path string, query string) openapi.Para
 
 func (th *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
 	const path = "/favicon.ico"
-	favicon := ico.Ico{
-		Char: strings.ToUpper(th.host.BrandName[0:1]),
-	}
-	mux.HandleFunc("GET "+path, favicon.FaviconHandler)
+	mux.HandleFunc("GET "+path, th.favicon.FaviconHandler)
 	registeredPaths[path] = PathInfo{
 		API: kdexv1alpha1.KDexOpenAPI{
 			Description: "A default Favicon",

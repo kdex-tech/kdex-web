@@ -8,6 +8,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/web/internal/host/ico"
 	"kdex.dev/web/internal/page"
 )
 
@@ -34,6 +35,7 @@ type HostHandler struct {
 	Translations Translations
 
 	defaultLanguage           string
+	favicon                   *ico.Ico
 	host                      *kdexv1alpha1.KDexHostSpec
 	importmap                 string
 	log                       logr.Logger
