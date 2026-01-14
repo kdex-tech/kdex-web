@@ -9,14 +9,12 @@ import (
 	"regexp"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-logr/logr"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
 	"kdex.dev/web/internal/host/ico"
@@ -24,90 +22,32 @@ import (
 	"kdex.dev/web/internal/page"
 )
 
-type HostHandler struct {
-	Mux          *http.ServeMux
-	Name         string
-	Namespace    string
-	Pages        *page.PageStore
-	Translations Translations
-
-	defaultLanguage           string
-	host                      *kdexv1alpha1.KDexHostSpec
-	importmap                 string
-	log                       logr.Logger
-	mu                        sync.RWMutex
-	packageReferences         []kdexv1alpha1.PackageReference
-	registeredPaths           map[string]PathInfo
-	pathsCollectedInReconcile map[string]PathInfo
-	scripts                   []kdexv1alpha1.ScriptDef
-	themeAssets               []kdexv1alpha1.Asset
-	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec
-	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
-
-	Sniffer interface {
-		DocsHandler(w http.ResponseWriter, r *http.Request)
-		Sniff(r *http.Request) error
-	}
-}
-
-type Translations struct {
-	catalog *catalog.Builder
-	keys    []string
-}
-
-func NewTranslations(defaultLanguage string, translations map[string]kdexv1alpha1.KDexTranslationSpec) (*Translations, error) {
-	catalogBuilder := catalog.NewBuilder()
-
-	if err := catalogBuilder.SetString(language.Make(defaultLanguage), "_", "_"); err != nil {
-		return nil, fmt.Errorf("failed to set default translation %s %s", defaultLanguage, "_")
+func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler {
+	th := &HostHandler{
+		Name:                      name,
+		Namespace:                 namespace,
+		defaultLanguage:           "en",
+		log:                       log.WithValues("host", name),
+		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
+		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
+		registeredPaths:           map[string]PathInfo{},
+		pathsCollectedInReconcile: map[string]PathInfo{},
 	}
 
-	keys := []string{}
-	for name, translation := range translations {
-		for _, tr := range translation.Translations {
-			for key, value := range tr.KeysAndValues {
-				if err := catalogBuilder.SetString(language.Make(tr.Lang), key, value); err != nil {
-					return nil, fmt.Errorf("failed to set translation %s %s %s %s", name, tr.Lang, key, value)
-				}
-				keys = append(keys, key)
-			}
-		}
+	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
+	if err != nil {
+		panic(err)
 	}
 
-	return &Translations{
-		catalog: catalogBuilder,
-		keys:    keys,
-	}, nil
+	th.Translations = *translations
+	th.Pages = page.NewPageStore(
+		name,
+		th.RebuildMux,
+		th.log.WithName("pages"),
+	)
+	th.RebuildMux()
+	return th
 }
-
-func (t *Translations) Catalog() *catalog.Builder {
-	return t.catalog
-}
-
-func (t *Translations) Keys() []string {
-	return t.keys
-}
-
-func (t *Translations) Languages() []language.Tag {
-	return t.catalog.Languages()
-}
-
-type errorResponseWriter struct {
-	http.ResponseWriter
-	statusCode  int
-	statusMsg   string
-	wroteHeader bool
-}
-
-const (
-	kdexUIMetaTemplate = `<meta
-  name="kdex-ui"
-  data-page-basepath="%s"
-  data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
-  data-page-patternpath="%s"
-/>
-`
-)
 
 func (th *HostHandler) AddOrUpdateTranslation(name string, translation *kdexv1alpha1.KDexTranslationSpec) {
 	if translation == nil {
@@ -138,21 +78,6 @@ func (th *HostHandler) Domains() []string {
 		return []string{}
 	}
 	return th.host.Routing.Domains
-}
-
-func (th *HostHandler) SecurityModes() []string {
-	// For now we assume that if a login page is specified we want to default to bearer auth
-	// as the preferred mode of authentication for auto-generated functions.
-	if th.host != nil && th.host.UtilityPages != nil && th.host.UtilityPages.LoginRef != nil {
-		return []string{"bearer"}
-	}
-
-	// Fallback to bearer if we have a host at all, better than nothing for signaling auth intent.
-	if th.host != nil {
-		return []string{"bearer"}
-	}
-
-	return []string{}
 }
 
 func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
@@ -310,33 +235,6 @@ func (th *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 	// data-state-endpoint="/~/state/out"
 
 	return buffer.String()
-}
-
-func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler {
-	th := &HostHandler{
-		Name:                      name,
-		Namespace:                 namespace,
-		defaultLanguage:           "en",
-		log:                       log.WithValues("host", name),
-		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
-		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
-		registeredPaths:           map[string]PathInfo{},
-		pathsCollectedInReconcile: map[string]PathInfo{},
-	}
-
-	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
-	if err != nil {
-		panic(err)
-	}
-
-	th.Translations = *translations
-	th.Pages = page.NewPageStore(
-		name,
-		th.RebuildMux,
-		th.log.WithName("pages"),
-	)
-	th.RebuildMux()
-	return th
 }
 
 func (th *HostHandler) RebuildMux() {
@@ -548,91 +446,185 @@ func (th *HostHandler) RebuildMux() {
 	th.mu.Unlock()
 }
 
-func (th *HostHandler) registerPath(path string, info PathInfo, m map[string]PathInfo) {
-	current, ok := m[path]
-	if !ok {
-		if info.API.Path == "" {
-			info.API.Path = path
+func (th *HostHandler) RemoveTranslation(name string) {
+	th.log.V(1).Info("delete translation", "translation", name)
+	th.mu.Lock()
+	delete(th.translationResources, name)
+	th.mu.Unlock()
+
+	th.RebuildMux() // Called after lock is released
+}
+
+func (th *HostHandler) RemoveUtilityPage(name string) {
+	th.log.V(1).Info("delete utility page", "name", name)
+	th.mu.Lock()
+	for t, ph := range th.utilityPages {
+		if ph.Name == name {
+			delete(th.utilityPages, t)
+			break
 		}
-		m[path] = info
+	}
+	th.mu.Unlock()
+
+	th.RebuildMux() // Called after lock is released
+}
+
+func (th *HostHandler) SecurityModes() []string {
+	// For now we assume that if a login page is specified we want to default to bearer auth
+	// as the preferred mode of authentication for auto-generated functions.
+	if th.host != nil && th.host.UtilityPages != nil && th.host.UtilityPages.LoginRef != nil {
+		return []string{"bearer"}
+	}
+
+	// Fallback to bearer if we have a host at all, better than nothing for signaling auth intent.
+	if th.host != nil {
+		return []string{"bearer"}
+	}
+
+	return []string{}
+}
+
+func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	th.mu.RLock()
+	mux := th.Mux
+	th.mu.RUnlock()
+
+	if mux == nil {
+		th.serveError(w, r, http.StatusNotFound, "not found")
 		return
 	}
 
-	th.mergeOperations(&current.API, &info.API)
+	ew := &errorResponseWriter{ResponseWriter: w}
+	mux.ServeHTTP(ew, r)
 
-	if current.API.Summary == "" {
-		current.API.Summary = info.API.Summary
-	}
-	if current.API.Description == "" {
-		current.API.Description = info.API.Description
-	}
-	if current.API.Path == "" {
-		current.API.Path = path
-	}
-
-	m[path] = current
-}
-
-func (th *HostHandler) mergeOperations(dest, src *kdexv1alpha1.KDexOpenAPI) {
-	if src.Connect != nil {
-		dest.Connect = src.Connect
-	}
-	if src.Delete != nil {
-		dest.Delete = src.Delete
-	}
-	if src.Get != nil {
-		dest.Get = src.Get
-	}
-	if src.Head != nil {
-		dest.Head = src.Head
-	}
-	if src.Options != nil {
-		dest.Options = src.Options
-	}
-	if src.Patch != nil {
-		dest.Patch = src.Patch
-	}
-	if src.Post != nil {
-		dest.Post = src.Post
-	}
-	if src.Put != nil {
-		dest.Put = src.Put
-	}
-	if src.Trace != nil {
-		dest.Trace = src.Trace
+	if ew.statusCode >= 400 {
+		if ew.statusCode == http.StatusNotFound && th.Sniffer != nil {
+			w.Header().Set("X-KDex-Sniffer-Docs", "/~/sniffer/docs")
+			if err := th.Sniffer.Sniff(r); err != nil {
+				th.log.Error(err, "failed to sniff request", "path", r.URL.Path)
+			}
+		}
+		th.serveError(w, r, ew.statusCode, ew.statusMsg)
 	}
 }
 
-func (th *HostHandler) setOperation(api *kdexv1alpha1.KDexOpenAPI, method string, op *openapi.Operation) {
-	if op == nil {
-		op = &openapi.Operation{}
+func (th *HostHandler) SetHost(
+	host *kdexv1alpha1.KDexHostSpec,
+	packageReferences []kdexv1alpha1.PackageReference,
+	themeAssets []kdexv1alpha1.Asset,
+	scripts []kdexv1alpha1.ScriptDef,
+	importmap string,
+	paths map[string]PathInfo,
+) {
+	th.mu.Lock()
+	th.defaultLanguage = host.DefaultLang
+	th.host = host
+	th.packageReferences = packageReferences
+	th.pathsCollectedInReconcile = paths
+	th.themeAssets = themeAssets
+	th.scripts = scripts
+	th.importmap = importmap
+	th.mu.Unlock()
+	th.RebuildMux()
+}
+
+func (th *HostHandler) ThemeAssetsToString() string {
+	var buffer bytes.Buffer
+
+	for _, asset := range th.themeAssets {
+		buffer.WriteString(asset.ToTag())
+		buffer.WriteRune('\n')
 	}
 
-	// Extract and set parameters from the path if not already set
-	if op.Parameters == nil && api.Path != "" {
-		op.Parameters = th.extractParameters(api.Path, "")
+	return buffer.String()
+}
+
+func (th *HostHandler) availableLanguages(translations *Translations) []string {
+	availableLangs := []string{}
+
+	for _, tag := range translations.Languages() {
+		availableLangs = append(availableLangs, tag.String())
 	}
 
-	switch strings.ToUpper(method) {
-	case "CONNECT":
-		api.Connect = op
-	case "DELETE":
-		api.Delete = op
-	case "GET":
-		api.Get = op
-	case "HEAD":
-		api.Head = op
-	case "OPTIONS":
-		api.Options = op
-	case "PATCH":
-		api.Patch = op
-	case "POST":
-		api.Post = op
-	case "PUT":
-		api.Put = op
-	case "TRACE":
-		api.Trace = op
+	return availableLangs
+}
+
+func (th *HostHandler) buildOpenAPI(registeredPaths map[string]PathInfo) *openapi.T {
+	doc := &openapi.T{
+		OpenAPI: "3.0.0",
+		Info: &openapi.Info{
+			Title:       fmt.Sprintf("KDex Host: %s", th.Name),
+			Description: "Auto-generated OpenAPI specification for KDex Host",
+			Version:     "1.0.0",
+		},
+		Paths: &openapi.Paths{},
 	}
+
+	for _, info := range registeredPaths {
+		path := info.API.Path
+		if path == "" {
+			continue
+		}
+
+		pathItem := &openapi.PathItem{
+			Summary:     info.API.Summary,
+			Description: info.API.Description,
+		}
+
+		// Fill path item operations
+		ensureOpMetadata := func(op *openapi.Operation) {
+			if op == nil {
+				return
+			}
+			if op.Summary == "" {
+				op.Summary = info.API.Summary
+			}
+			if op.Description == "" {
+				op.Description = info.API.Description
+			}
+		}
+
+		if info.API.Get != nil {
+			ensureOpMetadata(info.API.Get)
+			pathItem.Get = info.API.Get
+		}
+		if info.API.Put != nil {
+			ensureOpMetadata(info.API.Put)
+			pathItem.Put = info.API.Put
+		}
+		if info.API.Post != nil {
+			ensureOpMetadata(info.API.Post)
+			pathItem.Post = info.API.Post
+		}
+		if info.API.Delete != nil {
+			ensureOpMetadata(info.API.Delete)
+			pathItem.Delete = info.API.Delete
+		}
+		if info.API.Options != nil {
+			ensureOpMetadata(info.API.Options)
+			pathItem.Options = info.API.Options
+		}
+		if info.API.Head != nil {
+			ensureOpMetadata(info.API.Head)
+			pathItem.Head = info.API.Head
+		}
+		if info.API.Patch != nil {
+			ensureOpMetadata(info.API.Patch)
+			pathItem.Patch = info.API.Patch
+		}
+		if info.API.Trace != nil {
+			ensureOpMetadata(info.API.Trace)
+			pathItem.Trace = info.API.Trace
+		}
+		if info.API.Connect != nil {
+			ensureOpMetadata(info.API.Connect)
+			pathItem.Connect = info.API.Connect
+		}
+
+		doc.Paths.Set(path, pathItem)
+	}
+
+	return doc
 }
 
 func (th *HostHandler) extractParameters(path string, query string) openapi.Parameters {
@@ -733,308 +725,7 @@ func (th *HostHandler) extractParameters(path string, query string) openapi.Para
 	return params
 }
 
-func (th *HostHandler) registerPathFromPattern(pattern string, registeredPaths map[string]PathInfo, pathType PathType) {
-	parts := strings.Split(pattern, " ")
-	method := "GET"
-	path := pattern
-	if len(parts) > 1 {
-		method = parts[0]
-		path = parts[1]
-	}
-
-	info := PathInfo{
-		API: kdexv1alpha1.KDexOpenAPI{
-			Description: fmt.Sprintf("Internal system endpoint providing %s functionality. NOT YET IMPLEMENTED!", path),
-			Path:        path,
-			Summary:     fmt.Sprintf("System Endpoint: %s", path),
-		},
-		Type: pathType,
-	}
-	th.setOperation(&info.API, method, nil)
-
-	th.registerPath(path, info, registeredPaths)
-}
-
-func (th *HostHandler) RemoveTranslation(name string) {
-	th.log.V(1).Info("delete translation", "translation", name)
-	th.mu.Lock()
-	delete(th.translationResources, name)
-	th.mu.Unlock()
-
-	th.RebuildMux() // Called after lock is released
-}
-
-func (th *HostHandler) RemoveUtilityPage(name string) {
-	th.log.V(1).Info("delete utility page", "name", name)
-	th.mu.Lock()
-	for t, ph := range th.utilityPages {
-		if ph.Name == name {
-			delete(th.utilityPages, t)
-			break
-		}
-	}
-	th.mu.Unlock()
-
-	th.RebuildMux() // Called after lock is released
-}
-
-func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	th.mu.RLock()
-	mux := th.Mux
-	th.mu.RUnlock()
-
-	if mux == nil {
-		th.serveError(w, r, http.StatusNotFound, "not found")
-		return
-	}
-
-	ew := &errorResponseWriter{ResponseWriter: w}
-	mux.ServeHTTP(ew, r)
-
-	if ew.statusCode >= 400 {
-		if ew.statusCode == http.StatusNotFound && th.Sniffer != nil {
-			w.Header().Set("X-KDex-Sniffer-Docs", "/~/sniffer/docs")
-			if err := th.Sniffer.Sniff(r); err != nil {
-				th.log.Error(err, "failed to sniff request", "path", r.URL.Path)
-			}
-		}
-		th.serveError(w, r, ew.statusCode, ew.statusMsg)
-	}
-}
-
-func (th *HostHandler) SetHost(
-	host *kdexv1alpha1.KDexHostSpec,
-	packageReferences []kdexv1alpha1.PackageReference,
-	themeAssets []kdexv1alpha1.Asset,
-	scripts []kdexv1alpha1.ScriptDef,
-	importmap string,
-	paths map[string]PathInfo,
-) {
-	th.mu.Lock()
-	th.defaultLanguage = host.DefaultLang
-	th.host = host
-	th.packageReferences = packageReferences
-	th.pathsCollectedInReconcile = paths
-	th.themeAssets = themeAssets
-	th.scripts = scripts
-	th.importmap = importmap
-	th.mu.Unlock()
-	th.RebuildMux()
-}
-
-func (th *HostHandler) ThemeAssetsToString() string {
-	var buffer bytes.Buffer
-
-	for _, asset := range th.themeAssets {
-		buffer.WriteString(asset.ToTag())
-		buffer.WriteRune('\n')
-	}
-
-	return buffer.String()
-}
-
-func (ew *errorResponseWriter) Write(b []byte) (int, error) {
-	if ew.statusCode >= 400 {
-		// Drop original error body, we will render our own
-		ew.statusMsg = string(b)
-		return len(b), nil
-	}
-	if !ew.wroteHeader {
-		ew.WriteHeader(http.StatusOK)
-	}
-	return ew.ResponseWriter.Write(b)
-}
-
-func (ew *errorResponseWriter) WriteHeader(code int) {
-	if ew.wroteHeader {
-		return
-	}
-	ew.statusCode = code
-	if code >= 400 {
-		return
-	}
-	ew.wroteHeader = true
-	ew.ResponseWriter.WriteHeader(code)
-}
-
-func (th *HostHandler) availableLanguages(translations *Translations) []string {
-	availableLangs := []string{}
-
-	for _, tag := range translations.Languages() {
-		availableLangs = append(availableLangs, tag.String())
-	}
-
-	return availableLangs
-}
-
-func (th *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, registeredPaths map[string]PathInfo) {
-	mux.HandleFunc(
-		pattern,
-		func(w http.ResponseWriter, r *http.Request) {
-			th.log.V(1).Info("unimplemented handler", "path", r.URL.Path)
-			w.Header().Set("Content-Type", "application/json")
-			_, err := fmt.Fprintf(w, `{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		},
-	)
-
-	th.registerPathFromPattern(pattern, registeredPaths, InternalPathType)
-}
-
-func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
-	const path = "/~/openapi/"
-
-	// Register the path itself so it appears in the spec
-	th.registerPath(path, PathInfo{
-		API: kdexv1alpha1.KDexOpenAPI{
-			Description: "Serves the generated OpenAPI 3.0 specification for this host.",
-			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-				Get: &openapi.Operation{
-					Responses: openapi.NewResponses(
-						openapi.WithName("200", &openapi.Response{
-							Description: openapi.Ptr("OpenAPI documentation"),
-							Content: openapi.NewContentWithSchema(
-								openapi.NewSchema().WithAnyAdditionalProperties(),
-								[]string{"application/json"},
-							),
-						}),
-						openapi.WithName("500", &openapi.Response{
-							Description: openapi.Ptr("Failed to marshal OpenAPI spec"),
-						}),
-					),
-				},
-			},
-			Path:    path,
-			Summary: "OpenAPI Specification",
-		},
-		Type: InternalPathType,
-	}, registeredPaths)
-
-	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
-		th.mu.RLock()
-		defer th.mu.RUnlock()
-
-		spec := th.buildOpenAPI(th.registeredPaths)
-
-		jsonBytes, err := json.Marshal(spec)
-		if err != nil {
-			http.Error(w, "Failed to marshal OpenAPI spec", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(jsonBytes)
-	})
-}
-
-func (th *HostHandler) buildOpenAPI(registeredPaths map[string]PathInfo) *openapi.T {
-	doc := &openapi.T{
-		OpenAPI: "3.0.0",
-		Info: &openapi.Info{
-			Title:       fmt.Sprintf("KDex Host: %s", th.Name),
-			Description: "Auto-generated OpenAPI specification for KDex Host",
-			Version:     "1.0.0",
-		},
-		Paths: &openapi.Paths{},
-	}
-
-	for _, info := range registeredPaths {
-		path := info.API.Path
-		if path == "" {
-			continue
-		}
-
-		pathItem := &openapi.PathItem{
-			Summary:     info.API.Summary,
-			Description: info.API.Description,
-		}
-
-		// Fill path item operations
-		ensureOpMetadata := func(op *openapi.Operation) {
-			if op == nil {
-				return
-			}
-			if op.Summary == "" {
-				op.Summary = info.API.Summary
-			}
-			if op.Description == "" {
-				op.Description = info.API.Description
-			}
-		}
-
-		if info.API.Get != nil {
-			ensureOpMetadata(info.API.Get)
-			pathItem.Get = info.API.Get
-		}
-		if info.API.Put != nil {
-			ensureOpMetadata(info.API.Put)
-			pathItem.Put = info.API.Put
-		}
-		if info.API.Post != nil {
-			ensureOpMetadata(info.API.Post)
-			pathItem.Post = info.API.Post
-		}
-		if info.API.Delete != nil {
-			ensureOpMetadata(info.API.Delete)
-			pathItem.Delete = info.API.Delete
-		}
-		if info.API.Options != nil {
-			ensureOpMetadata(info.API.Options)
-			pathItem.Options = info.API.Options
-		}
-		if info.API.Head != nil {
-			ensureOpMetadata(info.API.Head)
-			pathItem.Head = info.API.Head
-		}
-		if info.API.Patch != nil {
-			ensureOpMetadata(info.API.Patch)
-			pathItem.Patch = info.API.Patch
-		}
-		if info.API.Trace != nil {
-			ensureOpMetadata(info.API.Trace)
-			pathItem.Trace = info.API.Trace
-		}
-		if info.API.Connect != nil {
-			ensureOpMetadata(info.API.Connect)
-			pathItem.Connect = info.API.Connect
-		}
-
-		doc.Paths.Set(path, pathItem)
-	}
-
-	return doc
-}
-
-func (th *HostHandler) messagePrinter(translations *Translations, tag language.Tag) *message.Printer {
-	return message.NewPrinter(
-		tag,
-		message.Catalog(translations.Catalog()),
-	)
-}
-
-func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]PathInfo) *http.ServeMux {
-	mux := http.NewServeMux()
-
-	th.icoHandler(mux, registeredPaths)
-	th.navigationHandler(mux, registeredPaths)
-	th.translationHandler(mux, registeredPaths)
-	th.snifferHandler(mux, registeredPaths)
-	th.openapiHandler(mux, registeredPaths)
-
-	// TODO: implement a state handler
-	// TODO: implement an oauth handler
-	// TODO: implement a check handler
-
-	th.unimplementedHandler("GET /~/check/", mux, registeredPaths)
-	th.unimplementedHandler("GET /~/oauth/", mux, registeredPaths)
-	th.unimplementedHandler("GET /~/state/", mux, registeredPaths)
-
-	return mux
-}
-
-func (th *HostHandler) icoHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
+func (th *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
 	const path = "/favicon.ico"
 	favicon := ico.Ico{
 		Char: strings.ToUpper(th.host.BrandName[0:1]),
@@ -1062,25 +753,61 @@ func (th *HostHandler) icoHandler(mux *http.ServeMux, registeredPaths map[string
 	}
 }
 
-func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
-	if th.Sniffer != nil {
-		const path = "/~/sniffer/docs"
-		mux.HandleFunc("GET "+path, th.Sniffer.DocsHandler)
-		registeredPaths[path] = PathInfo{
-			API: kdexv1alpha1.KDexOpenAPI{
-				Description: "Provides Markdown documentation for the Request Sniffer's supported headers and behaviors.",
-				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-					Get: &openapi.Operation{
-						Parameters: th.extractParameters(path, ""),
-						Responses:  openapi.NewResponses(),
-					},
-				},
-				Path:    path,
-				Summary: "Request Sniffer Documentation",
-			},
-			Type: InternalPathType,
-		}
+func (th *HostHandler) mergeOperations(dest, src *kdexv1alpha1.KDexOpenAPI) {
+	if src.Connect != nil {
+		dest.Connect = src.Connect
 	}
+	if src.Delete != nil {
+		dest.Delete = src.Delete
+	}
+	if src.Get != nil {
+		dest.Get = src.Get
+	}
+	if src.Head != nil {
+		dest.Head = src.Head
+	}
+	if src.Options != nil {
+		dest.Options = src.Options
+	}
+	if src.Patch != nil {
+		dest.Patch = src.Patch
+	}
+	if src.Post != nil {
+		dest.Post = src.Post
+	}
+	if src.Put != nil {
+		dest.Put = src.Put
+	}
+	if src.Trace != nil {
+		dest.Trace = src.Trace
+	}
+}
+
+func (th *HostHandler) messagePrinter(translations *Translations, tag language.Tag) *message.Printer {
+	return message.NewPrinter(
+		tag,
+		message.Catalog(translations.Catalog()),
+	)
+}
+
+func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]PathInfo) *http.ServeMux {
+	mux := http.NewServeMux()
+
+	th.faviconHandler(mux, registeredPaths)
+	th.navigationHandler(mux, registeredPaths)
+	th.translationHandler(mux, registeredPaths)
+	th.snifferHandler(mux, registeredPaths)
+	th.openapiHandler(mux, registeredPaths)
+
+	// TODO: implement a state handler
+	// TODO: implement an oauth handler
+	// TODO: implement a check handler
+
+	th.unimplementedHandler("GET /~/check/", mux, registeredPaths)
+	th.unimplementedHandler("GET /~/oauth/", mux, registeredPaths)
+	th.unimplementedHandler("GET /~/state/", mux, registeredPaths)
+
+	return mux
 }
 
 func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
@@ -1202,6 +929,199 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 	}, registeredPaths)
 }
 
+func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
+	const path = "/~/openapi/"
+
+	// Register the path itself so it appears in the spec
+	th.registerPath(path, PathInfo{
+		API: kdexv1alpha1.KDexOpenAPI{
+			Description: "Serves the generated OpenAPI 3.0 specification for this host.",
+			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
+				Get: &openapi.Operation{
+					Responses: openapi.NewResponses(
+						openapi.WithName("200", &openapi.Response{
+							Description: openapi.Ptr("OpenAPI documentation"),
+							Content: openapi.NewContentWithSchema(
+								openapi.NewSchema().WithAnyAdditionalProperties(),
+								[]string{"application/json"},
+							),
+						}),
+						openapi.WithName("500", &openapi.Response{
+							Description: openapi.Ptr("Failed to marshal OpenAPI spec"),
+						}),
+					),
+				},
+			},
+			Path:    path,
+			Summary: "OpenAPI Specification",
+		},
+		Type: InternalPathType,
+	}, registeredPaths)
+
+	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
+		th.mu.RLock()
+		defer th.mu.RUnlock()
+
+		spec := th.buildOpenAPI(th.registeredPaths)
+
+		jsonBytes, err := json.Marshal(spec)
+		if err != nil {
+			http.Error(w, "Failed to marshal OpenAPI spec", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonBytes)
+	})
+}
+
+func (th *HostHandler) registerPath(path string, info PathInfo, m map[string]PathInfo) {
+	current, ok := m[path]
+	if !ok {
+		if info.API.Path == "" {
+			info.API.Path = path
+		}
+		m[path] = info
+		return
+	}
+
+	th.mergeOperations(&current.API, &info.API)
+
+	if current.API.Summary == "" {
+		current.API.Summary = info.API.Summary
+	}
+	if current.API.Description == "" {
+		current.API.Description = info.API.Description
+	}
+	if current.API.Path == "" {
+		current.API.Path = path
+	}
+
+	m[path] = current
+}
+
+func (th *HostHandler) registerPathFromPattern(pattern string, registeredPaths map[string]PathInfo, pathType PathType) {
+	parts := strings.Split(pattern, " ")
+	method := "GET"
+	path := pattern
+	if len(parts) > 1 {
+		method = parts[0]
+		path = parts[1]
+	}
+
+	info := PathInfo{
+		API: kdexv1alpha1.KDexOpenAPI{
+			Description: fmt.Sprintf("Internal system endpoint providing %s functionality. NOT YET IMPLEMENTED!", path),
+			Path:        path,
+			Summary:     fmt.Sprintf("System Endpoint: %s", path),
+		},
+		Type: pathType,
+	}
+	th.setOperation(&info.API, method, nil)
+
+	th.registerPath(path, info, registeredPaths)
+}
+
+func (th *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any, translations *Translations) string {
+	ph, ok := th.utilityPages[utilityType]
+	if !ok {
+		return ""
+	}
+
+	rendered, err := th.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
+	if err != nil {
+		th.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
+		return ""
+	}
+
+	return rendered
+}
+
+func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {
+	th.mu.RLock()
+	l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+	if err != nil {
+		l = language.Make(th.defaultLanguage)
+	}
+
+	// collect stacktrace
+	stacktrace := string(debug.Stack())
+
+	th.log.V(2).Info("generating error page", "requestURI", r.URL.Path, "code", code, "msg", msg, "language", l, "stacktrace", stacktrace)
+
+	rendered := th.renderUtilityPage(
+		kdexv1alpha1.ErrorUtilityPageType,
+		l,
+		map[string]any{"ErrorCode": code, "ErrorCodeString": http.StatusText(code), "ErrorMessage": msg},
+		&th.Translations,
+	)
+	th.mu.RUnlock()
+
+	if rendered == "" {
+		// Fallback to standard http error if no custom error page
+		http.Error(w, msg, code)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Language", l.String())
+	w.WriteHeader(code)
+	_, _ = w.Write([]byte(rendered))
+}
+
+func (th *HostHandler) setOperation(api *kdexv1alpha1.KDexOpenAPI, method string, op *openapi.Operation) {
+	if op == nil {
+		op = &openapi.Operation{}
+	}
+
+	// Extract and set parameters from the path if not already set
+	if op.Parameters == nil && api.Path != "" {
+		op.Parameters = th.extractParameters(api.Path, "")
+	}
+
+	switch strings.ToUpper(method) {
+	case "CONNECT":
+		api.Connect = op
+	case "DELETE":
+		api.Delete = op
+	case "GET":
+		api.Get = op
+	case "HEAD":
+		api.Head = op
+	case "OPTIONS":
+		api.Options = op
+	case "PATCH":
+		api.Patch = op
+	case "POST":
+		api.Post = op
+	case "PUT":
+		api.Put = op
+	case "TRACE":
+		api.Trace = op
+	}
+}
+
+func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
+	if th.Sniffer != nil {
+		const path = "/~/sniffer/docs"
+		mux.HandleFunc("GET "+path, th.Sniffer.DocsHandler)
+		registeredPaths[path] = PathInfo{
+			API: kdexv1alpha1.KDexOpenAPI{
+				Description: "Provides Markdown documentation for the Request Sniffer's supported headers and behaviors.",
+				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
+					Get: &openapi.Operation{
+						Parameters: th.extractParameters(path, ""),
+						Responses:  openapi.NewResponses(),
+					},
+				},
+				Path:    path,
+				Summary: "Request Sniffer Documentation",
+			},
+			Type: InternalPathType,
+		}
+	}
+}
+
 func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
 	const path = "/~/translation/{l10n}"
 	mux.HandleFunc(
@@ -1287,49 +1207,18 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 	}, registeredPaths)
 }
 
-func (th *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any, translations *Translations) string {
-	ph, ok := th.utilityPages[utilityType]
-	if !ok {
-		return ""
-	}
-
-	rendered, err := th.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
-	if err != nil {
-		th.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
-		return ""
-	}
-
-	return rendered
-}
-
-func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {
-	th.mu.RLock()
-	l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
-	if err != nil {
-		l = language.Make(th.defaultLanguage)
-	}
-
-	// collect stacktrace
-	stacktrace := string(debug.Stack())
-
-	th.log.V(2).Info("generating error page", "requestURI", r.URL.Path, "code", code, "msg", msg, "language", l, "stacktrace", stacktrace)
-
-	rendered := th.renderUtilityPage(
-		kdexv1alpha1.ErrorUtilityPageType,
-		l,
-		map[string]any{"ErrorCode": code, "ErrorCodeString": http.StatusText(code), "ErrorMessage": msg},
-		&th.Translations,
+func (th *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, registeredPaths map[string]PathInfo) {
+	mux.HandleFunc(
+		pattern,
+		func(w http.ResponseWriter, r *http.Request) {
+			th.log.V(1).Info("unimplemented handler", "path", r.URL.Path)
+			w.Header().Set("Content-Type", "application/json")
+			_, err := fmt.Fprintf(w, `{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		},
 	)
-	th.mu.RUnlock()
 
-	if rendered == "" {
-		// Fallback to standard http error if no custom error page
-		http.Error(w, msg, code)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("Content-Language", l.String())
-	w.WriteHeader(code)
-	_, _ = w.Write([]byte(rendered))
+	th.registerPathFromPattern(pattern, registeredPaths, InternalPathType)
 }
