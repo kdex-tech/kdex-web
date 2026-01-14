@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	G "github.com/onsi/gomega"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	ko "kdex.dev/web/internal/openapi"
 )
 
 func TestHostHandler_openapiHandler(t *testing.T) {
@@ -21,7 +22,7 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 		Routing: kdexv1alpha1.Routing{
 			Domains: []string{"test.example.com"},
 		},
-	}, nil, nil, nil, "", map[string]PathInfo{})
+	}, nil, nil, nil, "", map[string]ko.PathInfo{})
 
 	mux := th.muxWithDefaultsLocked(th.registeredPaths) // registeredPaths is empty, but muxWithDefaultsLocked populates it for defaults
 
@@ -29,7 +30,7 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 	// Actually we need to call RebuildMux to fully populate everything but we can test defaults.
 
 	// Test OpenAPI endpoint
-	req := httptest.NewRequest("GET", "/~/openapi/", nil)
+	req := httptest.NewRequest("GET", "/~/openapi", nil)
 	w := httptest.NewRecorder()
 
 	mux.ServeHTTP(w, req)
@@ -48,7 +49,7 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 	// th.Sniffer is nil in test-host unless we set it.
 
 	// Check /~/openapi/
-	pathItem := doc.Paths.Find("/~/openapi/")
+	pathItem := doc.Paths.Find("/~/openapi")
 	g.Expect(pathItem).NotTo(G.BeNil())
 	g.Expect(pathItem.Get).NotTo(G.BeNil())
 	g.Expect(pathItem.Get.Summary).To(G.Equal("OpenAPI Specification"))

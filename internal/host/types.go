@@ -9,15 +9,11 @@ import (
 	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal/host/ico"
+	ko "kdex.dev/web/internal/openapi"
 	"kdex.dev/web/internal/page"
 )
 
 const (
-	BackendPathType  PathType = "BACKEND"
-	FunctionPathType PathType = "FUNCTION"
-	InternalPathType PathType = "INTERNAL"
-	PagePathType     PathType = "PAGE"
-
 	kdexUIMetaTemplate = `<meta
 	name="kdex-ui"
 	data-page-basepath="%s"
@@ -41,8 +37,8 @@ type HostHandler struct {
 	log                       logr.Logger
 	mu                        sync.RWMutex
 	packageReferences         []kdexv1alpha1.PackageReference
-	registeredPaths           map[string]PathInfo
-	pathsCollectedInReconcile map[string]PathInfo
+	registeredPaths           map[string]ko.PathInfo
+	pathsCollectedInReconcile map[string]ko.PathInfo
 	scripts                   []kdexv1alpha1.ScriptDef
 	themeAssets               []kdexv1alpha1.Asset
 	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec
@@ -52,14 +48,6 @@ type HostHandler struct {
 		DocsHandler(w http.ResponseWriter, r *http.Request)
 		Sniff(r *http.Request) error
 	}
-}
-
-type PathType string
-
-type PathInfo struct {
-	API         kdexv1alpha1.KDexOpenAPI
-	Secondaries []string
-	Type        PathType
 }
 
 type Translations struct {

@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal/host"
+	ko "kdex.dev/web/internal/openapi"
 )
 
 func TestRequestSniffer_calculatePath(t *testing.T) {
@@ -281,7 +282,7 @@ func TestRequestSniffer_mergeFunction(t *testing.T) {
 func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 	hh := host.NewHostHandler("test", "test", logr.Discard())
 	// Set a mock host so SecurityModes returns something
-	hh.SetHost(&kdexv1alpha1.KDexHostSpec{}, nil, nil, nil, "", map[string]host.PathInfo{})
+	hh.SetHost(&kdexv1alpha1.KDexHostSpec{}, nil, nil, nil, "", map[string]ko.PathInfo{})
 
 	s := &RequestSniffer{HostHandler: hh}
 

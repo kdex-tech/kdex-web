@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
@@ -15,20 +14,14 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal"
 	"kdex.dev/web/internal/host"
+	ko "kdex.dev/web/internal/openapi"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-type RequestSniffer struct {
-	Client      client.Client
-	HostHandler *host.HostHandler
-	HostName    string
-	Namespace   string
-}
-
-func (s *RequestSniffer) DocsHandler(w http.ResponseWriter, r *http.Request) {
-	docs := `
+const (
+	docs = `
 # KDex Request Sniffer Documentation
 
 The KDex Request Sniffer automatically generates or updates KDexFunction resources by observing unhandled requests (404s).
@@ -63,6 +56,16 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
 ---
 *Note: The sniffer only processes non-internal paths (paths not starting with "/~") that result in a 404.*
 `
+)
+
+type RequestSniffer struct {
+	Client      client.Client
+	HostHandler *host.HostHandler
+	HostName    string
+	Namespace   string
+}
+
+func (s *RequestSniffer) DocsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/markdown")
 	_, _ = w.Write([]byte(docs))
 }
@@ -371,95 +374,11 @@ func (s *RequestSniffer) parseRequestIntoAPI(r *http.Request, method string, pat
 	}
 
 	// Parameters
+	p := ko.ExtractParameters(patternPath, r.URL.Query().Encode(), r.Header)
+
 	params := []openapi.Parameter{}
-
-	// 1. Path Parameters from patternPath
-	if patternPath != "" {
-		re := regexp.MustCompile(`\{([^}]+)\}`)
-		matches := re.FindAllStringSubmatch(patternPath, -1)
-		for _, m := range matches {
-			name := strings.TrimSuffix(m[1], "...")
-			params = append(params, openapi.Parameter{
-				Name:     name,
-				In:       "path",
-				Required: true,
-				Schema: &openapi.SchemaRef{
-					Value: openapi.NewStringSchema(),
-				},
-			})
-		}
-	}
-
-	// 2. Query Parameters
-	for name, values := range r.URL.Query() {
-		param := openapi.Parameter{
-			Name: name,
-			In:   "query",
-		}
-
-		schema := openapi.NewStringSchema()
-		if len(values) > 1 {
-			// It's likely an array
-			param.Explode = openapi.Ptr(true)
-			param.Style = "form"
-			schema = openapi.NewArraySchema()
-			schema.Items = &openapi.SchemaRef{
-				Value: openapi.NewStringSchema(),
-			}
-		}
-
-		param.Schema = &openapi.SchemaRef{
-			Value: schema,
-		}
-		params = append(params, param)
-	}
-
-	// 3. Header Parameters (Selective)
-	skipHeaders := map[string]bool{
-		"accept":                    true,
-		"accept-encoding":           true,
-		"accept-language":           true,
-		"authorization":             true,
-		"connection":                true,
-		"content-length":            true,
-		"content-type":              true,
-		"cookie":                    true,
-		"expect":                    true,
-		"host":                      true,
-		"if-match":                  true,
-		"if-none-match":             true,
-		"if-modified-since":         true,
-		"if-unmodified-since":       true,
-		"origin":                    true,
-		"priority":                  true,
-		"referer":                   true,
-		"sec-ch-ua":                 true,
-		"sec-ch-ua-mobile":          true,
-		"sec-ch-ua-platform":        true,
-		"sec-fetch-dest":            true,
-		"sec-fetch-mode":            true,
-		"sec-fetch-site":            true,
-		"sec-fetch-user":            true,
-		"upgrade-insecure-requests": true,
-		"user-agent":                true,
-		"x-forwarded-for":           true,
-		"x-forwarded-host":          true,
-		"x-forwarded-proto":         true,
-		"x-real-ip":                 true,
-	}
-
-	for name := range r.Header {
-		lowerName := strings.ToLower(name)
-		if strings.HasPrefix(lowerName, "x-kdex-") || skipHeaders[lowerName] {
-			continue
-		}
-		params = append(params, openapi.Parameter{
-			Name: name,
-			In:   "header",
-			Schema: &openapi.SchemaRef{
-				Value: openapi.NewStringSchema(),
-			},
-		})
+	for _, pr := range p {
+		params = append(params, *pr.Value)
 	}
 
 	api.Parameters = params

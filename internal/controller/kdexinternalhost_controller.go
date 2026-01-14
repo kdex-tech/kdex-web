@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +36,7 @@ import (
 	"kdex.dev/crds/configuration"
 	"kdex.dev/web/internal"
 	"kdex.dev/web/internal/host"
+	ko "kdex.dev/web/internal/openapi"
 	"kdex.dev/web/internal/sniffer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -438,8 +440,8 @@ type resolvedBackend struct {
 
 func (r *KDexInternalHostReconciler) collectInitialPaths(
 	backends []resolvedBackend, functions kdexv1alpha1.KDexFunctionList,
-) map[string]host.PathInfo {
-	initialPaths := map[string]host.PathInfo{}
+) map[string]ko.PathInfo {
+	initialPaths := map[string]ko.PathInfo{}
 
 	for _, backend := range backends {
 		if backend.Backend.IngressPath == "" {
@@ -481,34 +483,39 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 
 		// Create generic GET operation for static content
 		op := &openapi.Operation{
-			Summary:     summary,
 			Description: description,
+			Parameters:  ko.ExtractParameters(wildcardPath, "", http.Header{}),
 			Responses: openapi.NewResponses(
 				openapi.WithName("200", &openapi.Response{
-					Description: openapi.Ptr("Static content"),
 					Content: openapi.NewContentWithSchema(
-						nil,
+						&openapi.Schema{
+							Format: "binary",
+							Type:   &openapi.Types{openapi.TypeString},
+						},
 						[]string{"*/*"},
 					),
+					Description: openapi.Ptr("Static content"),
+					Headers: openapi.Headers{
+						"Content-Type": &openapi.HeaderRef{
+							Value: &openapi.Header{
+								Parameter: openapi.Parameter{
+									Description: "The MIME type of the file (image/png, text/css, text/html, etc.)",
+									Schema: openapi.NewSchemaRef("", &openapi.Schema{
+										Type: &openapi.Types{openapi.TypeString},
+									}),
+								},
+							},
+						},
+					},
 				}),
 				openapi.WithName("404", &openapi.Response{
 					Description: openapi.Ptr("Resource not found"),
 				}),
 			),
+			Summary: summary,
 		}
 
-		// Add wildcard parameter manually since we are outside the host package
-		op.Parameters = append(op.Parameters, &openapi.ParameterRef{
-			Value: &openapi.Parameter{
-				Name:        "path",
-				In:          "path",
-				Required:    true,
-				Description: "Wildcard path parameter: path (captures remaining path segments)",
-				Schema:      openapi.NewSchemaRef("", &openapi.Schema{Type: &openapi.Types{"string"}, Description: "May contain multiple path segments separated by slashes"}),
-			},
-		})
-
-		pathInfo := host.PathInfo{
+		pathInfo := ko.PathInfo{
 			API: kdexv1alpha1.KDexOpenAPI{
 				Description: description,
 				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
@@ -517,16 +524,16 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 				Path:    wildcardPath,
 				Summary: summary,
 			},
-			Type: host.BackendPathType,
+			Type: ko.BackendPathType,
 		}
 
 		initialPaths[pathInfo.API.Path] = pathInfo
 	}
 
 	for _, function := range functions.Items {
-		pathInfo := host.PathInfo{
+		pathInfo := ko.PathInfo{
 			API:  function.Spec.API,
-			Type: host.FunctionPathType,
+			Type: ko.FunctionPathType,
 		}
 
 		initialPaths[function.Spec.API.Path] = pathInfo

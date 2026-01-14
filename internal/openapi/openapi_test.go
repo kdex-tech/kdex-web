@@ -1,19 +1,19 @@
-package host
+package openapi
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
-	"github.com/go-logr/logr"
 	G "github.com/onsi/gomega"
-	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
-func TestHostHandler_extractPathParameters(t *testing.T) {
+func Test_ExtractPathParameters(t *testing.T) {
 	tests := []struct {
 		name          string
 		path          string
 		query         string
+		header        http.Header
 		expectedCount int
 		expectedNames []string
 		expectedIn    []string // "path" or "query"
@@ -75,21 +75,25 @@ func TestHostHandler_extractPathParameters(t *testing.T) {
 			expectedArray: []bool{true}, // Array because key appears twice
 			hasWildcard:   false,
 		},
+		{
+			name: "header parameters",
+			path: "/static",
+			header: http.Header{
+				"foo": []string{"bar"},
+			},
+			expectedCount: 1,
+			expectedNames: []string{"foo"},
+			expectedIn:    []string{"header"},
+			expectedArray: []bool{true}, // Array because key appears twice
+			hasWildcard:   false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler("test-host", "default", logr.Discard())
-			th.SetHost(&kdexv1alpha1.KDexHostSpec{
-				DefaultLang: "en",
-				Routing: kdexv1alpha1.Routing{
-					Domains: []string{"test.example.com"},
-				},
-			}, nil, nil, nil, "", map[string]PathInfo{})
-
-			params := th.extractParameters(tt.path, tt.query)
+			params := ExtractParameters(tt.path, tt.query, tt.header)
 
 			g.Expect(params).To(G.HaveLen(tt.expectedCount), fmt.Sprintf("was %d", len(params)))
 
