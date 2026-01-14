@@ -732,6 +732,7 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 			Description: "Serves the generated OpenAPI 3.0 specification for this host.",
 			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
 				Get: &openapi.Operation{
+					Parameters: ko.ExtractParameters(path, "path=one&path=two", http.Header{}),
 					Responses: openapi.NewResponses(
 						openapi.WithName("200", &openapi.Response{
 							Content: openapi.NewContentWithSchema(
@@ -761,7 +762,14 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 		th.mu.RLock()
 		defer th.mu.RUnlock()
 
-		spec := ko.BuildOpenAPI(th.Name, th.registeredPaths)
+		paths := []string{}
+		queryParams := r.URL.Query()
+		pathParams := queryParams["path"]
+		if len(pathParams) > 0 {
+			paths = pathParams
+		}
+
+		spec := ko.BuildOpenAPI(th.Name, th.registeredPaths, paths)
 
 		jsonBytes, err := json.Marshal(spec)
 		if err != nil {

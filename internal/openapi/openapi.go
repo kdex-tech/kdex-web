@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
@@ -27,20 +28,28 @@ type PathInfo struct {
 	Type        PathType
 }
 
-func BuildOpenAPI(name string, registeredPaths map[string]PathInfo) *openapi.T {
+func BuildOpenAPI(name string, paths map[string]PathInfo, filterPaths []string) *openapi.T {
 	doc := &openapi.T{
-		OpenAPI: "3.0.0",
+		Components: &openapi.Components{
+			Schemas:         openapi.Schemas{},
+			SecuritySchemes: openapi.SecuritySchemes{},
+		},
 		Info: &openapi.Info{
 			Title:       fmt.Sprintf("KDex Host: %s", name),
 			Description: "Auto-generated OpenAPI specification for KDex Host",
 			Version:     "1.0.0",
 		},
-		Paths: &openapi.Paths{},
+		Paths:   &openapi.Paths{},
+		OpenAPI: "3.0.0",
 	}
 
-	for _, info := range registeredPaths {
+	for _, info := range paths {
 		path := toOpenAPIPath(info.API.Path)
 		if path == "" {
+			continue
+		}
+
+		if !slices.Contains(filterPaths, path) {
 			continue
 		}
 
@@ -100,6 +109,21 @@ func BuildOpenAPI(name string, registeredPaths map[string]PathInfo) *openapi.T {
 		}
 
 		doc.Paths.Set(path, pathItem)
+
+		for key, schema := range info.API.Schemas {
+			if !strings.HasPrefix(key, "#/components/schemas/") {
+				key = "#/components/schemas/" + key
+			}
+
+			_, found := doc.Components.Schemas[key]
+			if found {
+				key = key + "_conflict_" + GenerateNameFromPath(path, "")
+			}
+
+			doc.Components.Schemas[key] = &openapi.SchemaRef{
+				Value: &schema,
+			}
+		}
 	}
 
 	return doc
@@ -263,6 +287,27 @@ func ExtractParameters(path string, query string, header http.Header) openapi.Pa
 	}
 
 	return params
+}
+
+func GenerateNameFromPath(path string, headerName string) string {
+	if headerName != "" {
+		return headerName
+	}
+
+	cleanPath := strings.NewReplacer("{", "", "}", "", ".", "-", "$", "", " ", "-", "[", "", "]", "").Replace(path)
+	name := strings.ToLower(cleanPath)
+	name = strings.ReplaceAll(name, "/", "-")
+
+	// Collapse multiple dashes and trim
+	parts := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '-'
+	})
+	name = strings.Join(parts, "-")
+
+	if name == "" {
+		return "gen-root"
+	}
+	return "gen-" + name
 }
 
 func MergeOperations(dest, src *kdexv1alpha1.KDexOpenAPI) {

@@ -95,63 +95,6 @@ func TestRequestSniffer_calculatePath(t *testing.T) {
 	}
 }
 
-func TestRequestSniffer_generateName(t *testing.T) {
-	tests := []struct {
-		name       string
-		path       string
-		headerName string
-		existing   *kdexv1alpha1.KDexFunction
-		want       string
-	}{
-		{
-			name: "from simple path",
-			path: "/users",
-			want: "gen-users",
-		},
-		{
-			name: "from nested path",
-			path: "/api/v1/users",
-			want: "gen-api-v1-users",
-		},
-		{
-			name: "from pattern path",
-			path: "/users/{id}",
-			want: "gen-users-id",
-		},
-		{
-			name: "from wildcard pattern",
-			path: "/static/{path...}",
-			want: "gen-static-path",
-		},
-		{
-			name:       "from header name",
-			path:       "/users",
-			headerName: "custom-name",
-			want:       "custom-name",
-		},
-		{
-			name: "from existing name",
-			path: "/users",
-			existing: &kdexv1alpha1.KDexFunction{
-				ObjectMeta: metav1.ObjectMeta{Name: "existing-name"},
-			},
-			want: "existing-name",
-		},
-		{
-			name: "root path",
-			path: "/",
-			want: "gen-root",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &RequestSniffer{}
-			got := s.generateName(tt.path, tt.existing, tt.headerName)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestRequestSniffer_matchExisting(t *testing.T) {
 	items := []kdexv1alpha1.KDexFunction{
 		{

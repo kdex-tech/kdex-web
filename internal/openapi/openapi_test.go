@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	G "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_ExtractPathParameters(t *testing.T) {
@@ -131,6 +132,53 @@ func Test_ExtractPathParameters(t *testing.T) {
 				}
 				g.Expect(foundWildcard).To(G.BeTrue(), "Expected to find wildcard parameter description")
 			}
+		})
+	}
+}
+
+func Test_GenerateNameFromPath(t *testing.T) {
+	tests := []struct {
+		name       string
+		path       string
+		headerName string
+		want       string
+	}{
+		{
+			name: "from simple path",
+			path: "/users",
+			want: "gen-users",
+		},
+		{
+			name: "from nested path",
+			path: "/api/v1/users",
+			want: "gen-api-v1-users",
+		},
+		{
+			name: "from pattern path",
+			path: "/users/{id}",
+			want: "gen-users-id",
+		},
+		{
+			name: "from wildcard pattern",
+			path: "/static/{path...}",
+			want: "gen-static-path",
+		},
+		{
+			name:       "from header name",
+			path:       "/users",
+			headerName: "custom-name",
+			want:       "custom-name",
+		},
+		{
+			name: "root path",
+			path: "/",
+			want: "gen-root",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GenerateNameFromPath(tt.path, tt.headerName)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
