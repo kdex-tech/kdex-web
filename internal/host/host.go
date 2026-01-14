@@ -19,6 +19,7 @@ import (
 	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
+	"kdex.dev/web/internal/host/ico"
 	kdexhttp "kdex.dev/web/internal/http"
 	"kdex.dev/web/internal/page"
 )
@@ -1016,6 +1017,7 @@ func (th *HostHandler) messagePrinter(translations *Translations, tag language.T
 func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]PathInfo) *http.ServeMux {
 	mux := http.NewServeMux()
 
+	th.icoHandler(mux, registeredPaths)
 	th.navigationHandler(mux, registeredPaths)
 	th.translationHandler(mux, registeredPaths)
 	th.snifferHandler(mux, registeredPaths)
@@ -1032,6 +1034,34 @@ func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]PathInfo
 	return mux
 }
 
+func (th *HostHandler) icoHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
+	const path = "/favicon.ico"
+	favicon := ico.Ico{
+		Char: strings.ToUpper(th.host.BrandName[0:1]),
+	}
+	mux.HandleFunc("GET "+path, favicon.FaviconHandler)
+	registeredPaths[path] = PathInfo{
+		API: kdexv1alpha1.KDexOpenAPI{
+			Description: "A default Favicon",
+			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
+				Get: &openapi.Operation{
+					Responses: openapi.NewResponses(
+						openapi.WithName("200", &openapi.Response{
+							Content: openapi.NewContentWithSchema(
+								nil,
+								[]string{"image/svg+xml"},
+							),
+						}),
+					),
+				},
+			},
+			Path:    path,
+			Summary: "Request Sniffer Documentation",
+		},
+		Type: InternalPathType,
+	}
+}
+
 func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[string]PathInfo) {
 	if th.Sniffer != nil {
 		const path = "/~/sniffer/docs"
@@ -1042,6 +1072,7 @@ func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
 					Get: &openapi.Operation{
 						Parameters: th.extractParameters(path, ""),
+						Responses:  openapi.NewResponses(),
 					},
 				},
 				Path:    path,
@@ -1148,7 +1179,7 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 						openapi.WithName("200", &openapi.Response{
 							Description: openapi.Ptr("HTML navigation fragment"),
 							Content: openapi.NewContentWithSchema(
-								openapi.NewSchema().WithAnyAdditionalProperties(),
+								nil,
 								[]string{"text/html"},
 							),
 						}),

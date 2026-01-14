@@ -487,7 +487,7 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 				openapi.WithName("200", &openapi.Response{
 					Description: openapi.Ptr("Static content"),
 					Content: openapi.NewContentWithSchema(
-						openapi.NewSchema().WithAnyAdditionalProperties(),
+						nil,
 						[]string{"*/*"},
 					),
 				}),
