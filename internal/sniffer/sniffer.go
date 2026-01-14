@@ -299,6 +299,7 @@ func (s *RequestSniffer) mergeFunction(fn *kdexv1alpha1.KDexFunction, api kdexv1
 	}
 }
 
+// nolint:gocyclo
 func (s *RequestSniffer) parseRequestIntoAPI(r *http.Request, method string, patternPath string) kdexv1alpha1.KDexOpenAPIInternal {
 	api := kdexv1alpha1.KDexOpenAPIInternal{}
 
@@ -393,7 +394,8 @@ func (s *RequestSniffer) parseRequestIntoAPI(r *http.Request, method string, pat
 		schema := openapi.NewSchema()
 
 		// If it's form data, try to be specific about properties
-		if contentType == "application/x-www-form-urlencoded" {
+		switch contentType {
+		case "application/x-www-form-urlencoded":
 			_ = r.ParseForm()
 			schema.Type = &openapi.Types{"object"}
 			schema.Properties = make(openapi.Schemas)
@@ -402,7 +404,7 @@ func (s *RequestSniffer) parseRequestIntoAPI(r *http.Request, method string, pat
 					Value: openapi.NewStringSchema(),
 				}
 			}
-		} else if contentType == "application/json" {
+		case "application/json":
 			// Try to peek at the JSON to infer a basic schema
 			body, err := io.ReadAll(r.Body)
 			if err == nil {

@@ -770,7 +770,10 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write(jsonBytes)
+		_, err = w.Write(jsonBytes)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	})
 }
 

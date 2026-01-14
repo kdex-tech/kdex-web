@@ -212,8 +212,8 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		// we don't add page scripts here, because they are added by the pages
 	}
 
-	if internalHost.Spec.Backend.IsConfigured(defaultBackendServerImage) {
-		seenPaths[internalHost.Spec.Backend.IngressPath] = true
+	if internalHost.Spec.IsConfigured(defaultBackendServerImage) {
+		seenPaths[internalHost.Spec.IngressPath] = true
 		requiredBackends = append(requiredBackends, resolvedBackend{
 			Backend:   internalHost.Spec.Backend,
 			Kind:      "KDexHost",

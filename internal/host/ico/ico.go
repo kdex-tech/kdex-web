@@ -56,16 +56,18 @@ func (i *Ico) FaviconHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	svgContent := buf.Bytes()
-	svgBytes := []byte(svgContent)
 
 	// 3. Store and Serve
-	faviconCache.Store("favicon", svgBytes)
-	serveSVG(w, svgBytes)
+	faviconCache.Store("favicon", svgContent)
+	serveSVG(w, svgContent)
 }
 
 func serveSVG(w http.ResponseWriter, data []byte) {
 	// Note: We serve image/svg+xml even for the .ico path
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
-	w.Write(data)
+	_, err := w.Write(data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

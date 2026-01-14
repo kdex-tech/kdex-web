@@ -247,8 +247,7 @@ func ExtractParameters(path string, query string, header http.Header) openapi.Pa
 		if strings.HasPrefix(lowerName, "x-kdex-") || skipHeaders[lowerName] {
 			continue
 		}
-		var schema *openapi.Schema
-		schema = openapi.NewArraySchema()
+		schema := openapi.NewArraySchema()
 		schema.Items = openapi.NewSchemaRef("", openapi.NewStringSchema())
 
 		param := &openapi.Parameter{
