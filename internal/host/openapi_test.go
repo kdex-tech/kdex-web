@@ -16,13 +16,13 @@ import (
 func TestHostHandler_openapiHandler(t *testing.T) {
 	g := G.NewGomegaWithT(t)
 
-	th := NewHostHandler("test-host", "default", logr.Discard())
+	th := NewHostHandler(nil, "test-host", "default", logr.Discard())
 	th.SetHost(&kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
 		Routing: kdexv1alpha1.Routing{
 			Domains: []string{"test.example.com"},
 		},
-	}, nil, nil, nil, "", map[string]ko.PathInfo{})
+	}, nil, nil, nil, "", map[string]ko.PathInfo{}, nil)
 
 	mux := th.muxWithDefaultsLocked(th.registeredPaths) // registeredPaths is empty, but muxWithDefaultsLocked populates it for defaults
 
@@ -45,10 +45,10 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 	g.Expect(doc.Info.Title).To(G.Equal("KDex Host: test-host"))
 
 	// Check if paths are present
-	// We should see /~/openapi/ and /~/sniffer/docs at least (sniffer if sniffer != nil)
+	// We should see /~/openapi and /~/sniffer/docs at least (sniffer if sniffer != nil)
 	// th.Sniffer is nil in test-host unless we set it.
 
-	// Check /~/openapi/
+	// Check /~/openapi
 	pathItem := doc.Paths.Find("/~/openapi")
 	g.Expect(pathItem).NotTo(G.BeNil())
 	g.Expect(pathItem.Get).NotTo(G.BeNil())

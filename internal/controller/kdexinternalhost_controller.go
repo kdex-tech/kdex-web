@@ -37,7 +37,6 @@ import (
 	"kdex.dev/web/internal"
 	"kdex.dev/web/internal/host"
 	ko "kdex.dev/web/internal/openapi"
-	"kdex.dev/web/internal/sniffer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -85,17 +84,6 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	var internalHost kdexv1alpha1.KDexInternalHost
 	if err := r.Get(ctx, req.NamespacedName, &internalHost); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	if internalHost.Spec.DevMode {
-		r.HostHandler.Sniffer = &sniffer.RequestSniffer{
-			Client:      r.Client,
-			HostHandler: r.HostHandler,
-			Namespace:   r.ControllerNamespace,
-			HostName:    r.FocalHost,
-		}
-	} else {
-		r.HostHandler.Sniffer = nil
 	}
 
 	if internalHost.Status.Attributes == nil {
@@ -426,6 +414,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		uniqueScriptDefs,
 		importMap,
 		r.collectInitialPaths(requiredBackends, functions),
+		functions.Items,
 	)
 
 	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, requiredBackends)

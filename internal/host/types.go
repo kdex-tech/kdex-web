@@ -11,6 +11,7 @@ import (
 	"kdex.dev/web/internal/host/ico"
 	ko "kdex.dev/web/internal/openapi"
 	"kdex.dev/web/internal/page"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -30,6 +31,7 @@ type HostHandler struct {
 	Pages        *page.PageStore
 	Translations Translations
 
+	client                    client.Client
 	defaultLanguage           string
 	favicon                   *ico.Ico
 	host                      *kdexv1alpha1.KDexHostSpec
@@ -44,9 +46,9 @@ type HostHandler struct {
 	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 
-	Sniffer interface {
+	sniffer interface {
 		DocsHandler(w http.ResponseWriter, r *http.Request)
-		Sniff(r *http.Request) error
+		SniffThenCreateOrUpdate(c client.Client, r *http.Request) error
 	}
 }
 

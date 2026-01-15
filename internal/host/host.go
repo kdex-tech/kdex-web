@@ -20,12 +20,15 @@ import (
 	kdexhttp "kdex.dev/web/internal/http"
 	ko "kdex.dev/web/internal/openapi"
 	"kdex.dev/web/internal/page"
+	"kdex.dev/web/internal/sniffer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func NewHostHandler(name string, namespace string, log logr.Logger) *HostHandler {
+func NewHostHandler(c client.Client, name string, namespace string, log logr.Logger) *HostHandler {
 	th := &HostHandler{
 		Name:                      name,
 		Namespace:                 namespace,
+		client:                    c,
 		defaultLanguage:           "en",
 		log:                       log.WithValues("host", name),
 		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
@@ -489,9 +492,9 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mux.ServeHTTP(ew, r)
 
 	if ew.statusCode >= 400 {
-		if ew.statusCode == http.StatusNotFound && th.Sniffer != nil {
+		if ew.statusCode == http.StatusNotFound && th.sniffer != nil {
 			w.Header().Set("X-KDex-Sniffer-Docs", "/~/sniffer/docs")
-			if err := th.Sniffer.Sniff(r); err != nil {
+			if err := th.sniffer.SniffThenCreateOrUpdate(th.client, r); err != nil {
 				th.log.Error(err, "failed to sniff request", "path", r.URL.Path)
 			}
 		}
@@ -506,6 +509,7 @@ func (th *HostHandler) SetHost(
 	scripts []kdexv1alpha1.ScriptDef,
 	importmap string,
 	paths map[string]ko.PathInfo,
+	functions []kdexv1alpha1.KDexFunction,
 ) {
 	th.mu.Lock()
 	th.host = host
@@ -519,6 +523,18 @@ func (th *HostHandler) SetHost(
 	th.pathsCollectedInReconcile = paths
 	th.themeAssets = themeAssets
 	th.scripts = scripts
+
+	var snif *sniffer.RequestSniffer
+	if host.DevMode {
+		snif = &sniffer.RequestSniffer{
+			Functions:     functions,
+			Namespace:     th.Namespace,
+			HostName:      th.Name,
+			SecurityModes: th.SecurityModes(),
+		}
+	}
+
+	th.sniffer = snif
 	th.importmap = importmap
 	th.mu.Unlock()
 	th.RebuildMux()
@@ -858,9 +874,9 @@ func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 }
 
 func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if th.Sniffer != nil {
+	if th.sniffer != nil {
 		const path = "/~/sniffer/docs"
-		mux.HandleFunc("GET "+path, th.Sniffer.DocsHandler)
+		mux.HandleFunc("GET "+path, th.sniffer.DocsHandler)
 		registeredPaths[path] = ko.PathInfo{
 			API: kdexv1alpha1.KDexOpenAPI{
 				Description: "Provides Markdown documentation for the Request Sniffer's supported headers and behaviors.",

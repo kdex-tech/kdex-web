@@ -49,7 +49,7 @@ func BuildOpenAPI(name string, paths map[string]PathInfo, filterPaths []string) 
 			continue
 		}
 
-		if !slices.Contains(filterPaths, path) {
+		if len(filterPaths) > 0 && !slices.Contains(filterPaths, path) {
 			continue
 		}
 
