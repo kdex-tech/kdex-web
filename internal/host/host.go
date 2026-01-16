@@ -389,6 +389,8 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				th.serveError(w, r, http.StatusBadRequest, err.Error())
 				return
 			}
+			fmt.Fprint(w, "Sniffed!")
+			return
 		}
 		th.serveError(w, r, ew.statusCode, ew.statusMsg)
 	}
