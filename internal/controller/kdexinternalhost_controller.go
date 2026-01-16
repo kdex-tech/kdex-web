@@ -505,13 +505,11 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 		}
 
 		pathInfo := ko.PathInfo{
-			API: kdexv1alpha1.KDexOpenAPI{
+			API: ko.OpenAPI{
 				Description: description,
-				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-					Get: op,
-				},
-				Path:    wildcardPath,
-				Summary: summary,
+				Get:         op,
+				Path:        wildcardPath,
+				Summary:     summary,
 			},
 			Type: ko.BackendPathType,
 		}
@@ -520,8 +518,9 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 	}
 
 	for _, function := range functions.Items {
+		var o ko.OpenAPI
 		pathInfo := ko.PathInfo{
-			API:      function.Spec.API,
+			API:      *o.FromKDexAPI(&function.Spec.API),
 			Metadata: &function.Spec.Metadata.Metadata,
 			Type:     ko.FunctionPathType,
 		}

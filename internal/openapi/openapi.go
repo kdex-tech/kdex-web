@@ -28,10 +28,92 @@ type Filter struct {
 	Type  PathType
 }
 
+type OpenAPI struct {
+	Connect     *openapi.Operation
+	Delete      *openapi.Operation
+	Description string
+	Get         *openapi.Operation
+	Head        *openapi.Operation
+	Options     *openapi.Operation
+	Parameters  []openapi.Parameter
+	Path        string
+	Patch       *openapi.Operation
+	Post        *openapi.Operation
+	Put         *openapi.Operation
+	Schemas     map[string]openapi.Schema
+	Summary     string
+	Trace       *openapi.Operation
+}
+
+func (o *OpenAPI) FromKDexAPI(k *kdexv1alpha1.KDexOpenAPI) *OpenAPI {
+	return &OpenAPI{
+		Connect:     k.GetConnect(),
+		Delete:      k.GetDelete(),
+		Description: k.Description,
+		Get:         k.GetGet(),
+		Head:        k.GetHead(),
+		Options:     k.GetOptions(),
+		Parameters:  k.GetParameters(),
+		Path:        k.Path,
+		Patch:       k.GetPatch(),
+		Post:        k.GetPost(),
+		Put:         k.GetPut(),
+		Schemas:     k.GetSchemas(),
+		Summary:     k.Summary,
+		Trace:       k.GetTrace(),
+	}
+}
+
+func (o *OpenAPI) SetOperation(method string, op *openapi.Operation) {
+	switch method {
+	case "CONNECT":
+		o.Connect = op
+	case "DELETE":
+		o.Delete = op
+	case "GET":
+		o.Get = op
+	case "HEAD":
+		o.Head = op
+	case "OPTIONS":
+		o.Options = op
+	case "PATCH":
+		o.Patch = op
+	case "POST":
+		o.Post = op
+	case "PUT":
+		o.Put = op
+	case "TRACE":
+		o.Trace = op
+	}
+}
+
+func (o *OpenAPI) ToKDexAPI() *kdexv1alpha1.KDexOpenAPI {
+	k := &kdexv1alpha1.KDexOpenAPI{
+		Description:         o.Description,
+		KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{},
+		Path:                o.Path,
+		Summary:             o.Summary,
+	}
+
+	k.SetConnect(o.Connect)
+	k.SetDelete(o.Delete)
+	k.SetGet(o.Get)
+	k.SetHead(o.Head)
+	k.SetOptions(o.Options)
+	k.SetParameters(o.Parameters)
+	k.SetPatch(o.Patch)
+	k.SetPost(o.Post)
+	k.SetPut(o.Put)
+	k.SetSchemas(o.Schemas)
+	k.SetTrace(o.Trace)
+
+	return k
+}
+
 type PathType string
 
 type PathInfo struct {
-	API      kdexv1alpha1.KDexOpenAPI
+	API      OpenAPI
 	Metadata *kdexv1alpha1.Metadata
 	Type     PathType
 }
@@ -287,7 +369,9 @@ func ExtractParameters(path string, query string, header http.Header) openapi.Pa
 		"user-agent":                true,
 		"x-forwarded-for":           true,
 		"x-forwarded-host":          true,
+		"x-forwarded-port":          true,
 		"x-forwarded-proto":         true,
+		"x-forwarded-server":        true,
 		"x-real-ip":                 true,
 	}
 
@@ -372,7 +456,7 @@ func InferSchema(val any) *openapi.SchemaRef {
 	return schema.NewRef()
 }
 
-func MergeOperations(dest, src *kdexv1alpha1.KDexOpenAPI) {
+func MergeOperations(dest, src *OpenAPI) {
 	if src.Connect != nil {
 		dest.Connect = src.Connect
 	}
@@ -399,38 +483,6 @@ func MergeOperations(dest, src *kdexv1alpha1.KDexOpenAPI) {
 	}
 	if src.Trace != nil {
 		dest.Trace = src.Trace
-	}
-}
-
-func SetOperation(api *kdexv1alpha1.KDexOpenAPI, method string, op *openapi.Operation) {
-	if op == nil {
-		op = &openapi.Operation{}
-	}
-
-	// Extract and set parameters from the path if not already set
-	if op.Parameters == nil && api.Path != "" {
-		op.Parameters = ExtractParameters(api.Path, "", http.Header{})
-	}
-
-	switch strings.ToUpper(method) {
-	case "CONNECT":
-		api.Connect = op
-	case "DELETE":
-		api.Delete = op
-	case "GET":
-		api.Get = op
-	case "HEAD":
-		api.Head = op
-	case "OPTIONS":
-		api.Options = op
-	case "PATCH":
-		api.Patch = op
-	case "POST":
-		api.Post = op
-	case "PUT":
-		api.Put = op
-	case "TRACE":
-		api.Trace = op
 	}
 }
 
