@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"net/url"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -302,11 +303,6 @@ func (th *HostHandler) RebuildMux() {
 		return
 	}
 
-	type pageRender struct {
-		ph          page.PageHandler
-		l10nRenders map[string]string
-	}
-
 	renderedPages := []pageRender{}
 
 	for _, ph := range pageHandlers {
@@ -324,113 +320,7 @@ func (th *HostHandler) RebuildMux() {
 	th.mu.RUnlock()
 
 	for _, pr := range renderedPages {
-		ph := pr.ph
-		basePath := ph.BasePath()
-		l10nRenders := pr.l10nRenders
-
-		handler := func(w http.ResponseWriter, r *http.Request) {
-			rend := l10nRenders
-			name := ph.Name
-			bp := basePath
-
-			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			rendered, ok := rend[l.String()]
-
-			if !ok {
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-
-			th.log.V(1).Info("serving", "page", name, "basePath", bp, "language", l.String())
-
-			w.Header().Set("Content-Language", l.String())
-			w.Header().Set("Content-Type", "text/html")
-
-			_, err = w.Write([]byte(rendered))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		}
-
-		finalPath := basePath
-		if strings.HasSuffix(finalPath, "/") {
-			finalPath = finalPath + "{$}"
-		} else {
-			finalPath = finalPath + "/{$}"
-		}
-
-		mux.HandleFunc("GET "+finalPath, handler)
-		mux.HandleFunc("GET /{l10n}"+finalPath, handler)
-
-		th.registerPath(finalPath, ko.PathInfo{
-			API: kdexv1alpha1.KDexOpenAPI{
-				Description: fmt.Sprintf("Rendered HTML page for %s", ph.Label()),
-				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(finalPath, "", http.Header{}),
-					},
-				},
-				Path:    finalPath,
-				Summary: ph.Label(),
-			},
-			Type: ko.PagePathType,
-		}, registeredPaths)
-
-		l10nPath := "/{l10n}" + finalPath
-		th.registerPath(l10nPath, ko.PathInfo{
-			API: kdexv1alpha1.KDexOpenAPI{
-				Description: fmt.Sprintf("Localized rendered HTML page for %s", ph.Label()),
-				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(l10nPath, "", http.Header{}),
-					},
-				},
-				Path:    l10nPath,
-				Summary: fmt.Sprintf("%s (Localized)", ph.Label()),
-			},
-			Type: ko.PagePathType,
-		}, registeredPaths)
-
-		patternPath := ph.Page.PatternPath
-		l10nPatternPath := "/{l10n}" + patternPath
-
-		if patternPath != "" {
-			mux.HandleFunc("GET "+patternPath, handler)
-			mux.HandleFunc("GET "+l10nPatternPath, handler)
-
-			th.registerPath(patternPath, ko.PathInfo{
-				API: kdexv1alpha1.KDexOpenAPI{
-					Description: fmt.Sprintf("Rendered HTML page for %s using pattern %s", ph.Label(), patternPath),
-					KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-						Get: &openapi.Operation{
-							Parameters: ko.ExtractParameters(patternPath, "", http.Header{}),
-						},
-					},
-					Path:    patternPath,
-					Summary: ph.Label(),
-				},
-				Type: ko.PagePathType,
-			}, registeredPaths)
-
-			th.registerPath(l10nPatternPath, ko.PathInfo{
-				API: kdexv1alpha1.KDexOpenAPI{
-					Description: fmt.Sprintf("Localized rendered HTML page for %s using pattern %s", ph.Label(), l10nPatternPath),
-					KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
-						Get: &openapi.Operation{
-							Parameters: ko.ExtractParameters(l10nPatternPath, "", http.Header{}),
-						},
-					},
-					Path:    l10nPatternPath,
-					Summary: fmt.Sprintf("%s (Localized)", ph.Label()),
-				},
-				Type: ko.PagePathType,
-			}, registeredPaths)
-		}
+		th.addHandlerAndRegister(mux, pr, registeredPaths)
 	}
 
 	th.mu.Lock()
@@ -551,6 +441,102 @@ func (th *HostHandler) ThemeAssetsToString() string {
 	}
 
 	return buffer.String()
+}
+
+func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, registeredPaths map[string]ko.PathInfo) {
+	finalPath := toFinalPath(pr.ph.BasePath())
+	label := pr.ph.Label()
+
+	handler := th.pageHandlerFunc(finalPath, pr.ph.Name, pr.l10nRenders)
+
+	mux.HandleFunc("GET "+finalPath, handler)
+	mux.HandleFunc("GET /{l10n}"+finalPath, handler)
+
+	response := openapi.NewResponses(
+		openapi.WithStatus(200, &openapi.ResponseRef{
+			Value: &openapi.Response{
+				Content: openapi.Content{
+					"text/html": &openapi.MediaType{
+						Schema: &openapi.SchemaRef{
+							Value: &openapi.Schema{
+								Format: "html",
+								Type:   &openapi.Types{openapi.TypeString},
+							},
+						},
+					},
+				},
+			},
+		}),
+	)
+
+	th.registerPath(finalPath, ko.PathInfo{
+		API: kdexv1alpha1.KDexOpenAPI{
+			Description: fmt.Sprintf("Rendered HTML page for %s", label),
+			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
+				Get: &openapi.Operation{
+					Parameters: ko.ExtractParameters(finalPath, "", http.Header{}),
+					Responses:  response,
+				},
+			},
+			Path:    finalPath,
+			Summary: label,
+		},
+		Type: ko.PagePathType,
+	}, registeredPaths)
+
+	l10nPath := "/{l10n}" + finalPath
+	th.registerPath(l10nPath, ko.PathInfo{
+		API: kdexv1alpha1.KDexOpenAPI{
+			Description: fmt.Sprintf("Localized rendered HTML page for %s", label),
+			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
+				Get: &openapi.Operation{
+					Parameters: ko.ExtractParameters(l10nPath, "", http.Header{}),
+					Responses:  response,
+				},
+			},
+			Path:    l10nPath,
+			Summary: fmt.Sprintf("%s (Localized)", label),
+		},
+		Type: ko.PagePathType,
+	}, registeredPaths)
+
+	patternPath := pr.ph.Page.PatternPath
+	l10nPatternPath := "/{l10n}" + patternPath
+
+	if patternPath != "" {
+		mux.HandleFunc("GET "+patternPath, handler)
+		mux.HandleFunc("GET "+l10nPatternPath, handler)
+
+		th.registerPath(patternPath, ko.PathInfo{
+			API: kdexv1alpha1.KDexOpenAPI{
+				Description: fmt.Sprintf("Rendered HTML page for %s using pattern %s", label, patternPath),
+				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(patternPath, "", http.Header{}),
+						Responses:  response,
+					},
+				},
+				Path:    patternPath,
+				Summary: label,
+			},
+			Type: ko.PagePathType,
+		}, registeredPaths)
+
+		th.registerPath(l10nPatternPath, ko.PathInfo{
+			API: kdexv1alpha1.KDexOpenAPI{
+				Description: fmt.Sprintf("Localized rendered HTML page for %s using pattern %s", label, l10nPatternPath),
+				KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(l10nPatternPath, "", http.Header{}),
+						Responses:  response,
+					},
+				},
+				Path:    l10nPatternPath,
+				Summary: fmt.Sprintf("%s (Localized)", label),
+			},
+			Type: ko.PagePathType,
+		}, registeredPaths)
+	}
 }
 
 func (th *HostHandler) availableLanguages(translations *Translations) []string {
@@ -750,7 +736,7 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 			Description: "Serves the generated OpenAPI 3.0 specification for this host.",
 			KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
 				Get: &openapi.Operation{
-					Parameters: ko.ExtractParameters(path, "path=one&path=two", http.Header{}),
+					Parameters: ko.ExtractParameters(path, "path=one&path=two&tag=one&tag=two&type=one", http.Header{}),
 					Responses: openapi.NewResponses(
 						openapi.WithName("200", &openapi.Response{
 							Content: openapi.NewContentWithSchema(
@@ -780,14 +766,7 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 		th.mu.RLock()
 		defer th.mu.RUnlock()
 
-		paths := []string{}
-		queryParams := r.URL.Query()
-		pathParams := queryParams["path"]
-		if len(pathParams) > 0 {
-			paths = pathParams
-		}
-
-		spec := ko.BuildOpenAPI(th.Name, th.registeredPaths, paths)
+		spec := ko.BuildOpenAPI(th.Name, th.registeredPaths, filterFromQuery(r.URL.Query()))
 
 		jsonBytes, err := json.Marshal(spec)
 		if err != nil {
@@ -801,6 +780,37 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
+}
+
+func (th *HostHandler) pageHandlerFunc(
+	basePath string,
+	name string,
+	l10nRenders map[string]string,
+) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		rendered, ok := l10nRenders[l.String()]
+
+		if !ok {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		th.log.V(1).Info("serving", "page", name, "basePath", basePath, "language", l.String())
+
+		w.Header().Set("Content-Language", l.String())
+		w.Header().Set("Content-Type", "text/html")
+
+		_, err = w.Write([]byte(rendered))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
 }
 
 func (th *HostHandler) registerPath(path string, info ko.PathInfo, m map[string]ko.PathInfo) {
@@ -1035,4 +1045,44 @@ func (th *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, 
 
 	ko.SetOperation(&info.API, method, op)
 	th.registerPath(path, info, registeredPaths)
+}
+
+func filterFromQuery(queryParams url.Values) ko.Filter {
+	filter := ko.Filter{}
+
+	pathParams := queryParams["path"]
+	if len(pathParams) > 0 {
+		filter.Paths = pathParams
+	}
+
+	tagParams := queryParams["tag"]
+	if len(tagParams) > 0 {
+		filter.Tags = tagParams
+	}
+
+	typeParam := queryParams["type"]
+	if len(typeParam) > 0 {
+		t := strings.ToUpper(typeParam[0])
+
+		switch t {
+		case string(ko.BackendPathType):
+			filter.Type = ko.BackendPathType
+		case string(ko.FunctionPathType):
+			filter.Type = ko.FunctionPathType
+		case string(ko.InternalPathType):
+			filter.Type = ko.InternalPathType
+		case string(ko.PagePathType):
+			filter.Type = ko.PagePathType
+		}
+	}
+
+	return filter
+}
+
+func toFinalPath(path string) string {
+	if !strings.HasSuffix(path, "/") {
+		path = path + "/"
+	}
+	path = path + "{$}"
+	return path
 }

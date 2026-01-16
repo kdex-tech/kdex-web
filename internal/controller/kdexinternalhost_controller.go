@@ -521,8 +521,9 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 
 	for _, function := range functions.Items {
 		pathInfo := ko.PathInfo{
-			API:  function.Spec.API,
-			Type: ko.FunctionPathType,
+			API:      function.Spec.API,
+			Metadata: &function.Spec.Metadata.Metadata,
+			Type:     ko.FunctionPathType,
 		}
 
 		initialPaths[function.Spec.API.Path] = pathInfo

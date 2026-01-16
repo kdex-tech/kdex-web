@@ -19,6 +19,7 @@ const (
 	name="kdex-ui"
 	data-page-basepath="%s"
 	data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
+	data-openapi-endpoint="/~/openapi"
 	data-page-patternpath="%s"
 	/>
 	`
@@ -98,4 +99,9 @@ func (ew *errorResponseWriter) WriteHeader(code int) {
 	}
 	ew.wroteHeader = true
 	ew.ResponseWriter.WriteHeader(code)
+}
+
+type pageRender struct {
+	ph          page.PageHandler
+	l10nRenders map[string]string
 }

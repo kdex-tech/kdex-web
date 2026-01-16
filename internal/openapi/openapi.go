@@ -2,9 +2,11 @@ package openapi
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
@@ -20,15 +22,21 @@ const (
 
 var wildcardRegex = regexp.MustCompile(`\.\.\.\}`)
 
+type Filter struct {
+	Paths []string
+	Tags  []string
+	Type  PathType
+}
+
 type PathType string
 
 type PathInfo struct {
-	API         kdexv1alpha1.KDexOpenAPI
-	Secondaries []string
-	Type        PathType
+	API      kdexv1alpha1.KDexOpenAPI
+	Metadata *kdexv1alpha1.Metadata
+	Type     PathType
 }
 
-func BuildOpenAPI(name string, paths map[string]PathInfo, filterPaths []string) *openapi.T {
+func BuildOpenAPI(name string, paths map[string]PathInfo, filter Filter) *openapi.T {
 	doc := &openapi.T{
 		Components: &openapi.Components{
 			Schemas:         openapi.Schemas{},
@@ -43,19 +51,34 @@ func BuildOpenAPI(name string, paths map[string]PathInfo, filterPaths []string) 
 		OpenAPI: "3.0.0",
 	}
 
-	for _, info := range paths {
-		path := toOpenAPIPath(info.API.Path)
+	keys := slices.Collect(maps.Keys(paths))
+
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] < keys[j]
+	})
+
+	for _, key := range keys {
+		pathInfo := paths[key]
+
+		path := toOpenAPIPath(pathInfo.API.Path)
 		if path == "" {
 			continue
 		}
 
-		if len(filterPaths) > 0 && !slices.Contains(filterPaths, path) {
+		if !matchFilter(path, pathInfo, filter) {
 			continue
 		}
 
 		pathItem := &openapi.PathItem{
-			Summary:     info.API.Summary,
-			Description: info.API.Description,
+			Description: pathInfo.API.Description,
+			Summary:     pathInfo.API.Summary,
+			Extensions: map[string]any{
+				"x-kdex-type": pathInfo.Type,
+			},
+		}
+
+		if pathInfo.Metadata != nil {
+			pathItem.Extensions["x-kdex-metadata"] = pathInfo.Metadata
 		}
 
 		// Fill path item operations
@@ -64,53 +87,53 @@ func BuildOpenAPI(name string, paths map[string]PathInfo, filterPaths []string) 
 				return
 			}
 			if op.Summary == "" {
-				op.Summary = info.API.Summary
+				op.Summary = pathInfo.API.Summary
 			}
 			if op.Description == "" {
-				op.Description = info.API.Description
+				op.Description = pathInfo.API.Description
 			}
 		}
 
-		if info.API.Get != nil {
-			ensureOpMetadata(info.API.Get)
-			pathItem.Get = info.API.Get
+		if pathInfo.API.Get != nil {
+			ensureOpMetadata(pathInfo.API.Get)
+			pathItem.Get = pathInfo.API.Get
 		}
-		if info.API.Put != nil {
-			ensureOpMetadata(info.API.Put)
-			pathItem.Put = info.API.Put
+		if pathInfo.API.Put != nil {
+			ensureOpMetadata(pathInfo.API.Put)
+			pathItem.Put = pathInfo.API.Put
 		}
-		if info.API.Post != nil {
-			ensureOpMetadata(info.API.Post)
-			pathItem.Post = info.API.Post
+		if pathInfo.API.Post != nil {
+			ensureOpMetadata(pathInfo.API.Post)
+			pathItem.Post = pathInfo.API.Post
 		}
-		if info.API.Delete != nil {
-			ensureOpMetadata(info.API.Delete)
-			pathItem.Delete = info.API.Delete
+		if pathInfo.API.Delete != nil {
+			ensureOpMetadata(pathInfo.API.Delete)
+			pathItem.Delete = pathInfo.API.Delete
 		}
-		if info.API.Options != nil {
-			ensureOpMetadata(info.API.Options)
-			pathItem.Options = info.API.Options
+		if pathInfo.API.Options != nil {
+			ensureOpMetadata(pathInfo.API.Options)
+			pathItem.Options = pathInfo.API.Options
 		}
-		if info.API.Head != nil {
-			ensureOpMetadata(info.API.Head)
-			pathItem.Head = info.API.Head
+		if pathInfo.API.Head != nil {
+			ensureOpMetadata(pathInfo.API.Head)
+			pathItem.Head = pathInfo.API.Head
 		}
-		if info.API.Patch != nil {
-			ensureOpMetadata(info.API.Patch)
-			pathItem.Patch = info.API.Patch
+		if pathInfo.API.Patch != nil {
+			ensureOpMetadata(pathInfo.API.Patch)
+			pathItem.Patch = pathInfo.API.Patch
 		}
-		if info.API.Trace != nil {
-			ensureOpMetadata(info.API.Trace)
-			pathItem.Trace = info.API.Trace
+		if pathInfo.API.Trace != nil {
+			ensureOpMetadata(pathInfo.API.Trace)
+			pathItem.Trace = pathInfo.API.Trace
 		}
-		if info.API.Connect != nil {
-			ensureOpMetadata(info.API.Connect)
-			pathItem.Connect = info.API.Connect
+		if pathInfo.API.Connect != nil {
+			ensureOpMetadata(pathInfo.API.Connect)
+			pathItem.Connect = pathInfo.API.Connect
 		}
 
 		doc.Paths.Set(path, pathItem)
 
-		for key, schema := range info.API.Schemas {
+		for key, schema := range pathInfo.API.Schemas {
 			if !strings.HasPrefix(key, "#/components/schemas/") {
 				key = "#/components/schemas/" + key
 			}
@@ -130,6 +153,8 @@ func BuildOpenAPI(name string, paths map[string]PathInfo, filterPaths []string) 
 }
 
 func ExtractParameters(path string, query string, header http.Header) openapi.Parameters {
+	path = strings.ReplaceAll(path, "{$}", "")
+
 	var params openapi.Parameters
 
 	// Regular expression to match path parameters: {name} or {name...}
@@ -409,6 +434,26 @@ func SetOperation(api *kdexv1alpha1.KDexOpenAPI, method string, op *openapi.Oper
 	}
 }
 
+func matchFilter(path string, info PathInfo, filter Filter) bool {
+	if len(filter.Paths) > 0 && !slices.Contains(filter.Paths, path) {
+		return false
+	}
+
+	if len(filter.Tags) > 0 {
+		for _, tag := range filter.Tags {
+			if !slices.Contains(info.Metadata.Tags, tag) {
+				return false
+			}
+		}
+	}
+
+	if filter.Type != "" && info.Type != filter.Type {
+		return false
+	}
+
+	return true
+}
+
 func toOpenAPIPath(path string) string {
-	return wildcardRegex.ReplaceAllString(path, "}")
+	return strings.ReplaceAll(wildcardRegex.ReplaceAllString(path, "}"), "{$}", "")
 }
