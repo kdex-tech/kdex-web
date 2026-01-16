@@ -289,9 +289,9 @@ func ExtractParameters(path string, query string, header http.Header) openapi.Pa
 	return params
 }
 
-func GenerateNameFromPath(path string, headerName string) string {
-	if headerName != "" {
-		return headerName
+func GenerateNameFromPath(path string, headerValue string) string {
+	if headerValue != "" {
+		return headerValue
 	}
 
 	cleanPath := strings.NewReplacer("{", "", "}", "", ".", "-", "$", "", " ", "-", "[", "", "]", "").Replace(path)
@@ -308,6 +308,43 @@ func GenerateNameFromPath(path string, headerName string) string {
 		return "gen-root"
 	}
 	return "gen-" + name
+}
+
+func GenerateOperationID(name string, method string, headerValue string) string {
+	if headerValue != "" {
+		return headerValue
+	}
+	return fmt.Sprintf("%s-%s", name, strings.ToLower(method))
+}
+
+func InferSchema(val any) *openapi.SchemaRef {
+	schema := openapi.NewSchema()
+
+	switch v := val.(type) {
+	case string:
+		schema.Type = &openapi.Types{openapi.TypeString}
+	case bool:
+		schema.Type = &openapi.Types{openapi.TypeBoolean}
+	case float64:
+		// JSON unmarshals all numbers as float64 by default
+		schema.Type = &openapi.Types{openapi.TypeNumber}
+	case map[string]any:
+		schema.Type = &openapi.Types{openapi.TypeObject}
+		schema.Properties = make(openapi.Schemas)
+		for key, subVal := range v {
+			schema.Properties[key] = InferSchema(subVal)
+		}
+	case []any:
+		schema.Type = &openapi.Types{openapi.TypeArray}
+		if len(v) > 0 {
+			// Infer item type from the first element
+			schema.Items = InferSchema(v[0])
+		}
+	case nil:
+		schema.Nullable = true
+	}
+
+	return schema.NewRef()
 }
 
 func MergeOperations(dest, src *kdexv1alpha1.KDexOpenAPI) {

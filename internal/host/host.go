@@ -496,6 +496,8 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("X-KDex-Sniffer-Docs", "/~/sniffer/docs")
 			if err := th.sniffer.SniffThenCreateOrUpdate(th.client, r); err != nil {
 				th.log.Error(err, "failed to sniff request", "path", r.URL.Path)
+				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				return
 			}
 		}
 		th.serveError(w, r, ew.statusCode, ew.statusMsg)
