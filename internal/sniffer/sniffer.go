@@ -35,6 +35,7 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
 
 - **X-KDex-Function-Deprecated**: Set to "true" to mark the operation as deprecated.
 - **X-KDex-Function-Description**: Sets the OpenAPI operation description.
+- **X-KDex-Function-Keep-Schema-Conflict**: Tells OpenAPI to keep conflicting under a special no-conflict key. Diagnostic feature.
 - **X-KDex-Function-Name**: Specifies the name for the generated KDexFunction CR (standard Kubernetes naming rules apply).
 - **X-KDex-Function-Operation-ID**: Sets a specific operationId in OpenAPI.
 - **X-KDex-Function-Overwrite-Operation**: Set to "true" to overwrite an operation which is an exact match. Normally this would be rejected for satefy.
@@ -42,6 +43,8 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
   - Must start with "/"
   - Must NOT contain a method (e.g. use "/users/{id}" not "GET /users/{id}")
   - Variables are supported: "{name}", "{path...}"
+- **X-KDex-Function-Request-Schema-Ref**: Sets the OpenAPI operation request body schema reference. (e.g. "Foo" or "#/components/schemas/Foo", result is always prefixed by "#/components/schemas/")
+- **X-KDex-Function-Response-Schema-Ref**: Sets the OpenAPI operation response schema reference. (e.g. "Foo" or "#/components/schemas/Foo", result is always prefixed by "#/components/schemas/")
 - **X-KDex-Function-Summary**: Sets the OpenAPI operation summary.
 - **X-KDex-Function-Tags**: Comma-separated list of tags for the OpenAPI operation.
 
@@ -116,6 +119,7 @@ func (s *RequestSniffer) SniffThenCreateOrUpdate(c client.Client, r *http.Reques
 	log.V(2).Info(
 		"sniffed function",
 		"fnMutated", fnMutated,
+		"fn", fn,
 		"op", op,
 		"err", err,
 	)
