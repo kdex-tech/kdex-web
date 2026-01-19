@@ -389,7 +389,14 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				th.serveError(w, r, http.StatusBadRequest, err.Error())
 				return
 			}
-			fmt.Fprint(w, "Sniffed!")
+
+			if r.Method == "HEAD" || r.Method == "CONNECT" {
+				w.Header().Set("Content-Length", "0")
+				w.WriteHeader(http.StatusOK)
+			} else {
+				fmt.Fprint(w, "Sniffed!")
+			}
+
 			return
 		}
 		th.serveError(w, r, ew.statusCode, ew.statusMsg)
