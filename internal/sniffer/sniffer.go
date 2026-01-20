@@ -44,8 +44,8 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
   - Must start with "/"
   - Must NOT contain a method (e.g. use "/users/{id}" not "GET /users/{id}")
   - Variables are supported: "{name}", "{path...}"
-- **X-KDex-Function-Request-Schema-Ref**: Sets the OpenAPI operation request body schema reference. (e.g. "Foo" or "#/components/schemas/Foo")
-- **X-KDex-Function-Response-Schema-Ref**: Sets the OpenAPI operation response schema reference. (e.g. "Foo" or "#/components/schemas/Foo")
+- **X-KDex-Function-Request-Schema-Ref**: Sets the OpenAPI operation request body schema reference. (e.g. "Foo", "#/components/schemas/Foo" or a URL to an external schema)
+- **X-KDex-Function-Response-Schema-Ref**: Sets the OpenAPI operation response schema reference. (e.g. "Foo", "#/components/schemas/Foo" or a URL to an external schema)
 - **X-KDex-Function-Summary**: Sets the OpenAPI operation summary.
 - **X-KDex-Function-Tags**: Comma-separated list of tags for the OpenAPI operation.
 
@@ -65,6 +65,8 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
 *Note: The sniffer only processes non-internal paths (paths not starting with "/~") that result in a 404.*
 `
 )
+
+var urlSchemeRegex regexp.Regexp = *regexp.MustCompile("^https?://.*")
 
 type AnalysisResult struct {
 	OriginalRequest *http.Request
@@ -316,17 +318,26 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 
 	if r.Header.Get("X-KDex-Function-Response-Schema-Ref") != "" {
 		ref := r.Header.Get("X-KDex-Function-Response-Schema-Ref")
-		if !strings.HasPrefix(ref, "#/components/schemas/") {
+		responseSchemaIsExternal := urlSchemeRegex.MatchString(ref)
+
+		if !responseSchemaIsExternal &&
+			!strings.HasPrefix(ref, "http") && !strings.HasPrefix(ref, "#/components/schemas/") {
+
 			ref = "#/components/schemas/" + ref
 		}
 		responseSchemaRef = ref
 	}
 
 	requestSchemaRef := ""
+	requestSchemaIsExternal := false
 
 	if r.Header.Get("X-KDex-Function-Request-Schema-Ref") != "" {
 		ref := r.Header.Get("X-KDex-Function-Request-Schema-Ref")
-		if !strings.HasPrefix(ref, "#/components/schemas/") {
+		requestSchemaIsExternal := urlSchemeRegex.MatchString(ref)
+
+		if !requestSchemaIsExternal &&
+			!strings.HasPrefix(ref, "#/components/schemas/") {
+
 			ref = "#/components/schemas/" + ref
 		}
 		requestSchemaRef = ref
@@ -339,13 +350,13 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 
 		var schema *openapi.SchemaRef
 
-		if responseSchemaRef == "" {
+		if responseSchemaRef != "" {
 			schema = &openapi.SchemaRef{
-				Value: openapi.NewSchema(),
+				Ref: responseSchemaRef,
 			}
 		} else {
 			schema = &openapi.SchemaRef{
-				Ref: responseSchemaRef,
+				Value: openapi.NewSchema(),
 			}
 		}
 
@@ -399,125 +410,127 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 	var body io.Reader = r.Body
 
 	if r.ContentLength > 0 || r.Header.Get("Content-Type") != "" {
-		var encoding map[string]*openapi.Encoding
-		schema := openapi.NewSchema()
-
 		contentType := strings.Split(r.Header.Get("Content-Type"), ";")[0]
-		if contentType == "" {
-			var err error
-			var mt *mimetype.MIME
-			mt, body, err = mime.Detect(body)
+		schema := openapi.NewSchema()
+		var encoding map[string]*openapi.Encoding
 
-			if err != nil {
-				return nil, nil, err
-			}
+		if !requestSchemaIsExternal {
+			if contentType == "" {
+				var err error
+				var mt *mimetype.MIME
+				mt, body, err = mime.Detect(body)
 
-			contentType = mt.String()
-		}
-
-		switch contentType {
-		case "application/octet-stream":
-			schema.Type = &openapi.Types{openapi.TypeString}
-			schema.Format = "binary"
-		case "multipart/form-data":
-			mr, err := r.MultipartReader()
-			if err != nil {
-				return nil, nil, err
-			}
-
-			schema.Type = &openapi.Types{openapi.TypeObject}
-			schema.Properties = openapi.Schemas{}
-			encoding = map[string]*openapi.Encoding{}
-
-			for {
-				part, err := mr.NextPart()
-				if err == io.EOF {
-					break
-				}
 				if err != nil {
 					return nil, nil, err
 				}
 
-				fieldName := part.FormName()
-
-				_, isArray := schema.Properties[fieldName]
-
-				if part.FileName() == "" {
-					if isArray {
-						schema.Properties[fieldName] = &openapi.SchemaRef{
-							Value: &openapi.Schema{
-								Type:  &openapi.Types{openapi.TypeArray},
-								Items: openapi.NewStringSchema().NewRef(),
-							},
-						}
-					} else {
-						schema.Properties[fieldName] = openapi.NewStringSchema().NewRef()
-					}
-				} else {
-					if isArray {
-						schema.Properties[fieldName] = &openapi.SchemaRef{
-							Value: &openapi.Schema{
-								Type: &openapi.Types{openapi.TypeArray},
-								Items: &openapi.SchemaRef{
-									Value: &openapi.Schema{
-										Type:   &openapi.Types{openapi.TypeString},
-										Format: "binary",
-									},
-								},
-							},
-						}
-						continue // no need to parse out the content type again
-					} else {
-						schema.Properties[fieldName] = &openapi.SchemaRef{
-							Value: &openapi.Schema{
-								Format: "binary",
-								Type:   &openapi.Types{openapi.TypeString},
-							},
-						}
-					}
-
-					partContentType := part.Header.Get("Content-Type")
-
-					if partContentType == "" || partContentType == "application/octet-stream" {
-						var err error
-						var mt *mimetype.MIME
-						mt, _, err = mime.Detect(part)
-
-						if err != nil {
-							return nil, nil, err
-						}
-
-						partContentType = mt.String()
-					}
-
-					encoding[fieldName] = &openapi.Encoding{
-						ContentType: partContentType,
-					}
-				}
+				contentType = mt.String()
 			}
-		case "application/x-www-form-urlencoded":
-			_ = r.ParseForm()
-			schema.Type = &openapi.Types{openapi.TypeObject}
-			schema.Properties = openapi.Schemas{}
-			for name := range r.PostForm {
-				schema.Properties[name] = &openapi.SchemaRef{
-					Value: openapi.NewStringSchema(),
-				}
-			}
-		}
 
-		if isJSON(contentType) {
-			bytes, err := io.ReadAll(body)
-			if err == nil {
-				// Restore body for any subsequent uses
-				body = io.NopCloser(strings.NewReader(string(bytes)))
-
-				var data any
-				if err := json.Unmarshal(bytes, &data); err != nil {
+			switch contentType {
+			case "application/octet-stream":
+				schema.Type = &openapi.Types{openapi.TypeString}
+				schema.Format = "binary"
+			case "multipart/form-data":
+				mr, err := r.MultipartReader()
+				if err != nil {
 					return nil, nil, err
 				}
 
-				schema = ko.InferSchema(data).Value
+				schema.Type = &openapi.Types{openapi.TypeObject}
+				schema.Properties = openapi.Schemas{}
+				encoding = map[string]*openapi.Encoding{}
+
+				for {
+					part, err := mr.NextPart()
+					if err == io.EOF {
+						break
+					}
+					if err != nil {
+						return nil, nil, err
+					}
+
+					fieldName := part.FormName()
+
+					_, isArray := schema.Properties[fieldName]
+
+					if part.FileName() == "" {
+						if isArray {
+							schema.Properties[fieldName] = &openapi.SchemaRef{
+								Value: &openapi.Schema{
+									Type:  &openapi.Types{openapi.TypeArray},
+									Items: openapi.NewStringSchema().NewRef(),
+								},
+							}
+						} else {
+							schema.Properties[fieldName] = openapi.NewStringSchema().NewRef()
+						}
+					} else {
+						if isArray {
+							schema.Properties[fieldName] = &openapi.SchemaRef{
+								Value: &openapi.Schema{
+									Type: &openapi.Types{openapi.TypeArray},
+									Items: &openapi.SchemaRef{
+										Value: &openapi.Schema{
+											Type:   &openapi.Types{openapi.TypeString},
+											Format: "binary",
+										},
+									},
+								},
+							}
+							continue // no need to parse out the content type again
+						} else {
+							schema.Properties[fieldName] = &openapi.SchemaRef{
+								Value: &openapi.Schema{
+									Format: "binary",
+									Type:   &openapi.Types{openapi.TypeString},
+								},
+							}
+						}
+
+						partContentType := part.Header.Get("Content-Type")
+
+						if partContentType == "" || partContentType == "application/octet-stream" {
+							var err error
+							var mt *mimetype.MIME
+							mt, _, err = mime.Detect(part)
+
+							if err != nil {
+								return nil, nil, err
+							}
+
+							partContentType = mt.String()
+						}
+
+						encoding[fieldName] = &openapi.Encoding{
+							ContentType: partContentType,
+						}
+					}
+				}
+			case "application/x-www-form-urlencoded":
+				_ = r.ParseForm()
+				schema.Type = &openapi.Types{openapi.TypeObject}
+				schema.Properties = openapi.Schemas{}
+				for name := range r.PostForm {
+					schema.Properties[name] = &openapi.SchemaRef{
+						Value: openapi.NewStringSchema(),
+					}
+				}
+			}
+
+			if isJSON(contentType) {
+				bytes, err := io.ReadAll(body)
+				if err == nil {
+					// Restore body for any subsequent uses
+					body = io.NopCloser(strings.NewReader(string(bytes)))
+
+					var data any
+					if err := json.Unmarshal(bytes, &data); err != nil {
+						return nil, nil, err
+					}
+
+					schema = ko.InferSchema(data).Value
+				}
 			}
 		}
 
@@ -536,7 +549,10 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 			schemaRef = &openapi.SchemaRef{
 				Ref: requestSchemaRef,
 			}
-			schemas[(ko.StripSchemaPrefix(requestSchemaRef))] = *schema
+
+			if !requestSchemaIsExternal {
+				schemas[(ko.StripSchemaPrefix(requestSchemaRef))] = *schema
+			}
 		} else {
 			schemaRef = &openapi.SchemaRef{
 				Value: schema,
