@@ -1052,6 +1052,41 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			},
 		},
 		{
+			name: "external request schema override",
+			r: func() *http.Request {
+				r := httptest.NewRequest("PATCH", "/test", strings.NewReader(`[{"op": "replace", "path": "/email", "value": "john@fix.buz"}]`))
+				r.Header.Set("X-KDex-Function-Request-Schema-Ref", "https://json.schemastore.org/json-patch")
+				r.Header.Set("Content-Type", "application/json-patch+json")
+				return r
+			}(),
+			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]openapi.Schema, err error) {
+				assert.NotNil(t, op)
+				assert.NotNil(t, op.RequestBody)
+				content := op.RequestBody.Value.Content["application/json-patch+json"]
+				assert.NotNil(t, content)
+				assert.Equal(t, "https://json.schemastore.org/json-patch", content.Schema.Ref)
+				assert.Equal(t, 0, len(schemas))
+			},
+		},
+		{
+			name: "external response schema override",
+			r: func() *http.Request {
+				r := httptest.NewRequest("GET", "/test", http.NoBody)
+				r.Header.Set("X-KDex-Function-Response-Schema-Ref", "https://json.schemastore.org/json-patch")
+				r.Header.Set("Accept", "application/json-patch+json")
+				return r
+			}(),
+			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]openapi.Schema, err error) {
+				assert.NotNil(t, op)
+				resp := op.Responses.Value("200")
+				assert.NotNil(t, resp)
+				content := resp.Value.Content["application/json-patch+json"]
+				assert.NotNil(t, content)
+				assert.Equal(t, "https://json.schemastore.org/json-patch", content.Schema.Ref)
+				assert.Equal(t, 0, len(schemas))
+			},
+		},
+		{
 			name: "CONNECT /test",
 			r: func() *http.Request {
 				r := httptest.NewRequest("CONNECT", "/test", http.NoBody)

@@ -333,7 +333,7 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 
 	if r.Header.Get("X-KDex-Function-Request-Schema-Ref") != "" {
 		ref := r.Header.Get("X-KDex-Function-Request-Schema-Ref")
-		requestSchemaIsExternal := urlSchemeRegex.MatchString(ref)
+		requestSchemaIsExternal = urlSchemeRegex.MatchString(ref)
 
 		if !requestSchemaIsExternal &&
 			!strings.HasPrefix(ref, "#/components/schemas/") {
