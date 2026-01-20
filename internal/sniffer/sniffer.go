@@ -163,7 +163,7 @@ func (s *RequestSniffer) analyze(r *http.Request) (*AnalysisResult, error) {
 
 		// Run vacuum linter
 		spec := ko.BuildOneOff(ko.Host(r), fn)
-		specBytes, err := json.Marshal(spec)
+		specBytes, err := json.MarshalIndent(spec, "", "  ")
 		if err == nil {
 			lintResults, err := linter.LintSpec(specBytes)
 			if err == nil {
