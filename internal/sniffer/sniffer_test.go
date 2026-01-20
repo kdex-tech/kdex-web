@@ -419,7 +419,7 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
 				schemas := fn.Spec.API.GetSchemas()
 
-				s, ok := schemas["#/components/schemas/User"]
+				s, ok := schemas["User"]
 				assert.Equal(t, true, ok)
 				assert.Equal(t, &openapi.Types{openapi.TypeObject}, s.Type)
 			},
@@ -431,7 +431,7 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 					API: kdexv1alpha1.KDexOpenAPI{
 						KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{
 							Schemas: rawM(map[string]openapi.Schema{
-								"#/components/schemas/User": {
+								"User": {
 									Description: "Existing User",
 									Type:        &openapi.Types{openapi.TypeObject},
 								},
@@ -442,7 +442,7 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 			},
 			op: &openapi.Operation{},
 			schemas: map[string]openapi.Schema{
-				"#/components/schemas/User": {
+				"User": {
 					Description: "Conflicting User",
 					Type:        &openapi.Types{openapi.TypeObject},
 				},
@@ -452,12 +452,12 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
 				schemas := fn.Spec.API.GetSchemas()
 
-				s, ok := schemas["#/components/schemas/User"]
+				s, ok := schemas["User"]
 				assert.Equal(t, true, ok)
 				assert.Equal(t, "Existing User", s.Description)
 				assert.Equal(t, 2, len(fn.Spec.API.Schemas))
 
-				s2, ok := schemas["#/components/schemas/User_conflict_"+ko.GenerateNameFromPath(fn.Spec.API.Path, "")]
+				s2, ok := schemas["User:conflict:"+ko.GenerateNameFromPath(fn.Spec.API.Path, "")]
 				assert.Equal(t, true, ok)
 				assert.Equal(t, "Conflicting User", s2.Description)
 			},
@@ -558,9 +558,10 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				assert.Equal(t, "gen-foo-get", op.OperationID)
 				assert.Equal(t, 1, op.Responses.Len())
-				assert.NotNil(t, op.Responses.Default())
-				assert.Equal(t, openapi.Ptr("Successful response"), op.Responses.Default().Value.Description)
-				assert.Equal(t, 0, len(op.Responses.Default().Value.Content))
+				resp := op.Responses.Value("200")
+				assert.NotNil(t, resp)
+				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
+				assert.Equal(t, 0, len(resp.Value.Content))
 			},
 		},
 		{
@@ -574,9 +575,10 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				assert.Equal(t, "gen-foo-get", op.OperationID)
 				assert.Equal(t, 1, op.Responses.Len())
-				assert.NotNil(t, op.Responses.Default())
-				assert.Equal(t, "Successful response", *op.Responses.Default().Value.Description)
-				assert.Equal(t, 0, len(op.Responses.Default().Value.Content))
+				resp := op.Responses.Value("200")
+				assert.NotNil(t, resp)
+				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
+				assert.Equal(t, 0, len(resp.Value.Content))
 			},
 		},
 		{
@@ -590,9 +592,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				assert.Equal(t, "gen-foo-get", op.OperationID)
 				assert.Equal(t, 1, op.Responses.Len())
-
-				resp := op.Responses.Default()
-
+				resp := op.Responses.Value("200")
 				assert.NotNil(t, resp)
 				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
 				assert.Equal(t, 1, len(resp.Value.Content))
@@ -612,9 +612,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				assert.Equal(t, "gen-foo-get", op.OperationID)
 				assert.Equal(t, 1, op.Responses.Len())
-
-				resp := op.Responses.Default()
-
+				resp := op.Responses.Value("200")
 				assert.NotNil(t, resp)
 				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
 				assert.Equal(t, 1, len(resp.Value.Content))
@@ -675,7 +673,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]openapi.Schema, err error) {
 				expected := openapi.Schema{
-					Type: &openapi.Types{openapi.TypeObject},
+					Description: "[KDex Sniffer] inferred from request body",
+					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"name": &openapi.SchemaRef{
 							Value: &openapi.Schema{
@@ -750,7 +749,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]openapi.Schema, err error) {
 				expected := openapi.Schema{
-					Type: &openapi.Types{openapi.TypeObject},
+					Description: "[KDex Sniffer] inferred from request body",
+					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"name": &openapi.SchemaRef{
 							Value: &openapi.Schema{
@@ -812,8 +812,9 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]openapi.Schema, err error) {
 				expected := openapi.Schema{
-					Type:   &openapi.Types{openapi.TypeString},
-					Format: "binary",
+					Description: "[KDex Sniffer] inferred from request body",
+					Type:        &openapi.Types{openapi.TypeString},
+					Format:      "binary",
 				}
 
 				assert.NotNil(t, op)
@@ -837,7 +838,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]openapi.Schema, err error) {
 				expected := openapi.Schema{
-					Type: &openapi.Types{openapi.TypeObject},
+					Description: "[KDex Sniffer] inferred from request body",
+					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"name": &openapi.SchemaRef{
 							Value: &openapi.Schema{
@@ -880,7 +882,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]openapi.Schema, err error) {
 				expectedSchema := openapi.Schema{
-					Type: &openapi.Types{openapi.TypeObject},
+					Description: "[KDex Sniffer] inferred from request body",
+					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"username": &openapi.SchemaRef{
 							Value: &openapi.Schema{
@@ -932,7 +935,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]openapi.Schema, err error) {
 				expectedSchema := openapi.Schema{
-					Type: &openapi.Types{openapi.TypeObject},
+					Description: "[KDex Sniffer] inferred from request body",
+					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"username": &openapi.SchemaRef{
 							Value: &openapi.Schema{
@@ -990,7 +994,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]openapi.Schema, err error) {
 				expectedSchema := openapi.Schema{
-					Type: &openapi.Types{openapi.TypeObject},
+					Description: "[KDex Sniffer] inferred from request body",
+					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"username": &openapi.SchemaRef{
 							Value: &openapi.Schema{
@@ -1198,15 +1203,18 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 										},
 									},
 								},
+								Description: "[KDex Sniffer] inferred from request body",
 							},
 						},
 						Responses: openapi.NewResponses(
-							openapi.WithName("default", &openapi.Response{
-								Description: openapi.Ptr("Successful response"),
-								Content: openapi.Content{
-									"application/json": &openapi.MediaType{
-										Schema: &openapi.SchemaRef{
-											Ref: "#/components/schemas/User",
+							openapi.WithStatus(200, &openapi.ResponseRef{
+								Value: &openapi.Response{
+									Description: openapi.Ptr("Successful response"),
+									Content: openapi.Content{
+										"application/json": &openapi.MediaType{
+											Schema: &openapi.SchemaRef{
+												Ref: "#/components/schemas/User",
+											},
 										},
 									},
 								},
@@ -1215,8 +1223,9 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 						Summary: "gen-users-id",
 					}),
 					Schemas: rawM(map[string]openapi.Schema{
-						"#/components/schemas/User": {
-							Type: &openapi.Types{openapi.TypeObject},
+						"User": {
+							Description: "[KDex Sniffer] inferred from request body",
+							Type:        &openapi.Types{openapi.TypeObject},
 							Properties: openapi.Schemas{
 								"email": &openapi.SchemaRef{
 									Value: &openapi.Schema{
@@ -1281,12 +1290,14 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 			},
 		},
 		Responses: openapi.NewResponses(
-			openapi.WithName("default", &openapi.Response{
-				Description: openapi.Ptr("Successful response"),
-				Content: openapi.Content{
-					"application/json": &openapi.MediaType{
-						Schema: &openapi.SchemaRef{
-							Ref: "#/components/schemas/User",
+			openapi.WithStatus(200, &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("Successful response"),
+					Content: openapi.Content{
+						"application/json": &openapi.MediaType{
+							Schema: &openapi.SchemaRef{
+								Ref: "#/components/schemas/User",
+							},
 						},
 					},
 				},
@@ -1333,12 +1344,14 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 			},
 		},
 		Responses: openapi.NewResponses(
-			openapi.WithName("default", &openapi.Response{
-				Description: openapi.Ptr("Successful response"),
-				Content: openapi.Content{
-					"application/json": &openapi.MediaType{
-						Schema: &openapi.SchemaRef{
-							Ref: "#/components/schemas/User",
+			openapi.WithStatus(200, &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("Successful response"),
+					Content: openapi.Content{
+						"application/json": &openapi.MediaType{
+							Schema: &openapi.SchemaRef{
+								Ref: "#/components/schemas/User",
+							},
 						},
 					},
 				},
@@ -1383,8 +1396,10 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 			},
 		},
 		Responses: openapi.NewResponses(
-			openapi.WithName("default", &openapi.Response{
-				Description: openapi.Ptr("Successful response"),
+			openapi.WithStatus(200, &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("Successful response"),
+				},
 			}),
 		),
 		Summary: "gen-users-id",
@@ -1434,7 +1449,8 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 					"application/json-patch+json": &openapi.MediaType{
 						Schema: &openapi.SchemaRef{
 							Value: &openapi.Schema{
-								Type: &openapi.Types{openapi.TypeArray},
+								Description: "[KDex Sniffer] inferred from request body",
+								Type:        &openapi.Types{openapi.TypeArray},
 								Items: &openapi.SchemaRef{
 									Value: &openapi.Schema{
 										Type: &openapi.Types{openapi.TypeObject},
@@ -1461,15 +1477,18 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 						},
 					},
 				},
+				Description: "[KDex Sniffer] inferred from request body",
 			},
 		},
 		Responses: openapi.NewResponses(
-			openapi.WithName("default", &openapi.Response{
-				Description: openapi.Ptr("Successful response"),
-				Content: openapi.Content{
-					"application/json": &openapi.MediaType{
-						Schema: &openapi.SchemaRef{
-							Ref: "#/components/schemas/User",
+			openapi.WithStatus(200, &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("Successful response"),
+					Content: openapi.Content{
+						"application/json": &openapi.MediaType{
+							Schema: &openapi.SchemaRef{
+								Ref: "#/components/schemas/User",
+							},
 						},
 					},
 				},
@@ -1525,8 +1544,10 @@ func TestRequestSniffer_sniff(t *testing.T) {
 								Description: "GET /foo",
 								OperationID: "gen-foo-get",
 								Responses: openapi.NewResponses(
-									openapi.WithName("default", &openapi.Response{
-										Description: openapi.Ptr("Successful response"),
+									openapi.WithStatus(200, &openapi.ResponseRef{
+										Value: &openapi.Response{
+											Description: openapi.Ptr("Successful response"),
+										},
 									}),
 								),
 								Summary: "gen-foo",
@@ -1609,8 +1630,10 @@ func TestRequestSniffer_sniff(t *testing.T) {
 									},
 								},
 								Responses: openapi.NewResponses(
-									openapi.WithName("default", &openapi.Response{
-										Description: openapi.Ptr("Successful response"),
+									openapi.WithStatus(200, &openapi.ResponseRef{
+										Value: &openapi.Response{
+											Description: openapi.Ptr("Successful response"),
+										},
 									}),
 								),
 								Summary: "gen-bar",
@@ -1666,8 +1689,10 @@ func TestRequestSniffer_sniff(t *testing.T) {
 								Description: "GET /foo",
 								OperationID: "gen-foo-get",
 								Responses: openapi.NewResponses(
-									openapi.WithName("default", &openapi.Response{
-										Description: openapi.Ptr("Successful response"),
+									openapi.WithStatus(200, &openapi.ResponseRef{
+										Value: &openapi.Response{
+											Description: openapi.Ptr("Successful response"),
+										},
 									}),
 								),
 								Summary: "gen-foo",
@@ -1740,8 +1765,10 @@ func TestRequestSniffer_sniff(t *testing.T) {
 									Description: "GET /foo",
 									OperationID: "gen-foo-get",
 									Responses: openapi.NewResponses(
-										openapi.WithName("default", &openapi.Response{
-											Description: openapi.Ptr("Successful response"),
+										openapi.WithStatus(200, &openapi.ResponseRef{
+											Value: &openapi.Response{
+												Description: openapi.Ptr("Successful response"),
+											},
 										}),
 									),
 								}),
@@ -1783,8 +1810,10 @@ func TestRequestSniffer_sniff(t *testing.T) {
 									},
 								},
 								Responses: openapi.NewResponses(
-									openapi.WithName("default", &openapi.Response{
-										Description: openapi.Ptr("Successful response"),
+									openapi.WithStatus(200, &openapi.ResponseRef{
+										Value: &openapi.Response{
+											Description: openapi.Ptr("Successful response"),
+										},
 									}),
 								),
 								Summary: "gen-foo",

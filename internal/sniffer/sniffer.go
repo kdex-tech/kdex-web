@@ -14,6 +14,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/web/internal/linter"
 	"kdex.dev/web/internal/mime"
 	ko "kdex.dev/web/internal/openapi"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,8 +44,8 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
   - Must start with "/"
   - Must NOT contain a method (e.g. use "/users/{id}" not "GET /users/{id}")
   - Variables are supported: "{name}", "{path...}"
-- **X-KDex-Function-Request-Schema-Ref**: Sets the OpenAPI operation request body schema reference. (e.g. "Foo" or "#/components/schemas/Foo", result is always prefixed by "#/components/schemas/")
-- **X-KDex-Function-Response-Schema-Ref**: Sets the OpenAPI operation response schema reference. (e.g. "Foo" or "#/components/schemas/Foo", result is always prefixed by "#/components/schemas/")
+- **X-KDex-Function-Request-Schema-Ref**: Sets the OpenAPI operation request body schema reference. (e.g. "Foo" or "#/components/schemas/Foo")
+- **X-KDex-Function-Response-Schema-Ref**: Sets the OpenAPI operation response schema reference. (e.g. "Foo" or "#/components/schemas/Foo")
 - **X-KDex-Function-Summary**: Sets the OpenAPI operation summary.
 - **X-KDex-Function-Tags**: Comma-separated list of tags for the OpenAPI operation.
 
@@ -65,11 +66,54 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
 `
 )
 
+type AnalysisResult struct {
+	OriginalRequest *http.Request
+	Function        *kdexv1alpha1.KDexFunction
+	Lints           []string
+}
+
 type RequestSniffer struct {
 	Functions     []kdexv1alpha1.KDexFunction
 	HostName      string
 	Namespace     string
 	SecurityModes []string
+}
+
+func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
+	fn, err := s.sniff(r)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &AnalysisResult{
+		OriginalRequest: r,
+		Function:        fn,
+		Lints:           []string{},
+	}
+
+	if fn != nil {
+		// Basic inference insights
+		if r.Header.Get("Authorization") != "" {
+			res.Lints = append(res.Lints, "[inference] Detected 'Authorization' header; secured endpoint inferred.")
+		}
+		if len(r.URL.Query()) > 0 {
+			res.Lints = append(res.Lints, fmt.Sprintf("[inference] Detected %d query parameters.", len(r.URL.Query())))
+		}
+
+		// Run vacuum linter
+		spec := ko.BuildOneOff(ko.Host(r), fn)
+		specBytes, err := json.Marshal(spec)
+		if err == nil {
+			lintResults, err := linter.LintSpec(specBytes)
+			if err == nil {
+				for _, result := range lintResults {
+					res.Lints = append(res.Lints, fmt.Sprintf("[%s] %s (Line: %d)", result.RuleId, result.Message, result.StartNode.Line))
+				}
+			}
+		}
+	}
+
+	return res, nil
 }
 
 func (s *RequestSniffer) DocsHandler(w http.ResponseWriter, r *http.Request) {
@@ -78,10 +122,14 @@ func (s *RequestSniffer) DocsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *RequestSniffer) SniffThenCreateOrUpdate(c client.Client, r *http.Request) error {
-	fnMutated, err := s.sniff(r)
-
+	res, err := s.Analyze(r)
 	if err != nil {
 		return err
+	}
+	fnMutated := res.Function
+	if fnMutated == nil {
+		// Nil function means sniff returned no result (e.g. internal path)
+		return nil
 	}
 
 	fn := &kdexv1alpha1.KDexFunction{
@@ -215,13 +263,11 @@ func (s *RequestSniffer) mergeAPIIntoFunction(
 	// Merge schemas
 	fnSchemas := out.Spec.API.GetSchemas()
 	for key, schema := range schemas {
-		if !strings.HasPrefix(key, "#/components/schemas/") {
-			key = "#/components/schemas/" + key
-		}
+		key = ko.StripSchemaPrefix(key)
 
 		_, found := fnSchemas[key]
 		if found && keepConflictedSchemas {
-			key = key + "_conflict_" + ko.GenerateNameFromPath(path, "")
+			key = key + ":conflict:" + ko.GenerateNameFromPath(path, "")
 		}
 
 		fnSchemas[key] = schema
@@ -250,7 +296,6 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 		Deprecated:  strings.ToLower(r.Header.Get("X-KDex-Function-Deprecated")) == "true",
 		OperationID: operationId,
 		Parameters:  ko.ExtractParameters(path, r.URL.Query().Encode(), r.Header),
-		Responses:   openapi.NewResponses(),
 	}
 
 	// Metadata from headers
@@ -328,9 +373,13 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 		resp.Content = openapi.NewContent()
 	}
 
-	op.Responses.Set("default", &openapi.ResponseRef{
-		Value: resp,
-	})
+	op.Responses = openapi.NewResponses(
+		openapi.WithStatus(
+			200, &openapi.ResponseRef{
+				Value: resp,
+			},
+		),
+	)
 
 	// Authentication signal
 	if r.Header.Get("Authorization") != "" {
@@ -476,9 +525,12 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 			}
 		}
 
+		schema.Description = "[KDex Sniffer] inferred from request body"
+
 		op.RequestBody = &openapi.RequestBodyRef{
 			Value: &openapi.RequestBody{
-				Content: openapi.NewContent(),
+				Content:     openapi.NewContent(),
+				Description: "[KDex Sniffer] inferred from request body",
 			},
 		}
 
@@ -488,7 +540,7 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 			schemaRef = &openapi.SchemaRef{
 				Ref: requestSchemaRef,
 			}
-			schemas[requestSchemaRef] = *schema
+			schemas[(ko.StripSchemaPrefix(requestSchemaRef))] = *schema
 		} else {
 			schemaRef = &openapi.SchemaRef{
 				Value: schema,

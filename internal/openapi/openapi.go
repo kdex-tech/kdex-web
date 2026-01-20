@@ -118,7 +118,20 @@ type PathInfo struct {
 	Type     PathType
 }
 
-func BuildOpenAPI(name string, paths map[string]PathInfo, filter Filter) *openapi.T {
+func BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *openapi.T {
+	api := (&OpenAPI{}).FromKDexAPI(&fn.Spec.API)
+	info := PathInfo{
+		API:  *api,
+		Type: FunctionPathType,
+	}
+	paths := map[string]PathInfo{
+		fn.Spec.API.Path: info,
+	}
+
+	return BuildOpenAPI(serverUrl, fn.Name, paths, Filter{})
+}
+
+func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filter Filter) *openapi.T {
 	doc := &openapi.T{
 		Components: &openapi.Components{
 			Schemas:         openapi.Schemas{},
@@ -131,6 +144,12 @@ func BuildOpenAPI(name string, paths map[string]PathInfo, filter Filter) *openap
 		},
 		Paths:   &openapi.Paths{},
 		OpenAPI: "3.0.0",
+		Servers: openapi.Servers{
+			&openapi.Server{
+				URL: serverUrl,
+			},
+		},
+		Tags: openapi.Tags{},
 	}
 
 	keys := slices.Collect(maps.Keys(paths))
@@ -150,6 +169,8 @@ func BuildOpenAPI(name string, paths map[string]PathInfo, filter Filter) *openap
 		if !matchFilter(path, pathInfo, filter) {
 			continue
 		}
+
+		doc.Tags = append(doc.Tags, collectTags(pathInfo)...)
 
 		pathItem := &openapi.PathItem{
 			Description: pathInfo.API.Description,
@@ -216,13 +237,11 @@ func BuildOpenAPI(name string, paths map[string]PathInfo, filter Filter) *openap
 		doc.Paths.Set(path, pathItem)
 
 		for key, schema := range pathInfo.API.Schemas {
-			if !strings.HasPrefix(key, "#/components/schemas/") {
-				key = "#/components/schemas/" + key
-			}
+			key = StripSchemaPrefix(key)
 
 			_, found := doc.Components.Schemas[key]
 			if found {
-				key = key + "_conflict_" + GenerateNameFromPath(path, "")
+				key = key + ":conflict:" + GenerateNameFromPath(path, "")
 			}
 
 			doc.Components.Schemas[key] = &openapi.SchemaRef{
@@ -232,6 +251,53 @@ func BuildOpenAPI(name string, paths map[string]PathInfo, filter Filter) *openap
 	}
 
 	return doc
+}
+
+func collectTags(pathInfo PathInfo) []*openapi.Tag {
+	tags := []string{}
+
+	if pathInfo.API.Connect != nil {
+		tags = append(tags, pathInfo.API.Connect.Tags...)
+	}
+	if pathInfo.API.Delete != nil {
+		tags = append(tags, pathInfo.API.Delete.Tags...)
+	}
+	if pathInfo.API.Get != nil {
+		tags = append(tags, pathInfo.API.Get.Tags...)
+	}
+	if pathInfo.API.Head != nil {
+		tags = append(tags, pathInfo.API.Head.Tags...)
+	}
+	if pathInfo.API.Options != nil {
+		tags = append(tags, pathInfo.API.Options.Tags...)
+	}
+	if pathInfo.API.Patch != nil {
+		tags = append(tags, pathInfo.API.Patch.Tags...)
+	}
+	if pathInfo.API.Post != nil {
+		tags = append(tags, pathInfo.API.Post.Tags...)
+	}
+	if pathInfo.API.Put != nil {
+		tags = append(tags, pathInfo.API.Put.Tags...)
+	}
+	if pathInfo.API.Trace != nil {
+		tags = append(tags, pathInfo.API.Trace.Tags...)
+	}
+
+	openApiTags := []*openapi.Tag{}
+
+	seen := map[string]bool{}
+	for _, tag := range tags {
+		if seen[tag] {
+			continue
+		}
+		seen[tag] = true
+		openApiTags = append(openApiTags, &openapi.Tag{
+			Name: tag,
+		})
+	}
+
+	return openApiTags
 }
 
 func ExtractParameters(path string, query string, header http.Header) openapi.Parameters {
@@ -426,6 +492,18 @@ func GenerateOperationID(name string, method string, headerValue string) string 
 	return fmt.Sprintf("%s-%s", name, strings.ToLower(method))
 }
 
+func Host(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	host := r.Host
+	if host == "" {
+		host = "localhost" // Best effort
+	}
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
 func InferSchema(val any) *openapi.SchemaRef {
 	schema := openapi.NewSchema()
 
@@ -484,6 +562,14 @@ func MergeOperations(dest, src *OpenAPI) {
 	if src.Trace != nil {
 		dest.Trace = src.Trace
 	}
+}
+
+func StripSchemaPrefix(key string) string {
+	if strings.HasPrefix(key, "#/components/schemas/") {
+		key = strings.Replace(key, "#/components/schemas/", "", 1)
+	}
+
+	return key
 }
 
 func matchFilter(path string, info PathInfo, filter Filter) bool {

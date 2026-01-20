@@ -36,6 +36,7 @@ func NewHostHandler(c client.Client, name string, namespace string, log logr.Log
 		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
 		registeredPaths:           map[string]ko.PathInfo{},
 		pathsCollectedInReconcile: map[string]ko.PathInfo{},
+		analysisCache:             NewAnalysisCache(),
 	}
 
 	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
@@ -378,29 +379,8 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ew := &errorResponseWriter{ResponseWriter: w}
-	mux.ServeHTTP(ew, r)
-
-	if ew.statusCode >= 400 {
-		if ew.statusCode == http.StatusNotFound && th.sniffer != nil {
-			w.Header().Set("X-KDex-Sniffer-Docs", "/~/sniffer/docs")
-			if err := th.sniffer.SniffThenCreateOrUpdate(th.client, r); err != nil {
-				th.log.Error(err, "failed to sniff request", "path", r.URL.Path)
-				th.serveError(w, r, http.StatusBadRequest, err.Error())
-				return
-			}
-
-			if r.Method == "HEAD" || r.Method == "CONNECT" {
-				w.Header().Set("Content-Length", "0")
-				w.WriteHeader(http.StatusOK)
-			} else {
-				fmt.Fprint(w, "Sniffed!")
-			}
-
-			return
-		}
-		th.serveError(w, r, ew.statusCode, ew.statusMsg)
-	}
+	wrappedMux := th.DesignMiddleware(mux)
+	wrappedMux.ServeHTTP(w, r)
 }
 
 func (th *HostHandler) SetHost(
@@ -593,6 +573,9 @@ func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathI
 	th.snifferHandler(mux, registeredPaths)
 	th.openapiHandler(mux, registeredPaths)
 
+	// Register Inspect Handler
+	mux.HandleFunc("/inspect/{uuid}", th.InspectHandler)
+
 	// TODO: implement a state handler
 	// TODO: implement an oauth handler
 	// TODO: implement a check handler
@@ -761,7 +744,7 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 		th.mu.RLock()
 		defer th.mu.RUnlock()
 
-		spec := ko.BuildOpenAPI(th.Name, th.registeredPaths, filterFromQuery(r.URL.Query()))
+		spec := ko.BuildOpenAPI(ko.Host(r), th.Name, th.registeredPaths, filterFromQuery(r.URL.Query()))
 
 		jsonBytes, err := json.Marshal(spec)
 		if err != nil {

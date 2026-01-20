@@ -11,6 +11,7 @@ import (
 	"kdex.dev/web/internal/host/ico"
 	ko "kdex.dev/web/internal/openapi"
 	"kdex.dev/web/internal/page"
+	"kdex.dev/web/internal/sniffer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -47,7 +48,10 @@ type HostHandler struct {
 	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 
+	analysisCache *AnalysisCache
+
 	sniffer interface {
+		Analyze(r *http.Request) (*sniffer.AnalysisResult, error)
 		DocsHandler(w http.ResponseWriter, r *http.Request)
 		SniffThenCreateOrUpdate(c client.Client, r *http.Request) error
 	}
