@@ -616,6 +616,41 @@ func (s *RequestSniffer) sniff(r *http.Request) (*kdexv1alpha1.KDexFunction, err
 		name = existing.Name
 	}
 
+	/*
+		TODO: when presented with a schema introduce support to model a comprehensive set of paths and operations to operate over it
+
+		1. The Core Path Patterns
+
+		For any given schema (e.g., User or Order), a well-rounded system should generate these five categories of endpoints:
+		A. Collection Endpoints (/resources)
+
+			GET: Supports pagination, filtering, and sorting (e.g., ?limit=10&sort=createdAt).
+
+			POST: For creating a single resource.
+
+			PATCH (Bulk): Optional, but useful for updating multiple records at once.
+
+		B. Individual Resource Endpoints (/resources/{id})
+
+			GET: Returns the full object.
+
+			PUT: For a full replacement of the resource.
+
+			PATCH: For partial updates (crucial for "well-rounded" APIs to prevent data over-writing).
+
+			DELETE: To remove or soft-delete the resource.
+
+		C. Relationship Endpoints (/resources/{id}/sub-resources)
+
+		If your schema has nested relationships (e.g., an Order has Items), the generator should identify these and create sub-paths:
+
+			GET /orders/{id}/items
+
+		D. Action/Command Endpoints (/resources/{id}/actions/name)
+
+		For logic that doesn't fit a standard verb—like POST /orders/{id}/submit or POST /users/{id}/reset-password.
+	*/
+
 	op, schemas, err := s.parseRequestIntoAPI(r, name, method, path, operationId)
 
 	if err != nil {
