@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"net/url"
+	"path"
 	"regexp"
 	"slices"
 	"sort"
@@ -40,7 +42,7 @@ type OpenAPI struct {
 	Patch       *openapi.Operation
 	Post        *openapi.Operation
 	Put         *openapi.Operation
-	Schemas     map[string]openapi.Schema
+	Schemas     map[string]*openapi.SchemaRef
 	Summary     string
 	Trace       *openapi.Operation
 }
@@ -237,16 +239,12 @@ func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filt
 		doc.Paths.Set(path, pathItem)
 
 		for key, schema := range pathInfo.API.Schemas {
-			key = StripSchemaPrefix(key)
-
 			_, found := doc.Components.Schemas[key]
 			if found {
 				key = key + ":conflict:" + GenerateNameFromPath(path, "")
 			}
 
-			doc.Components.Schemas[key] = &openapi.SchemaRef{
-				Value: &schema,
-			}
+			doc.Components.Schemas[key] = schema
 		}
 	}
 
@@ -564,12 +562,31 @@ func MergeOperations(dest, src *OpenAPI) {
 	}
 }
 
-func StripSchemaPrefix(key string) string {
-	if strings.HasPrefix(key, "#/components/schemas/") {
-		key = strings.Replace(key, "#/components/schemas/", "", 1)
+func ExtractSchemaName(schemaString string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSuffix(schemaString, "/"))
+
+	if err != nil {
+		return "", err
 	}
 
-	return key
+	base := parsed.Path
+
+	if strings.Contains(base, "/") {
+		base = path.Base(base)
+	}
+
+	if base == "" {
+		base = parsed.Host
+	}
+
+	if base == "" && parsed.Fragment != "" {
+		base = parsed.Fragment
+	}
+
+	base = strings.TrimPrefix(base, "#")
+	base = strings.TrimPrefix(base, "/components/schemas/")
+
+	return base, nil
 }
 
 func matchFilter(path string, info PathInfo, filter Filter) bool {
