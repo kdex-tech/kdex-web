@@ -490,12 +490,12 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 			}
 		}
 
-		schema.Description = "[KDex Sniffer] inferred from request body"
+		schema.Description = "Inferred from request body"
 
 		op.RequestBody = &openapi.RequestBodyRef{
 			Value: &openapi.RequestBody{
 				Content:     openapi.NewContent(),
-				Description: "[KDex Sniffer] inferred from request body",
+				Description: "The request body schema",
 			},
 		}
 

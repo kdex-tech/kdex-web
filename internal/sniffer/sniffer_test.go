@@ -690,7 +690,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]*openapi.SchemaRef, err error) {
 				expected := openapi.Schema{
-					Description: "[KDex Sniffer] inferred from request body",
+					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"name": &openapi.SchemaRef{
@@ -766,7 +766,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]*openapi.SchemaRef, err error) {
 				expected := openapi.Schema{
-					Description: "[KDex Sniffer] inferred from request body",
+					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"name": &openapi.SchemaRef{
@@ -829,7 +829,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]*openapi.SchemaRef, err error) {
 				expected := openapi.Schema{
-					Description: "[KDex Sniffer] inferred from request body",
+					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeString},
 					Format:      "binary",
 				}
@@ -855,7 +855,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]*openapi.SchemaRef, err error) {
 				expected := openapi.Schema{
-					Description: "[KDex Sniffer] inferred from request body",
+					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"name": &openapi.SchemaRef{
@@ -899,7 +899,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]*openapi.SchemaRef, err error) {
 				expectedSchema := openapi.Schema{
-					Description: "[KDex Sniffer] inferred from request body",
+					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"username": &openapi.SchemaRef{
@@ -952,7 +952,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]*openapi.SchemaRef, err error) {
 				expectedSchema := openapi.Schema{
-					Description: "[KDex Sniffer] inferred from request body",
+					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"username": &openapi.SchemaRef{
@@ -1011,7 +1011,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			}(),
 			assertions: func(t *testing.T, op *openapi.Operation, schemas map[string]*openapi.SchemaRef, err error) {
 				expectedSchema := openapi.Schema{
-					Description: "[KDex Sniffer] inferred from request body",
+					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
 					Properties: openapi.Schemas{
 						"username": &openapi.SchemaRef{
@@ -1255,7 +1255,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 										},
 									},
 								},
-								Description: "[KDex Sniffer] inferred from request body",
+								Description: "The request body schema",
 							},
 						},
 						Responses: openapi.NewResponses(
@@ -1277,7 +1277,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 					Schemas: rawM(map[string]*openapi.SchemaRef{
 						"User": {
 							Value: &openapi.Schema{
-								Description: "[KDex Sniffer] inferred from request body",
+								Description: "Inferred from request body",
 								Type:        &openapi.Types{openapi.TypeObject},
 								Properties: openapi.Schemas{
 									"email": &openapi.SchemaRef{
@@ -1503,7 +1503,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 					"application/json-patch+json": &openapi.MediaType{
 						Schema: &openapi.SchemaRef{
 							Value: &openapi.Schema{
-								Description: "[KDex Sniffer] inferred from request body",
+								Description: "Inferred from request body",
 								Type:        &openapi.Types{openapi.TypeArray},
 								Items: &openapi.SchemaRef{
 									Value: &openapi.Schema{
@@ -1531,7 +1531,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 						},
 					},
 				},
-				Description: "[KDex Sniffer] inferred from request body",
+				Description: "The request body schema",
 			},
 		},
 		Responses: openapi.NewResponses(
