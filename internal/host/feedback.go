@@ -15,6 +15,60 @@ import (
 	"kdex.dev/web/internal/sniffer"
 )
 
+type FeedbackTheme struct {
+	// CLI Colors (ANSI)
+	CLIHeader  string
+	CLISuccess string
+	CLIWarning string
+	CLIDim     string
+	CLILineNum string
+	CLIReset   string
+
+	// HTML Colors (CSS)
+	BgPage        string
+	BgSidebar     string
+	BgCard        string
+	BgCode        string
+	Border        string
+	TextPrimary   string
+	TextSecondary string
+	TextAccent    string
+	TextLint      string
+	TextCode      string
+	MethodGet     string
+	MethodPost    string
+	MethodPut     string
+	MethodDelete  string
+	BtnSuccess    string
+	BtnHover      string
+}
+
+var defaultTheme = FeedbackTheme{
+	CLIHeader:  "\033[1;36m",
+	CLISuccess: "\033[1;32m",
+	CLIWarning: "\033[1;33m",
+	CLIDim:     "\033[2m",
+	CLILineNum: "\033[90m",
+	CLIReset:   "\033[0m",
+
+	BgPage:        "#0d1117",
+	BgSidebar:     "#161b22",
+	BgCard:        "#21262d",
+	BgCode:        "#1e1e1e",
+	Border:        "#30363d",
+	TextPrimary:   "#c9d1d9",
+	TextSecondary: "#8b949e",
+	TextAccent:    "#58a6ff",
+	TextLint:      "#d29922",
+	TextCode:      "#9cdcfe",
+	MethodGet:     "#238636",
+	MethodPost:    "#1f6feb",
+	MethodPut:     "#9e6a03",
+	MethodDelete:  "#da3633",
+	BtnSuccess:    "#238636",
+	BtnHover:      "#2ea043",
+}
+
 // AnalysisCache stores the results of the InferenceEngine for a short period
 // so that the redirected user can view the report.
 type AnalysisCache struct {
@@ -164,21 +218,25 @@ func (th *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 
 	if format == "text" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte("\033[1;36m─── API DESIGN FEEDBACK ───\033[0m\n\n"))
+		w.Write([]byte(fmt.Sprintf("%s─── API DESIGN FEEDBACK ───%s\n\n", defaultTheme.CLIHeader, defaultTheme.CLIReset)))
 
-		w.Write([]byte(fmt.Sprintf("\033[1;32m✓ Analyzed Request:\033[0m %s %s\n", result.OriginalRequest.Method, result.OriginalRequest.URL.Path)))
+		w.Write([]byte(fmt.Sprintf("%s✓ Analyzed Request:%s %s %s\n", defaultTheme.CLISuccess, defaultTheme.CLIReset, result.OriginalRequest.Method, result.OriginalRequest.URL.Path)))
 
 		if len(result.Lints) > 0 {
-			w.Write([]byte("\n\033[1;33mWarnings / Insights:\033[0m\n"))
+			w.Write([]byte(fmt.Sprintf("\n%sWarnings / Insights:%s\n", defaultTheme.CLIWarning, defaultTheme.CLIReset)))
 			for _, lint := range result.Lints {
 				w.Write([]byte(fmt.Sprintf("  • %s\n", lint)))
 			}
 		}
 
-		w.Write([]byte("\n\033[2mGenerated OpenAPI Spec (Fragment):\033[0m\n"))
-		w.Write([]byte("\033[90m")) // Dark gray
-		w.Write(specBytes)
-		w.Write([]byte("\033[0m\n"))
+		w.Write([]byte(fmt.Sprintf("\n%sGenerated OpenAPI Spec (Fragment):%s\n", defaultTheme.CLIDim, defaultTheme.CLIReset)))
+		lines := strings.Split(specStr, "\n")
+		for i, line := range lines {
+			if line == "" && i == len(lines)-1 {
+				break
+			}
+			w.Write([]byte(fmt.Sprintf("%s%4d │ %s%s\n", defaultTheme.CLILineNum, i+1, defaultTheme.CLIReset, line)))
+		}
 		return
 	}
 
@@ -190,24 +248,26 @@ func (th *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 <head>
 	<title>KDex API Workbench</title>
 	<style>
-		body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: #0d1117; color: #c9d1d9; display: grid; grid-template-columns: 350px 1fr; height: 100vh; overflow: hidden; }
-		.sidebar { background: #161b22; border-right: 1px solid #30363d; padding: 20px; overflow-y: auto; }
+		body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: %[1]s; color: %[2]s; display: grid; grid-template-columns: 350px 1fr; height: 100vh; overflow: hidden; }
+		.sidebar { background: %[3]s; border-right: 1px solid %[4]s; padding: 20px; overflow-y: auto; }
 		.main { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
-		h1 { font-size: 16px; margin: 0 0 20px; color: #58a6ff; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-		h2 { font-size: 14px; margin: 20px 0 10px; color: #8b949e; border-bottom: 1px solid #30363d; padding-bottom: 5px; }
-		.card { background: #21262d; border: 1px solid #30363d; border-radius: 6px; padding: 15px; margin-bottom: 15px; }
+		h1 { font-size: 16px; margin: 0 0 20px; color: %[5]s; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+		h2 { font-size: 14px; margin: 20px 0 10px; color: %[6]s; border-bottom: 1px solid %[4]s; padding-bottom: 5px; }
+		.card { background: %[7]s; border: 1px solid %[4]s; border-radius: 6px; padding: 15px; margin-bottom: 15px; }
 		.method { display: inline-block; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 12px; margin-right: 8px; }
-		.method.GET { background: #238636; color: white; }
-		.method.POST { background: #1f6feb; color: white; }
-		.method.PUT { background: #9e6a03; color: white; }
-		.method.DELETE { background: #da3633; color: white; }
+		.method.GET { background: %[8]s; color: white; }
+		.method.POST { background: %[9]s; color: white; }
+		.method.PUT { background: %[10]s; color: white; }
+		.method.DELETE { background: %[11]s; color: white; }
 		.lint-item { margin-bottom: 8px; font-size: 13px; display: flex; gap: 8px; align-items: flex-start; }
-		.lint-icon { color: #d29922; }
+		.lint-icon { color: %[12]s; }
 		pre { margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
-		code { display: block; padding: 15px; background: #1e1e1e; color: #9cdcfe; border-radius: 6px; overflow-x: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+		code { display: block; padding: 15px; background: %[13]s; color: %[14]s; border-radius: 6px; overflow-x: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+		.ln { color: %[5]s; opacity: 0.5; margin-right: 15px; user-select: none; border-right: 1px solid %[4]s; padding-right: 10px; display: inline-block; min-width: 30px; text-align: right; }
+		.lc { color: %[14]s; }
 		.toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
-		button { background: #238636; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-		button:hover { background: #2ea043; }
+		button { background: %[15]s; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+		button:hover { background: %[16]s; }
 	</style>
 </head>
 <body>
@@ -215,30 +275,44 @@ func (th *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 		<h1>API Workbench</h1>
 		
 		<div class="card">
-			<div style="font-size: 12px; color: #8b949e; margin-bottom: 4px;">Request Invariants</div>
+			<div style="font-size: 12px; color: %[6]s; margin-bottom: 4px;">Request Invariants</div>
 			<div style="font-family: monospace; font-size: 14px;">
-				<span class="method %s">%s</span>
-				<span title="%s">%s</span>
+				<span class="method %[17]s">%[17]s</span>
+				<span title="%[18]s">%[18]s</span>
 			</div>
 		</div>
 
 		<h2>Analysis & Linting</h2>
-		%s
+		%[19]s
 	</div>
 	<div class="main">
 		<div class="toolbar">
 			<button onclick="navigator.clipboard.writeText(document.querySelector('code').innerText); this.innerText='Copied!'">Copy Spec Fragment</button>
 		</div>
-		<pre><code>%s</code></pre>
+		<pre><code>%[20]s</code></pre>
 	</div>
 </body>
 </html>`,
-		result.OriginalRequest.Method,
-		result.OriginalRequest.Method,
-		result.OriginalRequest.URL.Path,
-		result.OriginalRequest.URL.Path,
-		generateLintHTML(result.Lints),
-		htmlEscape(specStr),
+		defaultTheme.BgPage,             // 1
+		defaultTheme.TextPrimary,        // 2
+		defaultTheme.BgSidebar,          // 3
+		defaultTheme.Border,             // 4
+		defaultTheme.TextAccent,         // 5
+		defaultTheme.TextSecondary,      // 6
+		defaultTheme.BgCard,             // 7
+		defaultTheme.MethodGet,          // 8
+		defaultTheme.MethodPost,         // 9
+		defaultTheme.MethodPut,          // 10
+		defaultTheme.MethodDelete,       // 11
+		defaultTheme.TextLint,           // 12
+		defaultTheme.BgCode,             // 13
+		defaultTheme.TextCode,           // 14
+		defaultTheme.BtnSuccess,         // 15
+		defaultTheme.BtnHover,           // 16
+		result.OriginalRequest.Method,   // 17
+		result.OriginalRequest.URL.Path, // 18
+		generateLintHTML(result.Lints),  // 19
+		renderSpecHTML(specStr),         // 20
 	)
 
 	w.Write([]byte(html))
@@ -246,15 +320,28 @@ func (th *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 
 func generateLintHTML(lints []string) string {
 	if len(lints) == 0 {
-		return `<div style="font-size: 13px; color: #8b949e; font-style: italic;">No linting issues found.</div>`
+		return fmt.Sprintf(`<div style="font-size: 13px; color: %s; font-style: italic;">No linting issues found.</div>`, defaultTheme.TextSecondary)
 	}
 	var b strings.Builder
 	for _, l := range lints {
-		b.WriteString(fmt.Sprintf(`<div class="lint-item"><span class="lint-icon">⚠</span> <span>%s</span></div>`, htmlEscape(l)))
+		b.WriteString(fmt.Sprintf(`<div class="lint-item"><span class="lint-icon" style="color: %s">⚠</span> <span>%s</span></div>`, defaultTheme.TextLint, htmlEscape(l)))
 	}
 	return b.String()
 }
 
 func htmlEscape(s string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(s, "&", "&amp;"), "<", "&lt;")
+}
+
+func renderSpecHTML(spec string) string {
+	lines := strings.Split(spec, "\n")
+	var b strings.Builder
+	for i, line := range lines {
+		if line == "" && i == len(lines)-1 {
+			break
+		}
+		// We use a separate span for the line number and the content
+		b.WriteString(fmt.Sprintf(`<span class="ln">%d</span><span class="lc">%s</span>`+"\n", i+1, htmlEscape(line)))
+	}
+	return b.String()
 }
