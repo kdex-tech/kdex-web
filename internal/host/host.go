@@ -408,6 +408,7 @@ func (th *HostHandler) SetHost(
 	var snif *sniffer.RequestSniffer
 	if host.DevMode {
 		snif = &sniffer.RequestSniffer{
+			Client:        th.client,
 			Functions:     functions,
 			Namespace:     th.Namespace,
 			HostName:      th.Name,

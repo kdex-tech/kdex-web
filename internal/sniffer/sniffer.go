@@ -73,6 +73,7 @@ type AnalysisResult struct {
 }
 
 type RequestSniffer struct {
+	Client        client.Client
 	Functions     []kdexv1alpha1.KDexFunction
 	HostName      string
 	Namespace     string
@@ -80,6 +81,64 @@ type RequestSniffer struct {
 }
 
 func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
+	res, err := s.analyze(r)
+	if err != nil {
+		return nil, err
+	}
+	fnMutated := res.Function
+	if fnMutated == nil {
+		// Nil function means sniff returned no result (e.g. internal path)
+		return nil, nil
+	}
+
+	fn := &kdexv1alpha1.KDexFunction{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fnMutated.Name,
+			Namespace: fnMutated.Namespace,
+		},
+	}
+
+	op, err := ctrl.CreateOrUpdate(
+		context.Background(), s.Client, fn,
+		func() error {
+			if fn.CreationTimestamp.IsZero() {
+				fn.Annotations = make(map[string]string)
+				fn.Labels = make(map[string]string)
+
+				fn.Labels["app.kubernetes.io/name"] = "kdex-web"
+				fn.Labels["kdex.dev/instance"] = s.HostName
+			}
+
+			fn.Spec = fnMutated.Spec
+
+			if fn.CreationTimestamp.IsZero() {
+				fn.Spec.HostRef = v1.LocalObjectReference{
+					Name: s.HostName,
+				}
+			}
+
+			return nil
+		},
+	)
+
+	log := logf.FromContext(r.Context())
+
+	log.V(2).Info(
+		"sniffed function",
+		"fnMutated", fnMutated,
+		"op", op,
+		"err", err,
+	)
+
+	return res, err
+}
+
+func (s *RequestSniffer) DocsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/markdown")
+	_, _ = w.Write([]byte(docs))
+}
+
+func (s *RequestSniffer) analyze(r *http.Request) (*AnalysisResult, error) {
 	fn, err := s.sniff(r)
 	if err != nil {
 		return nil, err
@@ -116,65 +175,6 @@ func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
 	return res, nil
 }
 
-func (s *RequestSniffer) DocsHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/markdown")
-	_, _ = w.Write([]byte(docs))
-}
-
-func (s *RequestSniffer) SniffThenCreateOrUpdate(c client.Client, r *http.Request) error {
-	res, err := s.Analyze(r)
-	if err != nil {
-		return err
-	}
-	fnMutated := res.Function
-	if fnMutated == nil {
-		// Nil function means sniff returned no result (e.g. internal path)
-		return nil
-	}
-
-	fn := &kdexv1alpha1.KDexFunction{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fnMutated.Name,
-			Namespace: fnMutated.Namespace,
-		},
-	}
-
-	op, err := ctrl.CreateOrUpdate(
-		context.Background(), c, fn,
-		func() error {
-			if fn.CreationTimestamp.IsZero() {
-				fn.Annotations = make(map[string]string)
-				fn.Labels = make(map[string]string)
-
-				fn.Labels["app.kubernetes.io/name"] = "kdex-web"
-				fn.Labels["kdex.dev/instance"] = s.HostName
-			}
-
-			fn.Spec = fnMutated.Spec
-
-			if fn.CreationTimestamp.IsZero() {
-				fn.Spec.HostRef = v1.LocalObjectReference{
-					Name: s.HostName,
-				}
-			}
-
-			return nil
-		},
-	)
-
-	log := logf.FromContext(r.Context())
-
-	log.V(2).Info(
-		"sniffed function",
-		"fnMutated", fnMutated,
-		"fn", fn,
-		"op", op,
-		"err", err,
-	)
-
-	return err
-}
-
 func (s *RequestSniffer) calculatePath(r *http.Request, patternPath string) (string, error) {
 	if patternPath == "" {
 		return r.URL.Path, nil
@@ -194,10 +194,6 @@ func (s *RequestSniffer) calculatePath(r *http.Request, patternPath string) (str
 	}
 
 	return patternPath, nil
-}
-
-func isJSON(mimeType string) bool {
-	return jsonMimeRegex.MatchString(strings.ToLower(mimeType))
 }
 
 func (s *RequestSniffer) matchExisting(
@@ -625,6 +621,10 @@ func (s *RequestSniffer) validatePattern(pattern string, r *http.Request) (err e
 	}
 
 	return nil
+}
+
+func isJSON(mimeType string) bool {
+	return jsonMimeRegex.MatchString(strings.ToLower(mimeType))
 }
 
 func shouldDelete(parameters []openapi.Parameter, parameterRef *openapi.ParameterRef) bool {

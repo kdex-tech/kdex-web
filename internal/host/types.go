@@ -53,7 +53,6 @@ type HostHandler struct {
 	sniffer interface {
 		Analyze(r *http.Request) (*sniffer.AnalysisResult, error)
 		DocsHandler(w http.ResponseWriter, r *http.Request)
-		SniffThenCreateOrUpdate(c client.Client, r *http.Request) error
 	}
 }
 
