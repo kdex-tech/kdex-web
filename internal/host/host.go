@@ -461,13 +461,17 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 
 	th.registerPath(finalPath, ko.PathInfo{
 		API: ko.OpenAPI{
-			Description: fmt.Sprintf("Rendered HTML page for %s", label),
-			Get: &openapi.Operation{
-				Parameters: ko.ExtractParameters(finalPath, "", http.Header{}),
-				Responses:  response,
+			BasePath: finalPath,
+			Paths: map[string]ko.PathItem{
+				finalPath: ko.PathItem{
+					Description: fmt.Sprintf("Rendered HTML page for %s", label),
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(finalPath, "", http.Header{}),
+						Responses:  response,
+					},
+					Summary: label,
+				},
 			},
-			Path:    finalPath,
-			Summary: label,
 		},
 		Type: ko.PagePathType,
 	}, registeredPaths)
@@ -475,13 +479,17 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 	l10nPath := "/{l10n}" + finalPath
 	th.registerPath(l10nPath, ko.PathInfo{
 		API: ko.OpenAPI{
-			Description: fmt.Sprintf("Localized rendered HTML page for %s", label),
-			Get: &openapi.Operation{
-				Parameters: ko.ExtractParameters(l10nPath, "", http.Header{}),
-				Responses:  response,
+			BasePath: l10nPath,
+			Paths: map[string]ko.PathItem{
+				l10nPath: ko.PathItem{
+					Description: fmt.Sprintf("Localized rendered HTML page for %s", label),
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(l10nPath, "", http.Header{}),
+						Responses:  response,
+					},
+					Summary: fmt.Sprintf("%s (Localized)", label),
+				},
 			},
-			Path:    l10nPath,
-			Summary: fmt.Sprintf("%s (Localized)", label),
 		},
 		Type: ko.PagePathType,
 	}, registeredPaths)
@@ -495,26 +503,34 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 
 		th.registerPath(patternPath, ko.PathInfo{
 			API: ko.OpenAPI{
-				Description: fmt.Sprintf("Rendered HTML page for %s using pattern %s", label, patternPath),
-				Get: &openapi.Operation{
-					Parameters: ko.ExtractParameters(patternPath, "", http.Header{}),
-					Responses:  response,
+				BasePath: patternPath,
+				Paths: map[string]ko.PathItem{
+					patternPath: {
+						Description: fmt.Sprintf("Rendered HTML page for %s using pattern %s", label, patternPath),
+						Get: &openapi.Operation{
+							Parameters: ko.ExtractParameters(patternPath, "", http.Header{}),
+							Responses:  response,
+						},
+						Summary: label,
+					},
 				},
-				Path:    patternPath,
-				Summary: label,
 			},
 			Type: ko.PagePathType,
 		}, registeredPaths)
 
 		th.registerPath(l10nPatternPath, ko.PathInfo{
 			API: ko.OpenAPI{
-				Description: fmt.Sprintf("Localized rendered HTML page for %s using pattern %s", label, l10nPatternPath),
-				Get: &openapi.Operation{
-					Parameters: ko.ExtractParameters(l10nPatternPath, "", http.Header{}),
-					Responses:  response,
+				BasePath: l10nPatternPath,
+				Paths: map[string]ko.PathItem{
+					l10nPatternPath: {
+						Description: fmt.Sprintf("Localized rendered HTML page for %s using pattern %s", label, l10nPatternPath),
+						Get: &openapi.Operation{
+							Parameters: ko.ExtractParameters(l10nPatternPath, "", http.Header{}),
+							Responses:  response,
+						},
+						Summary: fmt.Sprintf("%s (Localized)", label),
+					},
 				},
-				Path:    l10nPatternPath,
-				Summary: fmt.Sprintf("%s (Localized)", label),
 			},
 			Type: ko.PagePathType,
 		}, registeredPaths)
@@ -551,8 +567,8 @@ func (th *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 					}),
 				),
 			},
-			Path:    path,
-			Summary: "The site favicon",
+			BasePath: path,
+			Summary:  "The site favicon",
 		},
 		Type: ko.InternalPathType,
 	}
@@ -701,8 +717,8 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 					}),
 				),
 			},
-			Path:    path,
-			Summary: "Dynamic Navigation Fragment Provider",
+			BasePath: path,
+			Summary:  "Dynamic Navigation Fragment Provider",
 		},
 		Type: ko.InternalPathType,
 	}, registeredPaths)
@@ -735,8 +751,8 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 					}),
 				),
 			},
-			Path:    path,
-			Summary: "OpenAPI Specification",
+			BasePath: path,
+			Summary:  "OpenAPI Specification",
 		},
 		Type: ko.InternalPathType,
 	}, registeredPaths)
@@ -795,8 +811,8 @@ func (th *HostHandler) pageHandlerFunc(
 func (th *HostHandler) registerPath(path string, info ko.PathInfo, m map[string]ko.PathInfo) {
 	current, ok := m[path]
 	if !ok {
-		if info.API.Path == "" {
-			info.API.Path = path
+		if info.API.BasePath == "" {
+			info.API.BasePath = path
 		}
 		m[path] = info
 		return
@@ -804,14 +820,8 @@ func (th *HostHandler) registerPath(path string, info ko.PathInfo, m map[string]
 
 	ko.MergeOperations(&current.API, &info.API)
 
-	if current.API.Summary == "" {
-		current.API.Summary = info.API.Summary
-	}
-	if current.API.Description == "" {
-		current.API.Description = info.API.Description
-	}
-	if current.API.Path == "" {
-		current.API.Path = path
+	if current.API.BasePath == "" {
+		current.API.BasePath = path
 	}
 
 	m[path] = current
@@ -886,8 +896,8 @@ func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 						}),
 					),
 				},
-				Path:    path,
-				Summary: "Request Sniffer Documentation",
+				BasePath: path,
+				Summary:  "Request Sniffer Documentation",
 			},
 			Type: ko.InternalPathType,
 		}
@@ -975,7 +985,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 		API: ko.OpenAPI{
 			Description: "Provides a JSON map of localization keys and their translated values for a given language tag.",
 			Get:         op,
-			Path:        path,
+			BasePath:    path,
 			Summary:     "Localization Key Provider",
 		},
 		Type: ko.InternalPathType,
@@ -1012,7 +1022,7 @@ func (th *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, 
 	info := ko.PathInfo{
 		API: ko.OpenAPI{
 			Description: fmt.Sprintf("Internal system endpoint providing %s functionality. NOT YET IMPLEMENTED!", path),
-			Path:        path,
+			BasePath:    path,
 			Summary:     fmt.Sprintf("System Endpoint: %s", path),
 		},
 		Type: ko.InternalPathType,

@@ -344,26 +344,28 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	for _, function := range functions.Items {
-		if seenPaths[function.Spec.API.Path] {
-			err = fmt.Errorf(
-				"duplicated path %s, paths must be unique across backends and pages, obj: %s/%s, kind: %s",
-				function.Spec.API.Path, function.Namespace, function.Name, "KDexFunction",
-			)
+		for routePath, _ := range function.Spec.API.Paths {
+			if seenPaths[routePath] {
+				err = fmt.Errorf(
+					"duplicated path %s, paths must be unique across backends and pages, obj: %s/%s, kind: %s",
+					routePath, function.Namespace, function.Name, "KDexFunction",
+				)
 
-			kdexv1alpha1.SetConditions(
-				&internalHost.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
-				err.Error(),
-			)
+				kdexv1alpha1.SetConditions(
+					&internalHost.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileSuccess,
+					err.Error(),
+				)
 
-			return ctrl.Result{}, err
+				return ctrl.Result{}, err
+			}
+			seenPaths[routePath] = true
 		}
-		seenPaths[function.Spec.API.Path] = true
 	}
 
 	internalPackageReferences := &kdexv1alpha1.KDexInternalPackageReferences{
@@ -506,26 +508,28 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 
 		pathInfo := ko.PathInfo{
 			API: ko.OpenAPI{
-				Description: description,
-				Get:         op,
-				Path:        wildcardPath,
-				Summary:     summary,
+				BasePath: basePath,
+				Paths: map[string]ko.PathItem{
+					wildcardPath: ko.PathItem{
+						Description: description,
+						Get:         op,
+						Summary:     summary,
+					},
+				},
 			},
 			Type: ko.BackendPathType,
 		}
 
-		initialPaths[pathInfo.API.Path] = pathInfo
+		initialPaths[pathInfo.API.BasePath] = pathInfo
 	}
 
 	for _, function := range functions.Items {
-		var o ko.OpenAPI
 		pathInfo := ko.PathInfo{
-			API:      *o.FromKDexAPI(&function.Spec.API),
+			API:      *ko.FromKDexAPI(&function.Spec.API),
 			Metadata: &function.Spec.Metadata.Metadata,
 			Type:     ko.FunctionPathType,
 		}
-
-		initialPaths[function.Spec.API.Path] = pathInfo
+		initialPaths[function.Spec.API.BasePath] = pathInfo
 	}
 
 	return initialPaths

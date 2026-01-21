@@ -1,6 +1,7 @@
 package openapi
 
 import (
+	"crypto/rand"
 	"fmt"
 	"maps"
 	"net/http"
@@ -31,6 +32,25 @@ type Filter struct {
 }
 
 type OpenAPI struct {
+	BasePath string
+	Paths    map[string]PathItem
+	Schemas  map[string]*openapi.SchemaRef
+
+	// Shorthand fields for a single-path API
+	Connect     *openapi.Operation
+	Delete      *openapi.Operation
+	Description string
+	Get         *openapi.Operation
+	Head        *openapi.Operation
+	Options     *openapi.Operation
+	Patch       *openapi.Operation
+	Post        *openapi.Operation
+	Put         *openapi.Operation
+	Summary     string
+	Trace       *openapi.Operation
+}
+
+type PathItem struct {
 	Connect     *openapi.Operation
 	Delete      *openapi.Operation
 	Description string
@@ -38,35 +58,69 @@ type OpenAPI struct {
 	Head        *openapi.Operation
 	Options     *openapi.Operation
 	Parameters  []openapi.Parameter
-	Path        string
 	Patch       *openapi.Operation
 	Post        *openapi.Operation
 	Put         *openapi.Operation
-	Schemas     map[string]*openapi.SchemaRef
 	Summary     string
 	Trace       *openapi.Operation
 }
 
-func (o *OpenAPI) FromKDexAPI(k *kdexv1alpha1.KDexOpenAPI) *OpenAPI {
-	return &OpenAPI{
-		Connect:     k.GetConnect(),
-		Delete:      k.GetDelete(),
-		Description: k.Description,
-		Get:         k.GetGet(),
-		Head:        k.GetHead(),
-		Options:     k.GetOptions(),
-		Parameters:  k.GetParameters(),
-		Path:        k.Path,
-		Patch:       k.GetPatch(),
-		Post:        k.GetPost(),
-		Put:         k.GetPut(),
-		Schemas:     k.GetSchemas(),
-		Summary:     k.Summary,
-		Trace:       k.GetTrace(),
+func (o *OpenAPI) resolveShorthands() {
+	if o.Paths == nil {
+		o.Paths = make(map[string]PathItem)
 	}
+	path := o.BasePath
+	if path == "" {
+		path = "/"
+	}
+	item := o.Paths[path]
+	if o.Connect != nil {
+		item.Connect = o.Connect
+	}
+	if o.Delete != nil {
+		item.Delete = o.Delete
+	}
+	if o.Description != "" {
+		item.Description = o.Description
+	}
+	if o.Get != nil {
+		item.Get = o.Get
+	}
+	if o.Head != nil {
+		item.Head = o.Head
+	}
+	if o.Options != nil {
+		item.Options = o.Options
+	}
+	if o.Patch != nil {
+		item.Patch = o.Patch
+	}
+	if o.Post != nil {
+		item.Post = o.Post
+	}
+	if o.Put != nil {
+		item.Put = o.Put
+	}
+	if o.Summary != "" {
+		item.Summary = o.Summary
+	}
+	if o.Trace != nil {
+		item.Trace = o.Trace
+	}
+	o.Paths[path] = item
 }
 
 func (o *OpenAPI) SetOperation(method string, op *openapi.Operation) {
+	o.resolveShorthands()
+	path := o.BasePath
+	if path == "" {
+		path = "/"
+	}
+	item := o.Paths[path]
+	item.SetOperation(method, op)
+	o.Paths[path] = item
+
+	// Update shorthand field if applicable
 	switch method {
 	case "CONNECT":
 		o.Connect = op
@@ -89,25 +143,84 @@ func (o *OpenAPI) SetOperation(method string, op *openapi.Operation) {
 	}
 }
 
-func (o *OpenAPI) ToKDexAPI() *kdexv1alpha1.KDexOpenAPI {
-	k := &kdexv1alpha1.KDexOpenAPI{
-		Description:         o.Description,
-		KDexOpenAPIInternal: kdexv1alpha1.KDexOpenAPIInternal{},
-		Path:                o.Path,
-		Summary:             o.Summary,
+func FromKDexAPI(k *kdexv1alpha1.API) *OpenAPI {
+	openAPI := &OpenAPI{
+		BasePath: k.BasePath,
+		Paths:    map[string]PathItem{},
+		Schemas:  k.GetSchemas(),
 	}
 
-	k.SetConnect(o.Connect)
-	k.SetDelete(o.Delete)
-	k.SetGet(o.Get)
-	k.SetHead(o.Head)
-	k.SetOptions(o.Options)
-	k.SetParameters(o.Parameters)
-	k.SetPatch(o.Patch)
-	k.SetPost(o.Post)
-	k.SetPut(o.Put)
+	for curPath, curItem := range k.Paths {
+		openAPI.Paths[curPath] = PathItem{
+			Connect:     curItem.GetConnect(),
+			Delete:      curItem.GetDelete(),
+			Description: curItem.Description,
+			Get:         curItem.GetGet(),
+			Head:        curItem.GetHead(),
+			Options:     curItem.GetOptions(),
+			Parameters:  curItem.GetParameters(),
+			Patch:       curItem.GetPatch(),
+			Post:        curItem.GetPost(),
+			Put:         curItem.GetPut(),
+			Summary:     curItem.Summary,
+			Trace:       curItem.GetTrace(),
+		}
+	}
+
+	return openAPI
+}
+
+func (o *PathItem) SetOperation(method string, op *openapi.Operation) {
+	switch method {
+	case "CONNECT":
+		o.Connect = op
+	case "DELETE":
+		o.Delete = op
+	case "GET":
+		o.Get = op
+	case "HEAD":
+		o.Head = op
+	case "OPTIONS":
+		o.Options = op
+	case "PATCH":
+		o.Patch = op
+	case "POST":
+		o.Post = op
+	case "PUT":
+		o.Put = op
+	case "TRACE":
+		o.Trace = op
+	}
+}
+
+func (o *OpenAPI) ToKDexAPI() *kdexv1alpha1.API {
+	o.resolveShorthands()
+	k := &kdexv1alpha1.API{
+		BasePath: o.BasePath,
+		Paths:    map[string]kdexv1alpha1.PathItem{},
+	}
+
+	for curPath, curItem := range o.Paths {
+		item := kdexv1alpha1.PathItem{
+			Description: curItem.Description,
+			Summary:     curItem.Summary,
+		}
+
+		item.SetConnect(curItem.Connect)
+		item.SetDelete(curItem.Delete)
+		item.SetGet(curItem.Get)
+		item.SetHead(curItem.Head)
+		item.SetOptions(curItem.Options)
+		item.SetParameters(curItem.Parameters)
+		item.SetPatch(curItem.Patch)
+		item.SetPost(curItem.Post)
+		item.SetPut(curItem.Put)
+		item.SetTrace(curItem.Trace)
+
+		k.Paths[curPath] = item
+	}
+
 	k.SetSchemas(o.Schemas)
-	k.SetTrace(o.Trace)
 
 	return k
 }
@@ -121,13 +234,13 @@ type PathInfo struct {
 }
 
 func BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *openapi.T {
-	api := (&OpenAPI{}).FromKDexAPI(&fn.Spec.API)
+	api := FromKDexAPI(&fn.Spec.API)
 	info := PathInfo{
 		API:  *api,
 		Type: FunctionPathType,
 	}
 	paths := map[string]PathInfo{
-		fn.Spec.API.Path: info,
+		fn.Spec.API.BasePath: info,
 	}
 
 	return BuildOpenAPI(serverUrl, fn.Name, paths, Filter{})
@@ -154,94 +267,97 @@ func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filt
 		Tags: openapi.Tags{},
 	}
 
-	keys := slices.Collect(maps.Keys(paths))
+	basePaths := slices.Collect(maps.Keys(paths))
 
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
+	sort.Slice(basePaths, func(i, j int) bool {
+		return basePaths[i] < basePaths[j]
 	})
 
-	for _, key := range keys {
-		pathInfo := paths[key]
+	for _, basePath := range basePaths {
+		pathInfo := paths[basePath]
+		pathInfo.API.resolveShorthands()
 
-		path := toOpenAPIPath(pathInfo.API.Path)
-		if path == "" {
-			continue
-		}
-
-		if !matchFilter(path, pathInfo, filter) {
-			continue
-		}
-
-		doc.Tags = append(doc.Tags, collectTags(pathInfo)...)
-
-		pathItem := &openapi.PathItem{
-			Description: pathInfo.API.Description,
-			Summary:     pathInfo.API.Summary,
-			Extensions: map[string]any{
-				"x-kdex-type": pathInfo.Type,
-			},
-		}
-
-		if pathInfo.Metadata != nil {
-			pathItem.Extensions["x-kdex-metadata"] = pathInfo.Metadata
-		}
-
-		// Fill path item operations
-		ensureOpMetadata := func(op *openapi.Operation) {
-			if op == nil {
-				return
+		for curPatternPath, curItem := range pathInfo.API.Paths {
+			path := toOpenAPIPath(curPatternPath)
+			if path == "" {
+				continue
 			}
-			if op.Summary == "" {
-				op.Summary = pathInfo.API.Summary
-			}
-			if op.Description == "" {
-				op.Description = pathInfo.API.Description
-			}
-		}
 
-		if pathInfo.API.Get != nil {
-			ensureOpMetadata(pathInfo.API.Get)
-			pathItem.Get = pathInfo.API.Get
-		}
-		if pathInfo.API.Put != nil {
-			ensureOpMetadata(pathInfo.API.Put)
-			pathItem.Put = pathInfo.API.Put
-		}
-		if pathInfo.API.Post != nil {
-			ensureOpMetadata(pathInfo.API.Post)
-			pathItem.Post = pathInfo.API.Post
-		}
-		if pathInfo.API.Delete != nil {
-			ensureOpMetadata(pathInfo.API.Delete)
-			pathItem.Delete = pathInfo.API.Delete
-		}
-		if pathInfo.API.Options != nil {
-			ensureOpMetadata(pathInfo.API.Options)
-			pathItem.Options = pathInfo.API.Options
-		}
-		if pathInfo.API.Head != nil {
-			ensureOpMetadata(pathInfo.API.Head)
-			pathItem.Head = pathInfo.API.Head
-		}
-		if pathInfo.API.Patch != nil {
-			ensureOpMetadata(pathInfo.API.Patch)
-			pathItem.Patch = pathInfo.API.Patch
-		}
-		if pathInfo.API.Trace != nil {
-			ensureOpMetadata(pathInfo.API.Trace)
-			pathItem.Trace = pathInfo.API.Trace
-		}
-		if pathInfo.API.Connect != nil {
-			ensureOpMetadata(pathInfo.API.Connect)
-			pathItem.Connect = pathInfo.API.Connect
-		}
+			if !matchFilter(path, pathInfo, filter) {
+				continue
+			}
 
-		doc.Paths.Set(path, pathItem)
+			doc.Tags = append(doc.Tags, collectTags(pathInfo)...)
+
+			pathItem := &openapi.PathItem{
+				Description: curItem.Description,
+				Summary:     curItem.Summary,
+				Extensions: map[string]any{
+					"x-kdex-type": pathInfo.Type,
+				},
+			}
+
+			if pathInfo.Metadata != nil {
+				pathItem.Extensions["x-kdex-metadata"] = pathInfo.Metadata
+			}
+
+			// Fill path item operations
+			ensureOpMetadata := func(op *openapi.Operation) {
+				if op == nil {
+					return
+				}
+				if op.Summary == "" {
+					op.Summary = curItem.Summary
+				}
+				if op.Description == "" {
+					op.Description = curItem.Description
+				}
+			}
+
+			if curItem.Get != nil {
+				ensureOpMetadata(curItem.Get)
+				pathItem.Get = curItem.Get
+			}
+			if curItem.Put != nil {
+				ensureOpMetadata(curItem.Put)
+				pathItem.Put = curItem.Put
+			}
+			if curItem.Post != nil {
+				ensureOpMetadata(curItem.Post)
+				pathItem.Post = curItem.Post
+			}
+			if curItem.Delete != nil {
+				ensureOpMetadata(curItem.Delete)
+				pathItem.Delete = curItem.Delete
+			}
+			if curItem.Options != nil {
+				ensureOpMetadata(curItem.Options)
+				pathItem.Options = curItem.Options
+			}
+			if curItem.Head != nil {
+				ensureOpMetadata(curItem.Head)
+				pathItem.Head = curItem.Head
+			}
+			if curItem.Patch != nil {
+				ensureOpMetadata(curItem.Patch)
+				pathItem.Patch = curItem.Patch
+			}
+			if curItem.Trace != nil {
+				ensureOpMetadata(curItem.Trace)
+				pathItem.Trace = curItem.Trace
+			}
+			if curItem.Connect != nil {
+				ensureOpMetadata(curItem.Connect)
+				pathItem.Connect = curItem.Connect
+			}
+
+			doc.Paths.Set(path, pathItem)
+		}
 
 		for key, schema := range pathInfo.API.Schemas {
 			_, found := doc.Components.Schemas[key]
 			if found {
-				key = key + ":conflict:" + GenerateNameFromPath(path, "")
+				key = key + ":conflict:" + rand.Text()[0:4]
 			}
 
 			doc.Components.Schemas[key] = schema
@@ -254,32 +370,34 @@ func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filt
 func collectTags(pathInfo PathInfo) []*openapi.Tag {
 	tags := []string{}
 
-	if pathInfo.API.Connect != nil {
-		tags = append(tags, pathInfo.API.Connect.Tags...)
-	}
-	if pathInfo.API.Delete != nil {
-		tags = append(tags, pathInfo.API.Delete.Tags...)
-	}
-	if pathInfo.API.Get != nil {
-		tags = append(tags, pathInfo.API.Get.Tags...)
-	}
-	if pathInfo.API.Head != nil {
-		tags = append(tags, pathInfo.API.Head.Tags...)
-	}
-	if pathInfo.API.Options != nil {
-		tags = append(tags, pathInfo.API.Options.Tags...)
-	}
-	if pathInfo.API.Patch != nil {
-		tags = append(tags, pathInfo.API.Patch.Tags...)
-	}
-	if pathInfo.API.Post != nil {
-		tags = append(tags, pathInfo.API.Post.Tags...)
-	}
-	if pathInfo.API.Put != nil {
-		tags = append(tags, pathInfo.API.Put.Tags...)
-	}
-	if pathInfo.API.Trace != nil {
-		tags = append(tags, pathInfo.API.Trace.Tags...)
+	for _, curItem := range pathInfo.API.Paths {
+		if curItem.Connect != nil {
+			tags = append(tags, curItem.Connect.Tags...)
+		}
+		if curItem.Delete != nil {
+			tags = append(tags, curItem.Delete.Tags...)
+		}
+		if curItem.Get != nil {
+			tags = append(tags, curItem.Get.Tags...)
+		}
+		if curItem.Head != nil {
+			tags = append(tags, curItem.Head.Tags...)
+		}
+		if curItem.Options != nil {
+			tags = append(tags, curItem.Options.Tags...)
+		}
+		if curItem.Patch != nil {
+			tags = append(tags, curItem.Patch.Tags...)
+		}
+		if curItem.Post != nil {
+			tags = append(tags, curItem.Post.Tags...)
+		}
+		if curItem.Put != nil {
+			tags = append(tags, curItem.Put.Tags...)
+		}
+		if curItem.Trace != nil {
+			tags = append(tags, curItem.Trace.Tags...)
+		}
 	}
 
 	openApiTags := []*openapi.Tag{}
@@ -533,32 +651,44 @@ func InferSchema(val any) *openapi.SchemaRef {
 }
 
 func MergeOperations(dest, src *OpenAPI) {
-	if src.Connect != nil {
-		dest.Connect = src.Connect
-	}
-	if src.Delete != nil {
-		dest.Delete = src.Delete
-	}
-	if src.Get != nil {
-		dest.Get = src.Get
-	}
-	if src.Head != nil {
-		dest.Head = src.Head
-	}
-	if src.Options != nil {
-		dest.Options = src.Options
-	}
-	if src.Patch != nil {
-		dest.Patch = src.Patch
-	}
-	if src.Post != nil {
-		dest.Post = src.Post
-	}
-	if src.Put != nil {
-		dest.Put = src.Put
-	}
-	if src.Trace != nil {
-		dest.Trace = src.Trace
+	dest.resolveShorthands()
+	src.resolveShorthands()
+	for srcPath, srcItem := range src.Paths {
+		destItem, ok := dest.Paths[srcPath]
+
+		if !ok {
+			dest.Paths[srcPath] = srcItem
+		} else {
+			if srcItem.Connect != nil {
+				destItem.Connect = srcItem.Connect
+			}
+			if srcItem.Delete != nil {
+				destItem.Delete = srcItem.Delete
+			}
+			if srcItem.Get != nil {
+				destItem.Get = srcItem.Get
+			}
+			if srcItem.Head != nil {
+				destItem.Head = srcItem.Head
+			}
+			if srcItem.Options != nil {
+				destItem.Options = srcItem.Options
+			}
+			if srcItem.Patch != nil {
+				destItem.Patch = srcItem.Patch
+			}
+			if srcItem.Post != nil {
+				destItem.Post = srcItem.Post
+			}
+			if srcItem.Put != nil {
+				destItem.Put = srcItem.Put
+			}
+			if srcItem.Trace != nil {
+				destItem.Trace = srcItem.Trace
+			}
+
+			dest.Paths[srcPath] = destItem
+		}
 	}
 }
 

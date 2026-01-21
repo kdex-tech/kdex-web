@@ -10,6 +10,34 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+type Method string
+
+const (
+	Connect Method = http.MethodConnect
+	Delete  Method = http.MethodDelete
+	Get     Method = http.MethodGet
+	Head    Method = http.MethodHead
+	Options Method = http.MethodOptions
+	Patch   Method = http.MethodPatch
+	Post    Method = http.MethodPost
+	Put     Method = http.MethodPut
+	Trace   Method = http.MethodTrace
+)
+
+func Methods() []Method {
+	return []Method{
+		Connect,
+		Delete,
+		Get,
+		Head,
+		Options,
+		Patch,
+		Post,
+		Put,
+		Trace,
+	}
+}
+
 func GetParam(name string, defaultValue string, r *http.Request) string {
 	value := r.PathValue(name)
 
