@@ -1315,7 +1315,6 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			operationId := ko.GenerateOperationID(name, tt.r.Method, tt.r.Header.Get("X-KDex-Function-Operation-ID"))
 			items, schemas, err := s.parseRequestIntoAPI(
 				tt.r,
-				name,
 				tt.r.URL.Path,
 				operationId)
 			tt.assertions(t, items, schemas, err)
@@ -1338,13 +1337,12 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	r.Header.Set("X-KDex-Function-Request-Schema-Ref", "User")
 	r.Header.Set("X-KDex-Function-Response-Schema-Ref", "User")
 
-	basePath, patternPath, err := s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
+	_, patternPath, err := s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
 	assert.NoError(t, err)
 	patternName := ko.GenerateNameFromPath(pattern, "")
 	operationId := ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err := s.parseRequestIntoAPI(
 		r,
-		ko.GenerateNameFromPath(basePath, ""),
 		patternPath,
 		operationId)
 	assert.NoError(t, err)
@@ -1442,12 +1440,11 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	r.Header.Set("X-KDex-Function-Pattern-Path", pattern)
 	r.Header.Set("X-KDex-Function-Response-Schema-Ref", "User")
 
-	basePath, patternPath, err = s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
+	_, patternPath, err = s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
 	assert.NoError(t, err)
 	operationId = ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err = s.parseRequestIntoAPI(
 		r,
-		ko.GenerateNameFromPath(basePath, ""),
 		patternPath,
 		operationId)
 	assert.NoError(t, err)
@@ -1500,12 +1497,11 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	r.Header.Set("X-KDex-Function-Pattern-Path", pattern)
 	r.Header.Set("X-KDex-Function-Response-Schema-Ref", "User")
 
-	basePath, patternPath, err = s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
+	_, patternPath, err = s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
 	assert.NoError(t, err)
 	operationId = ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err = s.parseRequestIntoAPI(
 		r,
-		ko.GenerateNameFromPath(basePath, ""),
 		patternPath,
 		operationId)
 	assert.NoError(t, err)
@@ -1556,12 +1552,11 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	r = httptest.NewRequest("HEAD", "/v2/users/{id}", http.NoBody)
 	r.Header.Set("X-KDex-Function-Pattern-Path", pattern)
 
-	basePath, patternPath, err = s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
+	_, patternPath, err = s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
 	assert.NoError(t, err)
 	operationId = ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err = s.parseRequestIntoAPI(
 		r,
-		ko.GenerateNameFromPath(basePath, ""),
 		patternPath,
 		operationId)
 	assert.NoError(t, err)
@@ -1608,12 +1603,11 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	r.Header.Set("X-KDex-Function-Pattern-Path", pattern)
 	r.Header.Set("X-KDex-Function-Response-Schema-Ref", "User")
 
-	basePath, patternPath, err = s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
+	_, patternPath, err = s.calculatePaths(r, r.Header.Get("X-KDex-Function-Pattern-Path"))
 	assert.NoError(t, err)
 	operationId = ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err = s.parseRequestIntoAPI(
 		r,
-		ko.GenerateNameFromPath(basePath, ""),
 		patternPath,
 		operationId)
 	assert.NoError(t, err)

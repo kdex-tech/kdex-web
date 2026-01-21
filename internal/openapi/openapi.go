@@ -35,19 +35,6 @@ type OpenAPI struct {
 	BasePath string
 	Paths    map[string]PathItem
 	Schemas  map[string]*openapi.SchemaRef
-
-	// Shorthand fields for a single-path API
-	Connect     *openapi.Operation
-	Delete      *openapi.Operation
-	Description string
-	Get         *openapi.Operation
-	Head        *openapi.Operation
-	Options     *openapi.Operation
-	Patch       *openapi.Operation
-	Post        *openapi.Operation
-	Put         *openapi.Operation
-	Summary     string
-	Trace       *openapi.Operation
 }
 
 type PathItem struct {
@@ -63,84 +50,6 @@ type PathItem struct {
 	Put         *openapi.Operation
 	Summary     string
 	Trace       *openapi.Operation
-}
-
-func (o *OpenAPI) resolveShorthands() {
-	if o.Paths == nil {
-		o.Paths = make(map[string]PathItem)
-	}
-	path := o.BasePath
-	if path == "" {
-		path = "/"
-	}
-	item := o.Paths[path]
-	if o.Connect != nil {
-		item.Connect = o.Connect
-	}
-	if o.Delete != nil {
-		item.Delete = o.Delete
-	}
-	if o.Description != "" {
-		item.Description = o.Description
-	}
-	if o.Get != nil {
-		item.Get = o.Get
-	}
-	if o.Head != nil {
-		item.Head = o.Head
-	}
-	if o.Options != nil {
-		item.Options = o.Options
-	}
-	if o.Patch != nil {
-		item.Patch = o.Patch
-	}
-	if o.Post != nil {
-		item.Post = o.Post
-	}
-	if o.Put != nil {
-		item.Put = o.Put
-	}
-	if o.Summary != "" {
-		item.Summary = o.Summary
-	}
-	if o.Trace != nil {
-		item.Trace = o.Trace
-	}
-	o.Paths[path] = item
-}
-
-func (o *OpenAPI) SetOperation(method string, op *openapi.Operation) {
-	o.resolveShorthands()
-	path := o.BasePath
-	if path == "" {
-		path = "/"
-	}
-	item := o.Paths[path]
-	item.SetOperation(method, op)
-	o.Paths[path] = item
-
-	// Update shorthand field if applicable
-	switch method {
-	case "CONNECT":
-		o.Connect = op
-	case "DELETE":
-		o.Delete = op
-	case "GET":
-		o.Get = op
-	case "HEAD":
-		o.Head = op
-	case "OPTIONS":
-		o.Options = op
-	case "PATCH":
-		o.Patch = op
-	case "POST":
-		o.Post = op
-	case "PUT":
-		o.Put = op
-	case "TRACE":
-		o.Trace = op
-	}
 }
 
 func FromKDexAPI(k *kdexv1alpha1.API) *OpenAPI {
@@ -194,7 +103,6 @@ func (o *PathItem) SetOperation(method string, op *openapi.Operation) {
 }
 
 func (o *OpenAPI) ToKDexAPI() *kdexv1alpha1.API {
-	o.resolveShorthands()
 	k := &kdexv1alpha1.API{
 		BasePath: o.BasePath,
 		Paths:    map[string]kdexv1alpha1.PathItem{},
@@ -275,15 +183,14 @@ func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filt
 
 	for _, basePath := range basePaths {
 		pathInfo := paths[basePath]
-		pathInfo.API.resolveShorthands()
 
 		for curPatternPath, curItem := range pathInfo.API.Paths {
-			path := toOpenAPIPath(curPatternPath)
-			if path == "" {
+			openapiPath := toOpenAPIPath(curPatternPath)
+			if openapiPath == "" {
 				continue
 			}
 
-			if !matchFilter(path, pathInfo, filter) {
+			if !matchFilter(openapiPath, pathInfo, filter) {
 				continue
 			}
 
@@ -351,7 +258,7 @@ func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filt
 				pathItem.Connect = curItem.Connect
 			}
 
-			doc.Paths.Set(path, pathItem)
+			doc.Paths.Set(openapiPath, pathItem)
 		}
 
 		for key, schema := range pathInfo.API.Schemas {
@@ -416,14 +323,14 @@ func collectTags(pathInfo PathInfo) []*openapi.Tag {
 	return openApiTags
 }
 
-func ExtractParameters(path string, query string, header http.Header) openapi.Parameters {
-	path = strings.ReplaceAll(path, "{$}", "")
+func ExtractParameters(routePath string, query string, header http.Header) openapi.Parameters {
+	routePath = strings.ReplaceAll(routePath, "{$}", "")
 
 	var params openapi.Parameters
 
 	// Regular expression to match path parameters: {name} or {name...}
 	paramRegex := regexp.MustCompile(`\{([^}]+)\}`)
-	matches := paramRegex.FindAllStringSubmatch(path, -1)
+	matches := paramRegex.FindAllStringSubmatch(routePath, -1)
 
 	for _, match := range matches {
 		if len(match) < 2 {
@@ -580,12 +487,12 @@ func ExtractParameters(path string, query string, header http.Header) openapi.Pa
 	return params
 }
 
-func GenerateNameFromPath(path string, headerValue string) string {
+func GenerateNameFromPath(routePath string, headerValue string) string {
 	if headerValue != "" {
 		return headerValue
 	}
 
-	cleanPath := strings.NewReplacer("{", "", "}", "", ".", "-", "$", "", " ", "-", "[", "", "]", "").Replace(path)
+	cleanPath := strings.NewReplacer("{", "", "}", "", ".", "-", "$", "", " ", "-", "[", "", "]", "").Replace(routePath)
 	name := strings.ToLower(cleanPath)
 	name = strings.ReplaceAll(name, "/", "-")
 
@@ -651,8 +558,6 @@ func InferSchema(val any) *openapi.SchemaRef {
 }
 
 func MergeOperations(dest, src *OpenAPI) {
-	dest.resolveShorthands()
-	src.resolveShorthands()
 	for srcPath, srcItem := range src.Paths {
 		destItem, ok := dest.Paths[srcPath]
 
@@ -719,8 +624,8 @@ func ExtractSchemaName(schemaString string) (string, error) {
 	return base, nil
 }
 
-func matchFilter(path string, info PathInfo, filter Filter) bool {
-	if len(filter.Paths) > 0 && !slices.Contains(filter.Paths, path) {
+func matchFilter(routePath string, info PathInfo, filter Filter) bool {
+	if len(filter.Paths) > 0 && !slices.Contains(filter.Paths, routePath) {
 		return false
 	}
 
@@ -739,6 +644,6 @@ func matchFilter(path string, info PathInfo, filter Filter) bool {
 	return true
 }
 
-func toOpenAPIPath(path string) string {
-	return strings.ReplaceAll(wildcardRegex.ReplaceAllString(path, "}"), "{$}", "")
+func toOpenAPIPath(routePath string) string {
+	return strings.ReplaceAll(wildcardRegex.ReplaceAllString(routePath, "}"), "{$}", "")
 }

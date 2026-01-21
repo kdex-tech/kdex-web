@@ -344,7 +344,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	for _, function := range functions.Items {
-		for routePath, _ := range function.Spec.API.Paths {
+		for routePath := range function.Spec.API.Paths {
 			if seenPaths[routePath] {
 				err = fmt.Errorf(
 					"duplicated path %s, paths must be unique across backends and pages, obj: %s/%s, kind: %s",
@@ -510,7 +510,7 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 			API: ko.OpenAPI{
 				BasePath: basePath,
 				Paths: map[string]ko.PathItem{
-					wildcardPath: ko.PathItem{
+					wildcardPath: {
 						Description: description,
 						Get:         op,
 						Summary:     summary,

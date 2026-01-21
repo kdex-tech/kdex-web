@@ -185,7 +185,10 @@ func (th *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 			// Fallback body for those who don't follow redirects
 			// Use OSC 8 for clickable link
 			link := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", absoluteURL, absoluteURL)
-			fmt.Fprintf(w, "➔ API Draft Created. View at: %s\n(Note: Use 'curl -L' to follow automatically).\n", link)
+			_, err = fmt.Fprintf(w, "➔ API Draft Created. View at: %s\n(Note: Use 'curl -L' to follow automatically).\n", link)
+			if err != nil {
+				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+			}
 			return
 		}
 
@@ -216,26 +219,32 @@ func (th *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 	specBytes, _ := json.MarshalIndent(spec, "", "  ")
 	specStr := string(specBytes)
 
+	var out bytes.Buffer
+
 	if format == "text" {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte(fmt.Sprintf("%s─── API DESIGN FEEDBACK ───%s\n\n", defaultTheme.CLIHeader, defaultTheme.CLIReset)))
-
-		w.Write([]byte(fmt.Sprintf("%s✓ Analyzed Request:%s %s %s\n", defaultTheme.CLISuccess, defaultTheme.CLIReset, result.OriginalRequest.Method, result.OriginalRequest.URL.Path)))
+		fmt.Fprintf(&out, "%s─── API DESIGN FEEDBACK ───%s\n\n", defaultTheme.CLIHeader, defaultTheme.CLIReset)
+		fmt.Fprintf(&out, "%s✓ Analyzed Request:%s %s %s\n", defaultTheme.CLISuccess, defaultTheme.CLIReset, result.OriginalRequest.Method, result.OriginalRequest.URL.Path)
 
 		if len(result.Lints) > 0 {
-			w.Write([]byte(fmt.Sprintf("\n%sWarnings / Insights:%s\n", defaultTheme.CLIWarning, defaultTheme.CLIReset)))
+			out.WriteString(fmt.Sprintf("\n%sWarnings / Insights:%s\n", defaultTheme.CLIWarning, defaultTheme.CLIReset))
 			for _, lint := range result.Lints {
-				w.Write([]byte(fmt.Sprintf("  • %s\n", lint)))
+				out.WriteString(fmt.Sprintf("  • %s\n", lint))
 			}
 		}
 
-		w.Write([]byte(fmt.Sprintf("\n%sGenerated OpenAPI Spec (Fragment):%s\n", defaultTheme.CLIDim, defaultTheme.CLIReset)))
+		fmt.Fprintf(&out, "\n%sGenerated OpenAPI Spec (Fragment):%s\n", defaultTheme.CLIDim, defaultTheme.CLIReset)
 		lines := strings.Split(specStr, "\n")
 		for i, line := range lines {
 			if line == "" && i == len(lines)-1 {
 				break
 			}
-			w.Write([]byte(fmt.Sprintf("%s%4d │ %s%s\n", defaultTheme.CLILineNum, i+1, defaultTheme.CLIReset, line)))
+			fmt.Fprintf(&out, "%s%4d │ %s%s\n", defaultTheme.CLILineNum, i+1, defaultTheme.CLIReset, line)
+		}
+
+		_, err := w.Write(out.Bytes())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -243,7 +252,7 @@ func (th *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 	// HTML Dashboard
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-	html := fmt.Sprintf(`<!DOCTYPE html>
+	fmt.Fprintf(&out, `<!DOCTYPE html>
 <html>
 <head>
 	<title>KDex API Workbench</title>
@@ -293,29 +302,31 @@ func (th *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 	</div>
 </body>
 </html>`,
-		defaultTheme.BgPage,             // 1
-		defaultTheme.TextPrimary,        // 2
-		defaultTheme.BgSidebar,          // 3
-		defaultTheme.Border,             // 4
-		defaultTheme.TextAccent,         // 5
-		defaultTheme.TextSecondary,      // 6
-		defaultTheme.BgCard,             // 7
-		defaultTheme.MethodGet,          // 8
-		defaultTheme.MethodPost,         // 9
-		defaultTheme.MethodPut,          // 10
-		defaultTheme.MethodDelete,       // 11
-		defaultTheme.TextLint,           // 12
-		defaultTheme.BgCode,             // 13
-		defaultTheme.TextCode,           // 14
-		defaultTheme.BtnSuccess,         // 15
-		defaultTheme.BtnHover,           // 16
-		result.OriginalRequest.Method,   // 17
-		result.OriginalRequest.URL.Path, // 18
-		generateLintHTML(result.Lints),  // 19
-		renderSpecHTML(specStr),         // 20
-	)
+		defaultTheme.BgPage,
+		defaultTheme.TextPrimary,
+		defaultTheme.BgSidebar,
+		defaultTheme.Border,
+		defaultTheme.TextAccent,
+		defaultTheme.TextSecondary,
+		defaultTheme.BgCard,
+		defaultTheme.MethodGet,
+		defaultTheme.MethodPost,
+		defaultTheme.MethodPut,
+		defaultTheme.MethodDelete,
+		defaultTheme.TextLint,
+		defaultTheme.BgCode,
+		defaultTheme.TextCode,
+		defaultTheme.BtnSuccess,
+		defaultTheme.BtnHover,
+		result.OriginalRequest.Method,
+		result.OriginalRequest.URL.Path,
+		generateLintHTML(result.Lints),
+		renderSpecHTML(specStr))
 
-	w.Write([]byte(html))
+	_, err := w.Write(out.Bytes())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func generateLintHTML(lints []string) string {

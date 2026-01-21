@@ -463,7 +463,7 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 		API: ko.OpenAPI{
 			BasePath: finalPath,
 			Paths: map[string]ko.PathItem{
-				finalPath: ko.PathItem{
+				finalPath: {
 					Description: fmt.Sprintf("Rendered HTML page for %s", label),
 					Get: &openapi.Operation{
 						Parameters: ko.ExtractParameters(finalPath, "", http.Header{}),
@@ -481,7 +481,7 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 		API: ko.OpenAPI{
 			BasePath: l10nPath,
 			Paths: map[string]ko.PathItem{
-				l10nPath: ko.PathItem{
+				l10nPath: {
 					Description: fmt.Sprintf("Localized rendered HTML page for %s", label),
 					Get: &openapi.Operation{
 						Parameters: ko.ExtractParameters(l10nPath, "", http.Header{}),
@@ -552,23 +552,27 @@ func (th *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 	mux.HandleFunc("GET "+path, th.favicon.FaviconHandler)
 	registeredPaths[path] = ko.PathInfo{
 		API: ko.OpenAPI{
-			Description: "A default favicon",
-			Get: &openapi.Operation{
-				Responses: openapi.NewResponses(
-					openapi.WithName("200", &openapi.Response{
-						Content: openapi.NewContentWithSchema(
-							&openapi.Schema{
-								Format: "xml",
-								Type:   &openapi.Types{openapi.TypeString},
-							},
-							[]string{"image/svg+xml"},
-						),
-						Description: openapi.Ptr("SVG Favicon"),
-					}),
-				),
-			},
 			BasePath: path,
-			Summary:  "The site favicon",
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "A default favicon",
+					Get: &openapi.Operation{
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										Format: "xml",
+										Type:   &openapi.Types{openapi.TypeString},
+									},
+									[]string{"image/svg+xml"},
+								),
+								Description: openapi.Ptr("SVG Favicon"),
+							}),
+						),
+					},
+					Summary: "The site favicon",
+				},
+			},
 		},
 		Type: ko.InternalPathType,
 	}
@@ -692,33 +696,37 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 
 	th.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
-			Description: "Provides dynamic HTML fragments for page navigation components, supporting localization and breadcrumb contexts.",
-			Get: &openapi.Operation{
-				Parameters: ko.ExtractParameters(path, "", http.Header{}),
-				Responses: openapi.NewResponses(
-					openapi.WithName("200", &openapi.Response{
-						Content: openapi.NewContentWithSchema(
-							&openapi.Schema{
-								Format: "html",
-								Type:   &openapi.Types{openapi.TypeString},
-							},
-							[]string{"text/html"},
-						),
-						Description: openapi.Ptr("HTML navigation fragment"),
-					}),
-					openapi.WithName("400", &openapi.Response{
-						Description: openapi.Ptr("Unable to ascertain the locale from the {l10n} parameter"),
-					}),
-					openapi.WithName("404", &openapi.Response{
-						Description: openapi.Ptr("Resource not found"),
-					}),
-					openapi.WithName("500", &openapi.Response{
-						Description: openapi.Ptr("Internal server error"),
-					}),
-				),
-			},
 			BasePath: path,
-			Summary:  "Dynamic Navigation Fragment Provider",
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "Provides dynamic HTML fragments for page navigation components, supporting localization and breadcrumb contexts.",
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(path, "", http.Header{}),
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										Format: "html",
+										Type:   &openapi.Types{openapi.TypeString},
+									},
+									[]string{"text/html"},
+								),
+								Description: openapi.Ptr("HTML navigation fragment"),
+							}),
+							openapi.WithName("400", &openapi.Response{
+								Description: openapi.Ptr("Unable to ascertain the locale from the {l10n} parameter"),
+							}),
+							openapi.WithName("404", &openapi.Response{
+								Description: openapi.Ptr("Resource not found"),
+							}),
+							openapi.WithName("500", &openapi.Response{
+								Description: openapi.Ptr("Internal server error"),
+							}),
+						),
+					},
+					Summary: "Dynamic Navigation Fragment Provider",
+				},
+			},
 		},
 		Type: ko.InternalPathType,
 	}, registeredPaths)
@@ -730,29 +738,33 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 	// Register the path itself so it appears in the spec
 	th.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
-			Description: "Serves the generated OpenAPI 3.0 specification for this host.",
-			Get: &openapi.Operation{
-				Parameters: ko.ExtractParameters(path, "path=one&path=two&tag=one&tag=two&type=one", http.Header{}),
-				Responses: openapi.NewResponses(
-					openapi.WithName("200", &openapi.Response{
-						Content: openapi.NewContentWithSchema(
-							&openapi.Schema{
-								AdditionalProperties: openapi.AdditionalProperties{
-									Has: openapi.Ptr(true),
-								},
-								Type: &openapi.Types{openapi.TypeObject},
-							},
-							[]string{"application/json"},
-						),
-						Description: openapi.Ptr("OpenAPI documentation"),
-					}),
-					openapi.WithName("500", &openapi.Response{
-						Description: openapi.Ptr("Failed to marshal OpenAPI spec"),
-					}),
-				),
-			},
 			BasePath: path,
-			Summary:  "OpenAPI Specification",
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "Serves the generated OpenAPI 3.0 specification for this host.",
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(path, "path=one&path=two&tag=one&tag=two&type=one", http.Header{}),
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										AdditionalProperties: openapi.AdditionalProperties{
+											Has: openapi.Ptr(true),
+										},
+										Type: &openapi.Types{openapi.TypeObject},
+									},
+									[]string{"application/json"},
+								),
+								Description: openapi.Ptr("OpenAPI documentation"),
+							}),
+							openapi.WithName("500", &openapi.Response{
+								Description: openapi.Ptr("Failed to marshal OpenAPI spec"),
+							}),
+						),
+					},
+					Summary: "OpenAPI Specification",
+				},
+			},
 		},
 		Type: ko.InternalPathType,
 	}, registeredPaths)
@@ -880,24 +892,28 @@ func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 		mux.HandleFunc("GET "+path, th.sniffer.DocsHandler)
 		registeredPaths[path] = ko.PathInfo{
 			API: ko.OpenAPI{
-				Description: "Provides Markdown documentation for the Request Sniffer's supported headers and behaviors.",
-				Get: &openapi.Operation{
-					Parameters: ko.ExtractParameters(path, "", http.Header{}),
-					Responses: openapi.NewResponses(
-						openapi.WithName("200", &openapi.Response{
-							Description: openapi.Ptr("Markdown"),
-							Content: openapi.NewContentWithSchema(
-								&openapi.Schema{
-									Format: "markdown",
-									Type:   &openapi.Types{openapi.TypeString},
-								},
-								[]string{"text/markdown"},
-							),
-						}),
-					),
-				},
 				BasePath: path,
-				Summary:  "Request Sniffer Documentation",
+				Paths: map[string]ko.PathItem{
+					path: {
+						Description: "Provides Markdown documentation for the Request Sniffer's supported headers and behaviors.",
+						Get: &openapi.Operation{
+							Parameters: ko.ExtractParameters(path, "", http.Header{}),
+							Responses: openapi.NewResponses(
+								openapi.WithName("200", &openapi.Response{
+									Description: openapi.Ptr("Markdown"),
+									Content: openapi.NewContentWithSchema(
+										&openapi.Schema{
+											Format: "markdown",
+											Type:   &openapi.Types{openapi.TypeString},
+										},
+										[]string{"text/markdown"},
+									),
+								}),
+							),
+						},
+						Summary: "Request Sniffer Documentation",
+					},
+				},
 			},
 			Type: ko.InternalPathType,
 		}
@@ -983,10 +999,14 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 
 	th.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
-			Description: "Provides a JSON map of localization keys and their translated values for a given language tag.",
-			Get:         op,
-			BasePath:    path,
-			Summary:     "Localization Key Provider",
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "Provides a JSON map of localization keys and their translated values for a given language tag.",
+					Get:         op,
+					Summary:     "Localization Key Provider",
+				},
+			},
 		},
 		Type: ko.InternalPathType,
 	}, registeredPaths)
@@ -1003,32 +1023,32 @@ func (th *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, 
 	)
 
 	parts := strings.Split(pattern, " ")
-	method := "GET"
 	path := pattern
 	if len(parts) > 1 {
-		method = parts[0]
 		path = parts[1]
-	}
-
-	op := &openapi.Operation{
-		Parameters: ko.ExtractParameters(path, "", http.Header{}),
-		Responses: openapi.NewResponses(
-			openapi.WithName("501", &openapi.Response{
-				Description: openapi.Ptr("Not Implemented - This system endpoint is defined but not yet functional."),
-			}),
-		),
 	}
 
 	info := ko.PathInfo{
 		API: ko.OpenAPI{
-			Description: fmt.Sprintf("Internal system endpoint providing %s functionality. NOT YET IMPLEMENTED!", path),
-			BasePath:    path,
-			Summary:     fmt.Sprintf("System Endpoint: %s", path),
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: fmt.Sprintf("Internal system endpoint providing %s functionality. NOT YET IMPLEMENTED!", path),
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(path, "", http.Header{}),
+						Responses: openapi.NewResponses(
+							openapi.WithName("501", &openapi.Response{
+								Description: openapi.Ptr("Not Implemented - This system endpoint is defined but not yet functional."),
+							}),
+						),
+					},
+					Summary: fmt.Sprintf("System Endpoint: %s", path),
+				},
+			},
 		},
 		Type: ko.InternalPathType,
 	}
 
-	info.API.SetOperation(method, op)
 	th.registerPath(path, info, registeredPaths)
 }
 
