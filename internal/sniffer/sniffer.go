@@ -35,6 +35,7 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
 
 ### Custom HTTP Headers
 
+- **X-KDex-Function-Comprehensive-Mode**: Set to "true" to enable Comprehensive API Modelling. This automatically generates a full suite of CRUD operations (GET, POST, PUT, PATCH, DELETE) for both collection and resource paths based on the pattern path.
 - **X-KDex-Function-Deprecated**: Set to "true" to mark the operation as deprecated.
 - **X-KDex-Function-Description**: Sets the OpenAPI operation description.
 - **X-KDex-Function-Keep-Schema-Conflict**: Tells OpenAPI to keep conflicting under a special no-conflict key. Diagnostic feature.
@@ -282,6 +283,7 @@ func (s *RequestSniffer) mergeAPIIntoFunction(
 	out *kdexv1alpha1.KDexFunction,
 	calculated map[string]kdexv1alpha1.PathItem,
 	schemas map[string]*openapi.SchemaRef,
+	overwriteOperation bool,
 	keepConflictedSchemas bool,
 ) {
 	if out.Spec.API.Paths == nil {
@@ -290,6 +292,13 @@ func (s *RequestSniffer) mergeAPIIntoFunction(
 
 	for calculatePath, calculatePathItem := range calculated {
 		pathItem := out.Spec.API.Paths[calculatePath]
+
+		if overwriteOperation {
+			pathItem.Description = calculatePathItem.Description
+			pathItem.Summary = calculatePathItem.Summary
+		}
+
+		// TODO: merge parameters
 
 		for _, method := range kh.Methods() {
 			op := calculatePathItem.GetOp(string(method))
@@ -303,10 +312,6 @@ func (s *RequestSniffer) mergeAPIIntoFunction(
 					}
 				}
 			}
-		}
-
-		if pathItem.Description == "" || strings.HasPrefix(pathItem.Description, "Auto-generated") {
-			pathItem.Description = fmt.Sprintf("Auto-generated from request to %s", calculatePath)
 		}
 
 		out.Spec.API.Paths[calculatePath] = pathItem
@@ -333,45 +338,11 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 	routePath string,
 	operationId string,
 ) (map[string]kdexv1alpha1.PathItem, map[string]*openapi.SchemaRef, error) {
-
-	/*
-		TODO: when presented with a schema introduce support to model a comprehensive set of paths and operations to operate over it
-
-		1. The Core Path Patterns
-
-		For any given schema (e.g., User or Order), a well-rounded system should generate these five categories of endpoints:
-		A. Collection Endpoints (/resources)
-
-			GET: Supports pagination, filtering, and sorting (e.g., ?limit=10&sort=createdAt).
-
-			POST: For creating a single resource.
-
-			PATCH (Bulk): Optional, but useful for updating multiple records at once.
-
-		B. Individual Resource Endpoints (/resources/{id})
-
-			GET: Returns the full object.
-
-			PUT: For a full replacement of the resource.
-
-			PATCH: For partial updates (crucial for "well-rounded" APIs to prevent data over-writing).
-
-			DELETE: To remove or soft-delete the resource.
-
-		C. Relationship Endpoints (/resources/{id}/sub-resources)
-
-		If your schema has nested relationships (e.g., an Order has Items), the generator should identify these and create sub-paths:
-
-			GET /orders/{id}/items
-
-		D. Action/Command Endpoints (/resources/{id}/actions/name)
-
-		For logic that doesn't fit a standard verb—like POST /orders/{id}/submit or POST /users/{id}/reset-password.
-	*/
-
 	pathItems := map[string]kdexv1alpha1.PathItem{}
 	schemas := map[string]*openapi.SchemaRef{}
-	pathItem := kdexv1alpha1.PathItem{}
+	pathItem := kdexv1alpha1.PathItem{
+		Description: fmt.Sprintf("Auto-generated from request to %s", r.URL.Path),
+	}
 
 	op := &openapi.Operation{
 		Deprecated:  strings.ToLower(r.Header.Get("X-KDex-Function-Deprecated")) == TRUE,
@@ -670,7 +641,196 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 	pathItem.SetOp(r.Method, op)
 	pathItems[routePath] = pathItem
 
+	if strings.ToLower(r.Header.Get("X-KDex-Function-Comprehensive-Mode")) == TRUE {
+		// Comprehensive Mode: Generate full CRUD suite
+		// Determine base collection path and resource path
+		var collectionPath, resourcePath string
+		segments := strings.Split(routePath, "/")
+
+		if len(segments) > 0 {
+			lastSegment := segments[len(segments)-1]
+			if strings.HasPrefix(lastSegment, "{") && strings.HasSuffix(lastSegment, "}") {
+				// We are at a Resource Path (e.g., /v1/users/{id})
+				resourcePath = routePath
+				collectionPath = strings.Join(segments[:len(segments)-1], "/")
+			} else {
+				// We are at a Collection Path (e.g., /v1/users)
+				collectionPath = routePath
+				resourcePath = routePath + "/{id}"
+			}
+
+			// 1. Handle Collection Path (/resources)
+			colItem, colExists := pathItems[collectionPath]
+			if !colExists {
+				colItem = kdexv1alpha1.PathItem{
+					Description: "Collection Operations",
+				}
+			}
+			s.generateCollectionOperations(&colItem, op, requestSchemaRef, responseSchemaRef)
+			pathItems[collectionPath] = colItem
+
+			// 2. Handle Resource Path (/resources/{id})
+			resItem, resExists := pathItems[resourcePath]
+			if !resExists {
+				resItem = kdexv1alpha1.PathItem{
+					Description: "Resource Operations",
+				}
+			}
+			s.generateResourceOperations(resourcePath, &resItem, op, requestSchemaRef, responseSchemaRef)
+			pathItems[resourcePath] = resItem
+		}
+	}
+
 	return pathItems, schemas, nil
+}
+
+func (s *RequestSniffer) generateCollectionOperations(item *kdexv1alpha1.PathItem, templateOp *openapi.Operation, reqRef, respRef string) {
+	// GET /resources (List)
+	listOp := &openapi.Operation{
+		Tags:        templateOp.Tags,
+		Summary:     "List Resources",
+		Description: "Retrieve a paginated list of resources.",
+		OperationID: "list-" + templateOp.OperationID, // simplified ID generation
+		Responses:   openapi.NewResponses(),
+		Security:    templateOp.Security,
+	}
+	// Add pagination params
+	listOp.Parameters = append(listOp.Parameters,
+		&openapi.ParameterRef{Value: &openapi.Parameter{Name: "limit", In: "query", Description: "Maximum number of items to return.", Schema: openapi.NewSchemaRef("", openapi.NewIntegerSchema().WithMin(1).WithMax(100))}},
+		&openapi.ParameterRef{Value: &openapi.Parameter{Name: "offset", In: "query", Description: "Offset to start returning items from.", Schema: openapi.NewSchemaRef("", openapi.NewIntegerSchema().WithMin(0))}},
+	)
+
+	listResp := openapi.NewResponse().WithDescription("List of resources")
+	if respRef != "" {
+		listResp.Content = openapi.NewContent()
+		listResp.Content["application/json"] = &openapi.MediaType{
+			Schema: &openapi.SchemaRef{
+				Value: &openapi.Schema{
+					Type:  &openapi.Types{openapi.TypeArray},
+					Items: &openapi.SchemaRef{Ref: respRef},
+				},
+			},
+		}
+	}
+	listOp.Responses.Set("200", &openapi.ResponseRef{Value: listResp})
+	item.SetGet(listOp)
+
+	// POST /resources (Create)
+	createOp := &openapi.Operation{
+		Tags:        templateOp.Tags,
+		Summary:     "Create Resource",
+		Description: "Create a new resource.",
+		OperationID: "create-" + templateOp.OperationID,
+		Responses:   openapi.NewResponses(),
+		Security:    templateOp.Security,
+	}
+	if reqRef != "" {
+		createOp.RequestBody = &openapi.RequestBodyRef{
+			Value: &openapi.RequestBody{
+				Content:     openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: reqRef}, []string{"application/json"}),
+				Description: "The resource to create",
+			},
+		}
+	}
+
+	createResp := openapi.NewResponse().WithDescription("Resource created")
+	if respRef != "" {
+		createResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
+	}
+	createOp.Responses.Set("201", &openapi.ResponseRef{Value: createResp})
+	item.SetPost(createOp)
+}
+
+func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *kdexv1alpha1.PathItem, templateOp *openapi.Operation, reqRef, respRef string) {
+	// Extract path params from the resource path to ensure they are present
+	pathParams := ko.ExtractParameters(resourcePath, "", http.Header{})
+
+	// Add any non-path parameters from templateOp (e.g. headers, query from sniffed request)
+	for _, p := range templateOp.Parameters {
+		if p.Value != nil && p.Value.In != "path" {
+			pathParams = append(pathParams, p)
+		}
+	}
+
+	// GET /resources/{id} (Get)
+	getOp := &openapi.Operation{
+		Tags:        templateOp.Tags,
+		Summary:     "Get Resource",
+		Description: "Retrieve a single resource by ID.",
+		OperationID: "get-" + templateOp.OperationID,
+		Parameters:  pathParams,
+		Responses:   openapi.NewResponses(),
+		Security:    templateOp.Security,
+	}
+	getResp := openapi.NewResponse().WithDescription("Resource found")
+	if respRef != "" {
+		getResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
+	}
+	getOp.Responses.Set("200", &openapi.ResponseRef{Value: getResp})
+	item.SetGet(getOp)
+
+	// PUT /resources/{id} (Replace)
+	putOp := &openapi.Operation{
+		Tags:        templateOp.Tags,
+		Summary:     "Replace Resource",
+		Description: "Replace a resource by ID.",
+		OperationID: "replace-" + templateOp.OperationID,
+		Parameters:  pathParams,
+		Responses:   openapi.NewResponses(),
+		Security:    templateOp.Security,
+	}
+	if reqRef != "" {
+		putOp.RequestBody = &openapi.RequestBodyRef{
+			Value: &openapi.RequestBody{
+				Content:     openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: reqRef}, []string{"application/json"}),
+				Description: "The replaced resource",
+			},
+		}
+	}
+	putResp := openapi.NewResponse().WithDescription("Resource updated")
+	if respRef != "" {
+		putResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
+	}
+	putOp.Responses.Set("200", &openapi.ResponseRef{Value: putResp})
+	item.SetPut(putOp)
+
+	// PATCH /resources/{id} (Update)
+	patchOp := &openapi.Operation{
+		Tags:        templateOp.Tags,
+		Summary:     "Update Resource",
+		Description: "Partially update a resource by ID.",
+		OperationID: "update-" + templateOp.OperationID,
+		Parameters:  pathParams,
+		Responses:   openapi.NewResponses(),
+		Security:    templateOp.Security,
+	}
+	if reqRef != "" {
+		patchOp.RequestBody = &openapi.RequestBodyRef{
+			Value: &openapi.RequestBody{
+				Content:     openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: reqRef}, []string{"application/merge-patch+json"}),
+				Description: "The patch to apply",
+			},
+		}
+	}
+	patchResp := openapi.NewResponse().WithDescription("Resource updated")
+	if respRef != "" {
+		patchResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
+	}
+	patchOp.Responses.Set("200", &openapi.ResponseRef{Value: patchResp})
+	item.SetPatch(patchOp)
+
+	// DELETE /resources/{id} (Delete)
+	deleteOp := &openapi.Operation{
+		Tags:        templateOp.Tags,
+		Summary:     "Delete Resource",
+		Description: "Delete a resource by ID.",
+		OperationID: "delete-" + templateOp.OperationID,
+		Parameters:  pathParams,
+		Responses:   openapi.NewResponses(),
+		Security:    templateOp.Security,
+	}
+	deleteOp.Responses.Set("204", &openapi.ResponseRef{Value: openapi.NewResponse().WithDescription("Resource deleted")})
+	item.SetDelete(deleteOp)
 }
 
 // Basic criteria: non-HTML GET/POST requests that are not found
@@ -747,7 +907,12 @@ func (s *RequestSniffer) sniff(r *http.Request) (*kdexv1alpha1.KDexFunction, err
 		fn.Spec.Metadata.Tags = append(fn.Spec.Metadata.Tags, fn.Name)
 	}
 
-	s.mergeAPIIntoFunction(fn, pathItems, schemas, r.Header.Get("X-KDex-Function-Keep-Schema-Conflict") == TRUE)
+	s.mergeAPIIntoFunction(
+		fn,
+		pathItems,
+		schemas,
+		r.Header.Get("X-KDex-Function-Overwrite-Operation") != TRUE,
+		r.Header.Get("X-KDex-Function-Keep-Schema-Conflict") == TRUE)
 
 	return fn, nil
 }

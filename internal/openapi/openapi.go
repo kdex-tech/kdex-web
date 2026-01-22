@@ -637,6 +637,9 @@ func matchFilter(routePath string, info PathInfo, filter Filter) bool {
 	}
 
 	if len(filter.Tags) > 0 {
+		if info.Metadata == nil {
+			info.Metadata = &kdexv1alpha1.Metadata{}
+		}
 		for _, tag := range filter.Tags {
 			if !slices.Contains(info.Metadata.Tags, tag) {
 				return false
