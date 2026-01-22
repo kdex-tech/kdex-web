@@ -24,8 +24,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-var jsonMimeRegex = regexp.MustCompile(`^application\/(.*\+)?json(;.*)?$`)
-
 const (
 	docs = `
 # KDex Request Sniffer Documentation
@@ -69,6 +67,7 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
 	TRUE = "true"
 )
 
+var jsonMimeRegex = regexp.MustCompile(`^application\/(.*\+)?json(;.*)?$`)
 var urlSchemeRegex regexp.Regexp = *regexp.MustCompile("^https?://.*")
 
 type AnalysisResult struct {
@@ -78,9 +77,11 @@ type AnalysisResult struct {
 }
 
 type RequestSniffer struct {
+	BasePathRegex regexp.Regexp
 	Client        client.Client
 	Functions     []kdexv1alpha1.KDexFunction
 	HostName      string
+	ItemPathRegex regexp.Regexp
 	Namespace     string
 	SecurityModes []string
 }
@@ -180,30 +181,32 @@ func (s *RequestSniffer) analyze(r *http.Request) (*AnalysisResult, error) {
 	return res, nil
 }
 
-var basePathRegex regexp.Regexp = *regexp.MustCompile(`^/\w+/\w+`)
-
 func (s *RequestSniffer) calculatePaths(r *http.Request, patternPath string) (string, string, error) {
-	basePath := r.URL.Path
+	requestPath := r.URL.Path
 
-	if !basePathRegex.MatchString(basePath) {
-		return "", "", fmt.Errorf("path %s must match %s", basePath, basePathRegex.String())
+	if !s.BasePathRegex.MatchString(requestPath) {
+		return "", "", fmt.Errorf("path %s must match %s", requestPath, s.BasePathRegex.String())
 	}
 
 	if patternPath == "" {
-		return basePath, basePath, nil
+		return requestPath, requestPath, nil
 	}
 
-	if strings.Contains(patternPath, " ") {
-		return "", "", fmt.Errorf("pattern path must not contain a method: %q", patternPath)
+	if !s.ItemPathRegex.MatchString(patternPath) {
+		return "", "", fmt.Errorf("pattern path %s must match %s", patternPath, s.ItemPathRegex.String())
 	}
 
-	pos := strings.Index(patternPath, "/{")
-
-	if pos == -1 {
-		return "", "", fmt.Errorf("pattern path does not contain any path wildcards: %q", patternPath)
+	match := s.ItemPathRegex.FindStringSubmatch(patternPath)
+	namedGroups := make(map[string]string)
+	if len(match) > 0 {
+		for i, name := range s.ItemPathRegex.SubexpNames() {
+			if i != 0 && name != "" {
+				namedGroups[name] = match[i]
+			}
+		}
 	}
 
-	basePath = basePath[0:pos]
+	basePath := namedGroups["basePath"]
 
 	if !strings.HasPrefix(patternPath, basePath) {
 		return "", "", fmt.Errorf("pattern path %s must start with %s", patternPath, basePath)

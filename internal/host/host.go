@@ -408,10 +408,12 @@ func (th *HostHandler) SetHost(
 	var snif *sniffer.RequestSniffer
 	if host.DevMode {
 		snif = &sniffer.RequestSniffer{
+			BasePathRegex: (&kdexv1alpha1.API{}).BasePathRegex(),
 			Client:        th.client,
 			Functions:     functions,
-			Namespace:     th.Namespace,
 			HostName:      th.Name,
+			ItemPathRegex: (&kdexv1alpha1.API{}).ItemPathRegex(),
+			Namespace:     th.Namespace,
 			SecurityModes: th.SecurityModes(),
 		}
 	}
