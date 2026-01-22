@@ -595,6 +595,7 @@ func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathI
 	th.translationHandler(mux, registeredPaths)
 	th.snifferHandler(mux, registeredPaths)
 	th.openapiHandler(mux, registeredPaths)
+	th.schemaHandler(mux, registeredPaths)
 
 	// Register Inspect Handler
 	mux.HandleFunc("/inspect/{uuid}", th.InspectHandler)
@@ -787,6 +788,100 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 		_, err = w.Write(jsonBytes)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+}
+
+func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	const path = "/~/schema/{path...}"
+
+	// Register the path itself so it appears in the spec
+	th.registerPath(path, ko.PathInfo{
+		API: ko.OpenAPI{
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "Serves individual JSONschema fragments from the registered OpenAPI specifications. The path should be in the format /~/schema/{basePath}/{schemaName} (e.g., /~/schema/v1/users/User) or simply /~/schema/{schemaName} for a global lookup.",
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(path, "", http.Header{}),
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										Type: &openapi.Types{openapi.TypeObject},
+									},
+									[]string{"application/json"},
+								),
+								Description: openapi.Ptr("JSONschema fragment"),
+							}),
+							openapi.WithName("404", &openapi.Response{
+								Description: openapi.Ptr("Schema not found"),
+							}),
+							openapi.WithName("500", &openapi.Response{
+								Description: openapi.Ptr("Internal server error"),
+							}),
+						),
+					},
+					Summary: "JSONschema Fragment Provider",
+				},
+			},
+		},
+		Type: ko.InternalPathType,
+	}, registeredPaths)
+
+	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
+		requested := r.PathValue("path")
+
+		th.mu.RLock()
+		defer th.mu.RUnlock()
+
+		var foundSchema *openapi.SchemaRef
+
+		// 1. Global lookup by schema name
+		for _, info := range th.registeredPaths {
+			if schema, ok := info.API.Schemas[requested]; ok {
+				foundSchema = schema
+				break
+			}
+		}
+
+		// 2. Namespaced lookup if global failed: /~/schema/{basePath}/{schemaName}
+		if foundSchema == nil {
+			fullPath := "/" + requested
+			var bestMatchPath string
+			var bestMatchInfo ko.PathInfo
+
+			for basePath, info := range th.registeredPaths {
+				if strings.HasPrefix(fullPath, basePath) {
+					if len(basePath) > len(bestMatchPath) {
+						bestMatchPath = basePath
+						bestMatchInfo = info
+					}
+				}
+			}
+
+			if bestMatchPath != "" {
+				schemaName := strings.TrimPrefix(fullPath, bestMatchPath)
+				schemaName = strings.TrimPrefix(schemaName, "/")
+				foundSchema = bestMatchInfo.API.Schemas[schemaName]
+			}
+		}
+
+		if foundSchema == nil {
+			http.Error(w, "Schema not found", http.StatusNotFound)
+			return
+		}
+
+		jsonBytes, err := json.Marshal(foundSchema)
+		if err != nil {
+			http.Error(w, "Failed to marshal schema", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, err = w.Write(jsonBytes)
+		if err != nil {
+			th.log.Error(err, "failed to write schema response")
 		}
 	})
 }

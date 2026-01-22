@@ -41,8 +41,8 @@ type HostHandler struct {
 	log                       logr.Logger
 	mu                        sync.RWMutex
 	packageReferences         []kdexv1alpha1.PackageReference
-	registeredPaths           map[string]ko.PathInfo
 	pathsCollectedInReconcile map[string]ko.PathInfo
+	registeredPaths           map[string]ko.PathInfo
 	scripts                   []kdexv1alpha1.ScriptDef
 	themeAssets               []kdexv1alpha1.Asset
 	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec
