@@ -219,6 +219,13 @@ func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filt
 				if op.Description == "" {
 					op.Description = curItem.Description
 				}
+				if pathInfo.Metadata != nil {
+					for _, tag := range pathInfo.Metadata.Tags {
+						if !slices.Contains(op.Tags, tag) {
+							op.Tags = append(op.Tags, tag)
+						}
+					}
+				}
 			}
 
 			if curItem.Get != nil {
