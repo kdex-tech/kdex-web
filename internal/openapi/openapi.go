@@ -206,12 +206,21 @@ func (b *Builder) BuildOpenAPI(
 				continue
 			}
 
+			parameters := openapi.Parameters{}
+
+			for _, p := range curItem.Parameters {
+				parameters = append(parameters, &openapi.ParameterRef{
+					Value: &p,
+				})
+			}
+
 			pathItem := &openapi.PathItem{
 				Description: curItem.Description,
-				Summary:     curItem.Summary,
 				Extensions: map[string]any{
 					"x-kdex-type": pathInfo.Type,
 				},
+				Parameters: parameters,
+				Summary:    curItem.Summary,
 			}
 
 			if pathInfo.Metadata != nil {

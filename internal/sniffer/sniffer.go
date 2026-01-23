@@ -325,14 +325,15 @@ func (s *RequestSniffer) mergeAPIIntoFunction(
 		for _, method := range kh.Methods() {
 			op := getOp(string(method), inItem)
 			if op != nil {
-				outItem.SetOp(string(method), op)
 
 				// If an op param is in shared (path) params, remove it from op
-				for i := len(outItem.Parameters) - 1; i >= 0; i-- {
-					if shouldDelete(outItem.GetParameters(), op.Parameters[i]) {
+				for i := len(op.Parameters) - 1; i >= 0; i-- {
+					if shouldDelete(outParams, op.Parameters[i]) {
 						op.Parameters = append(op.Parameters[:i], op.Parameters[i+1:]...)
 					}
 				}
+
+				outItem.SetOp(string(method), op)
 			}
 		}
 
