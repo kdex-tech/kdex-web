@@ -281,7 +281,7 @@ func (s *RequestSniffer) matchExisting(
 
 func (s *RequestSniffer) mergeAPIIntoFunction(
 	out *kdexv1alpha1.KDexFunction,
-	calculated map[string]kdexv1alpha1.PathItem,
+	in map[string]*openapi.PathItem,
 	schemas map[string]*openapi.SchemaRef,
 	overwriteOperation bool,
 	keepConflictedSchemas bool,
@@ -290,31 +290,52 @@ func (s *RequestSniffer) mergeAPIIntoFunction(
 		out.Spec.API.Paths = map[string]kdexv1alpha1.PathItem{}
 	}
 
-	for calculatePath, calculatePathItem := range calculated {
-		pathItem := out.Spec.API.Paths[calculatePath]
+	for inPath, inItem := range in {
+		outItem := out.Spec.API.Paths[inPath]
 
 		if overwriteOperation {
-			pathItem.Description = calculatePathItem.Description
-			pathItem.Summary = calculatePathItem.Summary
+			outItem.Description = inItem.Description
+			outItem.Summary = inItem.Summary
 		}
 
-		// TODO: merge parameters
+		outParams := outItem.GetParameters()
+		for _, inParam := range inItem.Parameters {
+			if inParam.Ref != "" {
+				continue
+			}
+			found := false
+			for odx, outParam := range outParams {
+				if inParam.Value.Name == outParam.Name &&
+					inParam.Value.In == outParam.In {
+					if overwriteOperation {
+						outParams[odx] = *inParam.Value
+					} else {
+						found = true
+					}
+					break
+				}
+			}
+			if !found {
+				outParams = append(outParams, *inParam.Value)
+			}
+		}
+		outItem.SetParameters(outParams)
 
 		for _, method := range kh.Methods() {
-			op := calculatePathItem.GetOp(string(method))
+			op := getOp(string(method), inItem)
 			if op != nil {
-				pathItem.SetOp(string(method), op)
+				outItem.SetOp(string(method), op)
 
 				// If an op param is in shared (path) params, remove it from op
-				for i := len(pathItem.Parameters) - 1; i >= 0; i-- {
-					if shouldDelete(pathItem.GetParameters(), op.Parameters[i]) {
+				for i := len(outItem.Parameters) - 1; i >= 0; i-- {
+					if shouldDelete(outItem.GetParameters(), op.Parameters[i]) {
 						op.Parameters = append(op.Parameters[:i], op.Parameters[i+1:]...)
 					}
 				}
 			}
 		}
 
-		out.Spec.API.Paths[calculatePath] = pathItem
+		out.Spec.API.Paths[inPath] = outItem
 	}
 
 	// Merge schemas
@@ -337,10 +358,10 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 	r *http.Request,
 	routePath string,
 	operationId string,
-) (map[string]kdexv1alpha1.PathItem, map[string]*openapi.SchemaRef, error) {
-	pathItems := map[string]kdexv1alpha1.PathItem{}
+) (map[string]*openapi.PathItem, map[string]*openapi.SchemaRef, error) {
+	pathItems := map[string]*openapi.PathItem{}
 	schemas := map[string]*openapi.SchemaRef{}
-	pathItem := kdexv1alpha1.PathItem{
+	pathItem := &openapi.PathItem{
 		Description: fmt.Sprintf("Auto-generated from request to %s", r.URL.Path),
 	}
 
@@ -638,7 +659,7 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 		Value: resp,
 	})
 
-	pathItem.SetOp(r.Method, op)
+	setOp(pathItem, r.Method, op)
 	pathItems[routePath] = pathItem
 
 	if strings.ToLower(r.Header.Get("X-KDex-Function-Comprehensive-Mode")) == TRUE {
@@ -662,21 +683,21 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 			// 1. Handle Collection Path (/resources)
 			colItem, colExists := pathItems[collectionPath]
 			if !colExists {
-				colItem = kdexv1alpha1.PathItem{
+				colItem = &openapi.PathItem{
 					Description: "Collection Operations",
 				}
 			}
-			s.generateCollectionOperations(&colItem, op, requestSchemaRef, responseSchemaRef)
+			s.generateCollectionOperations(colItem, op, requestSchemaRef, responseSchemaRef)
 			pathItems[collectionPath] = colItem
 
 			// 2. Handle Resource Path (/resources/{id})
 			resItem, resExists := pathItems[resourcePath]
 			if !resExists {
-				resItem = kdexv1alpha1.PathItem{
+				resItem = &openapi.PathItem{
 					Description: "Resource Operations",
 				}
 			}
-			s.generateResourceOperations(resourcePath, &resItem, op, requestSchemaRef, responseSchemaRef)
+			s.generateResourceOperations(resourcePath, resItem, op, requestSchemaRef, responseSchemaRef)
 			pathItems[resourcePath] = resItem
 		}
 	}
@@ -684,7 +705,7 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 	return pathItems, schemas, nil
 }
 
-func (s *RequestSniffer) generateCollectionOperations(item *kdexv1alpha1.PathItem, templateOp *openapi.Operation, reqRef, respRef string) {
+func (s *RequestSniffer) generateCollectionOperations(item *openapi.PathItem, templateOp *openapi.Operation, reqRef, respRef string) {
 	// GET /resources (List)
 	listOp := &openapi.Operation{
 		Tags:        templateOp.Tags,
@@ -713,7 +734,7 @@ func (s *RequestSniffer) generateCollectionOperations(item *kdexv1alpha1.PathIte
 		}
 	}
 	listOp.Responses.Set("200", &openapi.ResponseRef{Value: listResp})
-	item.SetGet(listOp)
+	item.Get = listOp
 
 	// POST /resources (Create)
 	createOp := &openapi.Operation{
@@ -738,10 +759,10 @@ func (s *RequestSniffer) generateCollectionOperations(item *kdexv1alpha1.PathIte
 		createResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
 	}
 	createOp.Responses.Set("201", &openapi.ResponseRef{Value: createResp})
-	item.SetPost(createOp)
+	item.Post = createOp
 }
 
-func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *kdexv1alpha1.PathItem, templateOp *openapi.Operation, reqRef, respRef string) {
+func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *openapi.PathItem, templateOp *openapi.Operation, reqRef, respRef string) {
 	// Extract path params from the resource path to ensure they are present
 	pathParams := ko.ExtractParameters(resourcePath, "", http.Header{})
 
@@ -767,7 +788,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *k
 		getResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
 	}
 	getOp.Responses.Set("200", &openapi.ResponseRef{Value: getResp})
-	item.SetGet(getOp)
+	item.Get = getOp
 
 	// PUT /resources/{id} (Replace)
 	putOp := &openapi.Operation{
@@ -792,7 +813,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *k
 		putResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
 	}
 	putOp.Responses.Set("200", &openapi.ResponseRef{Value: putResp})
-	item.SetPut(putOp)
+	item.Put = putOp
 
 	// PATCH /resources/{id} (Update)
 	patchOp := &openapi.Operation{
@@ -817,7 +838,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *k
 		patchResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
 	}
 	patchOp.Responses.Set("200", &openapi.ResponseRef{Value: patchResp})
-	item.SetPatch(patchOp)
+	item.Patch = patchOp
 
 	// DELETE /resources/{id} (Delete)
 	deleteOp := &openapi.Operation{
@@ -830,7 +851,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *k
 		Security:    templateOp.Security,
 	}
 	deleteOp.Responses.Set("204", &openapi.ResponseRef{Value: openapi.NewResponse().WithDescription("Resource deleted")})
-	item.SetDelete(deleteOp)
+	item.Delete = deleteOp
 }
 
 // Basic criteria: non-HTML GET/POST requests that are not found
@@ -935,8 +956,55 @@ func (s *RequestSniffer) validatePattern(pattern string, r *http.Request) (err e
 	return nil
 }
 
+func getOp(method string, calcItem *openapi.PathItem) *openapi.Operation {
+	switch kh.MethodFromString(method) {
+	case kh.Connect:
+		return calcItem.Connect
+	case kh.Delete:
+		return calcItem.Delete
+	case kh.Get:
+		return calcItem.Get
+	case kh.Head:
+		return calcItem.Head
+	case kh.Options:
+		return calcItem.Options
+	case kh.Patch:
+		return calcItem.Patch
+	case kh.Post:
+		return calcItem.Post
+	case kh.Put:
+		return calcItem.Put
+	case kh.Trace:
+		return calcItem.Trace
+	}
+	return nil
+}
+
 func isJSON(mimeType string) bool {
 	return jsonMimeRegex.MatchString(strings.ToLower(mimeType))
+}
+
+func setOp(item *openapi.PathItem, method string, op *openapi.Operation) {
+	switch kh.MethodFromString(method) {
+	case kh.Connect:
+		item.Connect = op
+	case kh.Delete:
+		item.Delete = op
+	case kh.Get:
+		item.Get = op
+	case kh.Head:
+		item.Head = op
+	case kh.Options:
+		item.Options = op
+	case kh.Patch:
+		item.Patch = op
+	case kh.Post:
+		item.Post = op
+	case kh.Put:
+		item.Put = op
+	case kh.Trace:
+		item.Trace = op
+	}
 }
 
 func shouldDelete(parameters []openapi.Parameter, parameterRef *openapi.ParameterRef) bool {

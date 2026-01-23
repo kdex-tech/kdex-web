@@ -318,7 +318,7 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 	tests := []struct {
 		name          string
 		out           *kdexv1alpha1.KDexFunction
-		paths         map[string]kdexv1alpha1.PathItem
+		paths         map[string]*openapi.PathItem
 		schemas       map[string]*openapi.SchemaRef
 		keepConflicts bool
 		assertions    func(t *testing.T, fn *kdexv1alpha1.KDexFunction)
@@ -326,17 +326,17 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name:       "no op",
 			out:        &kdexv1alpha1.KDexFunction{},
-			paths:      map[string]kdexv1alpha1.PathItem{},
+			paths:      map[string]*openapi.PathItem{},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {},
 		},
 		{
 			name: "add connect",
 			out:  &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/path": {
-					Connect: raw(&openapi.Operation{
+					Connect: &openapi.Operation{
 						Description: "CONNECT /path",
-					}),
+					},
 				},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -348,11 +348,11 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name: "add delete",
 			out:  &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/path": {
-					Delete: raw(&openapi.Operation{
+					Delete: &openapi.Operation{
 						Description: "DELETE /path",
-					}),
+					},
 				},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -364,11 +364,11 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name: "add head",
 			out:  &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/path": {
-					Head: raw(&openapi.Operation{
+					Head: &openapi.Operation{
 						Description: "HEAD /path",
-					}),
+					},
 				},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -380,11 +380,11 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name: "add options",
 			out:  &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/path": {
-					Options: raw(&openapi.Operation{
+					Options: &openapi.Operation{
 						Description: "OPTIONS /path",
-					}),
+					},
 				},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -396,11 +396,11 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name: "add patch",
 			out:  &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/path": {
-					Patch: raw(&openapi.Operation{
+					Patch: &openapi.Operation{
 						Description: "PATCH /path",
-					}),
+					},
 				},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -412,11 +412,11 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name: "add post",
 			out:  &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/path": {
-					Post: raw(&openapi.Operation{
+					Post: &openapi.Operation{
 						Description: "POST /path",
-					}),
+					},
 				},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -428,11 +428,11 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name: "add put",
 			out:  &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/path": {
-					Put: raw(&openapi.Operation{
+					Put: &openapi.Operation{
 						Description: "PUT /path",
-					}),
+					},
 				},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -444,11 +444,11 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name: "add trace",
 			out:  &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/path": {
-					Trace: raw(&openapi.Operation{
+					Trace: &openapi.Operation{
 						Description: "TRACE /path",
-					}),
+					},
 				},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -460,7 +460,7 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name: "set path",
 			out:  &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/foo": {},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -471,7 +471,7 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 		{
 			name:  "add new schema",
 			out:   &kdexv1alpha1.KDexFunction{},
-			paths: map[string]kdexv1alpha1.PathItem{},
+			paths: map[string]*openapi.PathItem{},
 			schemas: map[string]*openapi.SchemaRef{
 				"User": {
 					Value: &openapi.Schema{
@@ -552,11 +552,11 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 					},
 				},
 			},
-			paths: map[string]kdexv1alpha1.PathItem{
+			paths: map[string]*openapi.PathItem{
 				"/path": {
-					Trace: raw(&openapi.Operation{
+					Trace: &openapi.Operation{
 						Description: "TRACE /path",
-					}),
+					},
 				},
 			},
 			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction) {
@@ -585,18 +585,18 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 	tests := []struct {
 		name       string
 		r          *http.Request
-		assertions func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error)
+		assertions func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error)
 		skip       bool
 	}{
 		{
 			name: "GET /foo",
 			r:    httptest.NewRequest("GET", "/foo", http.NoBody),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/foo"]
 				assert.True(t, ok)
-				assert.Equal(t, "gen-foo-get", item.GetGet().OperationID)
-				assert.Nil(t, item.GetGet().Security)
+				assert.Equal(t, "gen-foo-get", item.Get.OperationID)
+				assert.Nil(t, item.Get.Security)
 			},
 		},
 		{
@@ -606,12 +606,12 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Add("X-KDex-Function-Tags", "one,two,three")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/foo"]
 				assert.True(t, ok)
-				assert.Equal(t, "gen-foo-get", item.GetGet().OperationID)
-				assert.Equal(t, []string{"one", "two", "three"}, item.GetGet().Tags)
+				assert.Equal(t, "gen-foo-get", item.Get.OperationID)
+				assert.Equal(t, []string{"one", "two", "three"}, item.Get.Tags)
 			},
 		},
 		{
@@ -622,13 +622,13 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Add("X-KDex-Function-Summary", "custom summary")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/foo"]
 				assert.True(t, ok)
-				assert.Equal(t, "gen-foo-get", item.GetGet().OperationID)
-				assert.Equal(t, "custom description", item.GetGet().Description)
-				assert.Equal(t, "custom summary", item.GetGet().Summary)
+				assert.Equal(t, "gen-foo-get", item.Get.OperationID)
+				assert.Equal(t, "custom description", item.Get.Description)
+				assert.Equal(t, "custom summary", item.Get.Summary)
 			},
 		},
 		{
@@ -637,13 +637,13 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r := httptest.NewRequest("GET", "/foo", http.NoBody)
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/foo"]
 				assert.True(t, ok)
-				assert.Equal(t, "gen-foo-get", item.GetGet().OperationID)
-				assert.Equal(t, 1, item.GetGet().Responses.Len())
-				resp := item.GetGet().Responses.Value("200")
+				assert.Equal(t, "gen-foo-get", item.Get.OperationID)
+				assert.Equal(t, 1, item.Get.Responses.Len())
+				resp := item.Get.Responses.Value("200")
 				assert.NotNil(t, resp)
 				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
 				assert.Equal(t, 0, len(resp.Value.Content))
@@ -656,13 +656,13 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Add("Accept", "*/*")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/foo"]
 				assert.True(t, ok)
-				assert.Equal(t, "gen-foo-get", item.GetGet().OperationID)
-				assert.Equal(t, 1, item.GetGet().Responses.Len())
-				resp := item.GetGet().Responses.Value("200")
+				assert.Equal(t, "gen-foo-get", item.Get.OperationID)
+				assert.Equal(t, 1, item.Get.Responses.Len())
+				resp := item.Get.Responses.Value("200")
 				assert.NotNil(t, resp)
 				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
 				assert.Equal(t, 0, len(resp.Value.Content))
@@ -675,13 +675,13 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Add("Accept", "application/json")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/foo"]
 				assert.True(t, ok)
-				assert.Equal(t, "gen-foo-get", item.GetGet().OperationID)
-				assert.Equal(t, 1, item.GetGet().Responses.Len())
-				resp := item.GetGet().Responses.Value("200")
+				assert.Equal(t, "gen-foo-get", item.Get.OperationID)
+				assert.Equal(t, 1, item.Get.Responses.Len())
+				resp := item.Get.Responses.Value("200")
 				assert.NotNil(t, resp)
 				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
 				assert.Equal(t, 1, len(resp.Value.Content))
@@ -696,13 +696,13 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Add("X-KDex-Function-Response-Schema-Ref", "Foo")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/foo"]
 				assert.True(t, ok)
-				assert.Equal(t, "gen-foo-get", item.GetGet().OperationID)
-				assert.Equal(t, 1, item.GetGet().Responses.Len())
-				resp := item.GetGet().Responses.Value("200")
+				assert.Equal(t, "gen-foo-get", item.Get.OperationID)
+				assert.Equal(t, 1, item.Get.Responses.Len())
+				resp := item.Get.Responses.Value("200")
 				assert.NotNil(t, resp)
 				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
 				assert.Equal(t, 1, len(resp.Value.Content))
@@ -717,26 +717,26 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Set("Authorization", "Bearer token")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/foo"]
 				assert.True(t, ok)
-				assert.Equal(t, "gen-foo-get", item.GetGet().OperationID)
-				assert.NotNil(t, item.GetGet().Security)
-				assert.Len(t, *item.GetGet().Security, 1)
-				assert.Contains(t, (*item.GetGet().Security)[0], "bearer")
+				assert.Equal(t, "gen-foo-get", item.Get.OperationID)
+				assert.NotNil(t, item.Get.Security)
+				assert.Len(t, *item.Get.Security, 1)
+				assert.Contains(t, (*item.Get.Security)[0], "bearer")
 			},
 		},
 		{
 			name: "query array",
 			r:    httptest.NewRequest("GET", "/test?id=1&id=2", http.NoBody),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.Equal(t, "gen-test-get", item.GetGet().OperationID)
+				assert.Equal(t, "gen-test-get", item.Get.OperationID)
 				found := false
-				for _, p := range item.GetGet().Parameters {
+				for _, p := range item.Get.Parameters {
 					if p.Value.Name == "id" {
 						assert.True(t, p.Value.Schema.Value.Type.Is("array"))
 						found = true
@@ -765,7 +765,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Set("Content-Type", "application/json")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				expected := openapi.Schema{
 					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
@@ -818,8 +818,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.NotNil(t, item.GetPost().RequestBody)
-				content := item.GetPost().RequestBody.Value.Content["application/json"]
+				assert.NotNil(t, item.Post.RequestBody)
+				content := item.Post.RequestBody.Value.Content["application/json"]
 				assert.NotNil(t, content)
 				assert.Equal(t, &expected, content.Schema.Value)
 			},
@@ -843,7 +843,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 }`))
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				expected := openapi.Schema{
 					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
@@ -896,8 +896,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.NotNil(t, item.GetPost().RequestBody)
-				content := item.GetPost().RequestBody.Value.Content["application/json"]
+				assert.NotNil(t, item.Post.RequestBody)
+				content := item.Post.RequestBody.Value.Content["application/json"]
 				assert.NotNil(t, content)
 				assert.Equal(t, &expected, content.Schema.Value)
 			},
@@ -908,7 +908,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte{123, 23, 34, 145, 233}))
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				expected := openapi.Schema{
 					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeString},
@@ -918,8 +918,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.NotNil(t, item.GetPost().RequestBody)
-				content := item.GetPost().RequestBody.Value.Content["application/octet-stream"]
+				assert.NotNil(t, item.Post.RequestBody)
+				content := item.Post.RequestBody.Value.Content["application/octet-stream"]
 				assert.NotNil(t, content)
 				assert.Equal(t, &expected, content.Schema.Value)
 			},
@@ -936,7 +936,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				expected := openapi.Schema{
 					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
@@ -962,8 +962,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.NotNil(t, item.GetPost().RequestBody)
-				content := item.GetPost().RequestBody.Value.Content["application/x-www-form-urlencoded"]
+				assert.NotNil(t, item.Post.RequestBody)
+				content := item.Post.RequestBody.Value.Content["application/x-www-form-urlencoded"]
 				assert.NotNil(t, content)
 				assert.Equal(t, &expected, content.Schema.Value)
 			},
@@ -982,7 +982,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Set("Content-Type", writer.FormDataContentType())
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				expectedSchema := openapi.Schema{
 					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
@@ -1014,8 +1014,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.NotNil(t, item.GetPost().RequestBody)
-				content := item.GetPost().RequestBody.Value.Content["multipart/form-data"]
+				assert.NotNil(t, item.Post.RequestBody)
+				content := item.Post.RequestBody.Value.Content["multipart/form-data"]
 				assert.NotNil(t, content)
 				assert.Equal(t, &expectedSchema, content.Schema.Value)
 				assert.Equal(t, expectedEncoding, content.Encoding)
@@ -1037,7 +1037,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Set("Content-Type", writer.FormDataContentType())
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				expectedSchema := openapi.Schema{
 					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
@@ -1064,8 +1064,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.NotNil(t, item.GetPost().RequestBody)
-				content := item.GetPost().RequestBody.Value.Content["multipart/form-data"]
+				assert.NotNil(t, item.Post.RequestBody)
+				content := item.Post.RequestBody.Value.Content["multipart/form-data"]
 				assert.NotNil(t, content)
 				assert.Equal(t, &expectedSchema, content.Schema.Value)
 				assert.Equal(t, expectedEncoding, content.Encoding)
@@ -1098,7 +1098,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Set("Content-Type", writer.FormDataContentType())
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				expectedSchema := openapi.Schema{
 					Description: "Inferred from request body",
 					Type:        &openapi.Types{openapi.TypeObject},
@@ -1135,8 +1135,8 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.NotNil(t, item.GetPost().RequestBody)
-				content := item.GetPost().RequestBody.Value.Content["multipart/form-data"]
+				assert.NotNil(t, item.Post.RequestBody)
+				content := item.Post.RequestBody.Value.Content["multipart/form-data"]
 				assert.NotNil(t, content)
 				assert.Equal(t, &expectedSchema, content.Schema.Value)
 				assert.Equal(t, expectedEncoding, content.Encoding)
@@ -1149,12 +1149,12 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Set("X-KDex-Function-Request-Schema-Ref", "Foo")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.NotNil(t, item.GetPost().RequestBody)
-				content := item.GetPost().RequestBody.Value.Content["application/json"]
+				assert.NotNil(t, item.Post.RequestBody)
+				content := item.Post.RequestBody.Value.Content["application/json"]
 				assert.NotNil(t, content)
 				assert.Equal(t, "#/components/schemas/Foo", content.Schema.Ref)
 				sharedSchema := schemas["Foo"]
@@ -1169,12 +1169,12 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Set("Content-Type", "application/json-patch+json")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.NotNil(t, item.GetPatch().RequestBody)
-				content := item.GetPatch().RequestBody.Value.Content["application/json-patch+json"]
+				assert.NotNil(t, item.Patch.RequestBody)
+				content := item.Patch.RequestBody.Value.Content["application/json-patch+json"]
 				assert.NotNil(t, content)
 				assert.Equal(t, "https://json.schemastore.org/json-patch", content.Schema.Ref)
 				assert.Equal(t, 1, len(schemas))
@@ -1188,11 +1188,11 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r.Header.Set("Accept", "application/json-patch+json")
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				resp := item.GetGet().Responses.Value("200")
+				resp := item.Get.Responses.Value("200")
 				assert.NotNil(t, resp)
 				content := resp.Value.Content["application/json-patch+json"]
 				assert.NotNil(t, content)
@@ -1206,11 +1206,11 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r := httptest.NewRequest("CONNECT", "/test", http.NoBody)
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.Equal(t, "CONNECT /test", item.GetConnect().Description)
+				assert.Equal(t, "CONNECT /test", item.Connect.Description)
 			},
 		},
 		{
@@ -1219,11 +1219,11 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r := httptest.NewRequest("DELETE", "/test", http.NoBody)
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.Equal(t, "DELETE /test", item.GetDelete().Description)
+				assert.Equal(t, "DELETE /test", item.Delete.Description)
 			},
 		},
 		{
@@ -1232,11 +1232,11 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r := httptest.NewRequest("HEAD", "/test", http.NoBody)
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.Equal(t, "HEAD /test", item.GetHead().Description)
+				assert.Equal(t, "HEAD /test", item.Head.Description)
 			},
 		},
 		{
@@ -1245,11 +1245,11 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r := httptest.NewRequest("OPTIONS", "/test", http.NoBody)
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.Equal(t, "OPTIONS /test", item.GetOptions().Description)
+				assert.Equal(t, "OPTIONS /test", item.Options.Description)
 			},
 		},
 		{
@@ -1258,11 +1258,11 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r := httptest.NewRequest("PATCH", "/test", http.NoBody)
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.Equal(t, "PATCH /test", item.GetPatch().Description)
+				assert.Equal(t, "PATCH /test", item.Patch.Description)
 			},
 		},
 		{
@@ -1271,11 +1271,11 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r := httptest.NewRequest("PUT", "/test", http.NoBody)
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.Equal(t, "PUT /test", item.GetPut().Description)
+				assert.Equal(t, "PUT /test", item.Put.Description)
 			},
 		},
 		{
@@ -1284,11 +1284,11 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				r := httptest.NewRequest("TRACE", "/test", http.NoBody)
 				return r
 			}(),
-			assertions: func(t *testing.T, op map[string]kdexv1alpha1.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
+			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {
 				assert.NotNil(t, op)
 				item, ok := op["/test"]
 				assert.True(t, ok)
-				assert.Equal(t, "TRACE /test", item.GetTrace().Description)
+				assert.Equal(t, "TRACE /test", item.Trace.Description)
 			},
 		},
 	}

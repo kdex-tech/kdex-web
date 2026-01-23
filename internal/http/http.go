@@ -38,6 +38,31 @@ func Methods() []Method {
 	}
 }
 
+func MethodFromString(method string) Method {
+	switch method {
+	case string(Connect):
+		return Connect
+	case string(Delete):
+		return Delete
+	case string(Get):
+		return Get
+	case string(Head):
+		return Head
+	case string(Options):
+		return Options
+	case string(Patch):
+		return Patch
+	case string(Post):
+		return Post
+	case string(Put):
+		return Put
+	case string(Trace):
+		return Trace
+	default:
+		return Get
+	}
+}
+
 func GetParam(name string, defaultValue string, r *http.Request) string {
 	value := r.PathValue(name)
 
