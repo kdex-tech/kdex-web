@@ -294,6 +294,16 @@ func (b *Builder) BuildOpenAPI(
 	}
 	if b.SecuritySchemes != nil {
 		doc.Components.SecuritySchemes = *b.SecuritySchemes
+
+		if doc.Components.Responses == nil {
+			doc.Components.Responses = openapi.ResponseBodies{}
+		}
+
+		doc.Components.Responses["UnauthorizedError"] = &openapi.ResponseRef{
+			Value: &openapi.Response{
+				Description: openapi.Ptr("Unauthorized"),
+			},
+		}
 	}
 
 	return doc

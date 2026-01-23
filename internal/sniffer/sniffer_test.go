@@ -579,8 +579,10 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 	s := &RequestSniffer{
 		HostName: "test-host",
-		Security: &openapi.SecurityRequirements{
-			openapi.NewSecurityRequirement().Authenticate("bearer"),
+		SecuritySchemes: &openapi.SecuritySchemes{
+			"bearer": &openapi.SecuritySchemeRef{
+				Value: openapi.NewJWTSecurityScheme(),
+			},
 		},
 	}
 
@@ -2064,7 +2066,11 @@ func TestRequestSniffer_sniff(t *testing.T) {
 				HostName:      "test-host",
 				ItemPathRegex: (&kdexv1alpha1.API{}).ItemPathRegex(),
 				Namespace:     "test-namespace",
-				Security:      tt.security,
+				SecuritySchemes: &openapi.SecuritySchemes{
+					"bearer": &openapi.SecuritySchemeRef{
+						Value: openapi.NewJWTSecurityScheme(),
+					},
+				},
 			}
 
 			got, gotErr := s.sniff(tt.r)

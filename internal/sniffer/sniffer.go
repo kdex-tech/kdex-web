@@ -79,14 +79,14 @@ type AnalysisResult struct {
 }
 
 type RequestSniffer struct {
-	BasePathRegex  regexp.Regexp
-	Client         client.Client
-	Functions      []kdexv1alpha1.KDexFunction
-	HostName       string
-	ItemPathRegex  regexp.Regexp
-	Namespace      string
-	OpenAPIBuilder ko.Builder
-	Security       *openapi.SecurityRequirements
+	BasePathRegex   regexp.Regexp
+	Client          client.Client
+	Functions       []kdexv1alpha1.KDexFunction
+	HostName        string
+	ItemPathRegex   regexp.Regexp
+	Namespace       string
+	OpenAPIBuilder  ko.Builder
+	SecuritySchemes *openapi.SecuritySchemes
 }
 
 func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
@@ -426,16 +426,16 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 
 	// Authentication signal
 	if r.Header.Get("Authorization") != "" {
-		if len(*s.Security) > 0 {
+		if len(*s.SecuritySchemes) > 0 {
 			security := openapi.SecurityRequirements{}
-			for _, mode := range *s.Security {
-				security = append(security, mode)
+			for schemeName, _ := range *s.SecuritySchemes {
+				security = append(security, openapi.NewSecurityRequirement().Authenticate(schemeName))
 			}
 			op.Security = &security
 
 			// Add 401 response when auth is required
 			op.Responses.Set("401", &openapi.ResponseRef{
-				Value: openapi.NewResponse().WithDescription("Unauthorized - Authentication required"),
+				Ref: "#/components/responses/UnauthorizedError",
 			})
 		}
 	}

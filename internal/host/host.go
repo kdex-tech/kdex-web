@@ -355,14 +355,18 @@ func (th *HostHandler) RemoveUtilityPage(name string) {
 	th.RebuildMux() // Called after lock is released
 }
 
-func (th *HostHandler) SecurityModes() *openapi.SecurityRequirements {
-	req := openapi.NewSecurityRequirements()
+func (th *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
+	req := &openapi.SecuritySchemes{}
 	// For now we assume that if a login page is specified we want to default to bearer auth
 	// as the preferred mode of authentication for auto-generated functions.
 	if th.host != nil && th.host.UtilityPages != nil && th.host.UtilityPages.LoginRef != nil {
-		req.With(openapi.NewSecurityRequirement().Authenticate("bearer"))
+		(*req)["bearer"] = &openapi.SecuritySchemeRef{
+			Value: openapi.NewJWTSecurityScheme(),
+		}
 	} else if th.host != nil {
-		req.With(openapi.NewSecurityRequirement().Authenticate("bearer"))
+		(*req)["bearer"] = &openapi.SecuritySchemeRef{
+			Value: openapi.NewJWTSecurityScheme(),
+		}
 	}
 
 	return req
@@ -400,7 +404,7 @@ func (th *HostHandler) SetHost(
 		Organization:    host.Organization,
 	})
 	th.openapiBuilder = ko.Builder{
-		Security: th.SecurityModes(),
+		SecuritySchemes: th.SecuritySchemes(),
 	}
 	th.packageReferences = packageReferences
 	th.pathsCollectedInReconcile = paths
@@ -410,14 +414,14 @@ func (th *HostHandler) SetHost(
 	var snif *sniffer.RequestSniffer
 	if host.DevMode {
 		snif = &sniffer.RequestSniffer{
-			BasePathRegex:  (&kdexv1alpha1.API{}).BasePathRegex(),
-			Client:         th.client,
-			Functions:      functions,
-			HostName:       th.Name,
-			ItemPathRegex:  (&kdexv1alpha1.API{}).ItemPathRegex(),
-			OpenAPIBuilder: th.openapiBuilder,
-			Namespace:      th.Namespace,
-			Security:       th.SecurityModes(),
+			BasePathRegex:   (&kdexv1alpha1.API{}).BasePathRegex(),
+			Client:          th.client,
+			Functions:       functions,
+			HostName:        th.Name,
+			ItemPathRegex:   (&kdexv1alpha1.API{}).ItemPathRegex(),
+			OpenAPIBuilder:  th.openapiBuilder,
+			Namespace:       th.Namespace,
+			SecuritySchemes: th.SecuritySchemes(),
 		}
 	}
 
