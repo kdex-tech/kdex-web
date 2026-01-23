@@ -714,7 +714,7 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 					Description: "Collection Operations",
 				}
 			}
-			s.generateCollectionOperations(colItem, op, requestSchemaRef, responseSchemaRef)
+			s.generateCollectionOperations(collectionPath, colItem, op, requestSchemaRef, responseSchemaRef)
 			pathItems[collectionPath] = colItem
 
 			// 2. Handle Resource Path (/resources/{id})
@@ -732,13 +732,20 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 	return pathItems, schemas, nil
 }
 
-func (s *RequestSniffer) generateCollectionOperations(item *openapi.PathItem, templateOp *openapi.Operation, reqRef, respRef string) {
+func (s *RequestSniffer) generateCollectionOperations(
+	collectionPath string,
+	item *openapi.PathItem,
+	templateOp *openapi.Operation,
+	reqRef, respRef string,
+) {
+	baseOperationID := ko.GenerateNameFromPath(collectionPath, "")
+
 	// GET /resources (List)
 	listOp := &openapi.Operation{
 		Tags:        templateOp.Tags,
 		Summary:     "List Resources",
-		Description: "Retrieve a paginated list of resources.",
-		OperationID: "list-" + templateOp.OperationID, // simplified ID generation
+		Description: "List of resources.",
+		OperationID: baseOperationID + "-get",
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
@@ -764,16 +771,16 @@ func (s *RequestSniffer) generateCollectionOperations(item *openapi.PathItem, te
 	item.Get = listOp
 
 	// POST /resources (Create)
-	createOp := &openapi.Operation{
+	postOp := &openapi.Operation{
 		Tags:        templateOp.Tags,
-		Summary:     "Create Resource",
-		Description: "Create a new resource.",
-		OperationID: "create-" + templateOp.OperationID,
+		Summary:     "Post Resource",
+		Description: "Post a new resource.",
+		OperationID: baseOperationID + "-post",
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
 	if reqRef != "" {
-		createOp.RequestBody = &openapi.RequestBodyRef{
+		postOp.RequestBody = &openapi.RequestBodyRef{
 			Value: &openapi.RequestBody{
 				Content:     openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: reqRef}, []string{"application/json"}),
 				Description: "The resource to create",
@@ -785,11 +792,13 @@ func (s *RequestSniffer) generateCollectionOperations(item *openapi.PathItem, te
 	if respRef != "" {
 		createResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
 	}
-	createOp.Responses.Set("201", &openapi.ResponseRef{Value: createResp})
-	item.Post = createOp
+	postOp.Responses.Set("201", &openapi.ResponseRef{Value: createResp})
+	item.Post = postOp
 }
 
 func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *openapi.PathItem, templateOp *openapi.Operation, reqRef, respRef string) {
+	baseOperationID := ko.GenerateNameFromPath(resourcePath, "")
+
 	// Extract path params from the resource path to ensure they are present
 	pathParams := ko.ExtractParameters(resourcePath, "", http.Header{})
 
@@ -806,8 +815,8 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 	getOp := &openapi.Operation{
 		Tags:        templateOp.Tags,
 		Summary:     "Get Resource",
-		Description: "Retrieve a single resource by ID.",
-		OperationID: "get-" + templateOp.OperationID,
+		Description: "Get a resource by ID.",
+		OperationID: baseOperationID + "-get",
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
@@ -821,9 +830,9 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 	// PUT /resources/{id} (Replace)
 	putOp := &openapi.Operation{
 		Tags:        templateOp.Tags,
-		Summary:     "Replace Resource",
-		Description: "Replace a resource by ID.",
-		OperationID: "replace-" + templateOp.OperationID,
+		Summary:     "Put Resource",
+		Description: "Put a resource by ID.",
+		OperationID: baseOperationID + "-put",
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
@@ -835,7 +844,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 			},
 		}
 	}
-	putResp := openapi.NewResponse().WithDescription("Resource updated")
+	putResp := openapi.NewResponse().WithDescription("Resource replaced")
 	if respRef != "" {
 		putResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
 	}
@@ -845,9 +854,9 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 	// PATCH /resources/{id} (Update)
 	patchOp := &openapi.Operation{
 		Tags:        templateOp.Tags,
-		Summary:     "Update Resource",
-		Description: "Partially update a resource by ID.",
-		OperationID: "update-" + templateOp.OperationID,
+		Summary:     "Patch Resource",
+		Description: "Patch a resource by ID.",
+		OperationID: baseOperationID + "-patch",
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
@@ -859,7 +868,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 			},
 		}
 	}
-	patchResp := openapi.NewResponse().WithDescription("Resource updated")
+	patchResp := openapi.NewResponse().WithDescription("Resource patched")
 	if respRef != "" {
 		patchResp.Content = openapi.NewContentWithSchemaRef(&openapi.SchemaRef{Ref: respRef}, []string{"application/json"})
 	}
@@ -871,7 +880,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 		Tags:        templateOp.Tags,
 		Summary:     "Delete Resource",
 		Description: "Delete a resource by ID.",
-		OperationID: "delete-" + templateOp.OperationID,
+		OperationID: baseOperationID + "-delete",
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
