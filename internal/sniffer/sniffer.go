@@ -48,7 +48,7 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
   - Variables are supported: "{name}", "{path...}"
 - **X-KDex-Function-Request-Schema-Ref**: Sets the OpenAPI operation request body schema reference. (e.g. "Foo", "#/components/schemas/Foo" or a URL to an external schema)
 - **X-KDex-Function-Response-Schema-Ref**: Sets the OpenAPI operation response schema reference. (e.g. "Foo", "#/components/schemas/Foo" or a URL to an external schema)
-- **X-KDex-Function-Security**: If present, the sniffer signals that the route requires authentication. It adds security requirements matching the comma deliminted scheme names in the value and injects a "401 Unauthorized" response.
+- **X-KDex-Function-Security**: If present, the sniffer signals that the route requires authentication. It adds security requirements matching the semicolon deliminted (';') scheme names in the value and injects a "401 Unauthorized" response. Scopes can be included with the scheme name by appending a equal sign ('=') and a pipe delimited list or scopes. (e.g. "X-KDex-Function-Security: bearer=users:read|users:write;apiKey")
 - **X-KDex-Function-Summary**: Sets the OpenAPI operation summary.
 - **X-KDex-Function-Tags**: Comma-separated list of tags for the OpenAPI operation.
 
@@ -427,17 +427,41 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 
 	// Authentication signal
 	if r.Header.Get("X-KDex-Function-Security") != "" {
-		if len(*s.SecuritySchemes) > 0 {
-			security := openapi.SecurityRequirements{}
-			for schemeName := range *s.SecuritySchemes {
-				security = append(security, openapi.NewSecurityRequirement().Authenticate(schemeName))
+		secValues := strings.Split(r.Header.Get("X-KDex-Function-Security"), ";")
+		security := map[string][]string{}
+		for _, val := range secValues {
+			secValue := strings.TrimSpace(val)
+			if strings.Contains(secValue, "=") {
+				parts := strings.SplitN(secValue, "=", 1)
+				schemeName := strings.TrimSpace(parts[0])
+				if strings.Contains(parts[1], "|") {
+					security[schemeName] = []string{}
+					for scope := range strings.SplitSeq(parts[1], "|") {
+						security[schemeName] = append(security[schemeName], strings.TrimSpace(scope))
+					}
+				} else {
+					security[schemeName] = []string{parts[1]}
+				}
+			} else {
+				security[secValue] = []string{}
 			}
-			op.Security = &security
+		}
+		if len(*s.SecuritySchemes) > 0 && len(secValues) > 0 {
+			security := openapi.SecurityRequirements{}
+			found := false
+			for schemeName := range *s.SecuritySchemes {
+				if slices.Contains(secValues, schemeName) {
+					security = append(security, openapi.NewSecurityRequirement().Authenticate(schemeName))
+					found = true
+				}
+			}
 
-			// Add 401 response when auth is required
-			op.Responses.Set("401", &openapi.ResponseRef{
-				Ref: "#/components/responses/UnauthorizedError",
-			})
+			if found {
+				op.Security = &security
+				op.Responses.Set("401", &openapi.ResponseRef{
+					Ref: "#/components/responses/UnauthorizedError",
+				})
+			}
 		}
 	}
 
