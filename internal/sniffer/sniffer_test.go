@@ -578,8 +578,10 @@ func TestRequestSniffer_mergeAPIIntoFunction(t *testing.T) {
 
 func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 	s := &RequestSniffer{
-		HostName:      "test-host",
-		SecurityModes: []string{"bearer"},
+		HostName: "test-host",
+		Security: &openapi.SecurityRequirements{
+			openapi.NewSecurityRequirement().Authenticate("bearer"),
+		},
 	}
 
 	tests := []struct {
@@ -611,7 +613,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				item, ok := op["/foo"]
 				assert.True(t, ok)
 				assert.Equal(t, "gen-foo-get", item.Get.OperationID)
-				assert.Equal(t, []string{"one", "two", "three"}, item.Get.Tags)
+				assert.Equal(t, []string{"one", "two", "three", "test"}, item.Get.Tags)
 			},
 		},
 		{
@@ -1301,6 +1303,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			operationId := ko.GenerateOperationID(name, tt.r.Method, tt.r.Header.Get("X-KDex-Function-Operation-ID"))
 			items, schemas, err := s.parseRequestIntoAPI(
 				tt.r,
+				"test",
 				tt.r.URL.Path,
 				operationId)
 			tt.assertions(t, items, schemas, err)
@@ -1333,6 +1336,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	operationId := ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err := s.parseRequestIntoAPI(
 		r,
+		"test",
 		patternPath,
 		operationId)
 	assert.NoError(t, err)
@@ -1389,6 +1393,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 								}),
 							),
 							Summary: "gen-v2-users-id-put",
+							Tags:    []string{"test"},
 						}),
 					},
 				},
@@ -1435,6 +1440,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	operationId = ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err = s.parseRequestIntoAPI(
 		r,
+		"test",
 		patternPath,
 		operationId)
 	assert.NoError(t, err)
@@ -1475,6 +1481,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 			}),
 		),
 		Summary: "gen-v2-users-id-get",
+		Tags:    []string{"test"},
 	})
 	expected.Spec.API.Paths["/v2/users/{id}"] = item
 
@@ -1492,6 +1499,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	operationId = ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err = s.parseRequestIntoAPI(
 		r,
+		"test",
 		patternPath,
 		operationId)
 	assert.NoError(t, err)
@@ -1532,6 +1540,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 			}),
 		),
 		Summary: "gen-v2-users-id-delete",
+		Tags:    []string{"test"},
 	})
 	expected.Spec.API.Paths["/v2/users/{id}"] = item
 
@@ -1547,6 +1556,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	operationId = ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err = s.parseRequestIntoAPI(
 		r,
+		"test",
 		patternPath,
 		operationId)
 	assert.NoError(t, err)
@@ -1580,6 +1590,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 			}),
 		),
 		Summary: "gen-v2-users-id-head",
+		Tags:    []string{"test"},
 	})
 	expected.Spec.API.Paths["/v2/users/{id}"] = item
 
@@ -1598,6 +1609,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 	operationId = ko.GenerateOperationID(patternName, r.Method, "")
 	paths, schemas, err = s.parseRequestIntoAPI(
 		r,
+		"test",
 		patternPath,
 		operationId)
 	assert.NoError(t, err)
@@ -1675,6 +1687,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 			}),
 		),
 		Summary: "gen-v2-users-id-patch",
+		Tags:    []string{"test"},
 	})
 	expected.Spec.API.Paths["/v2/users/{id}"] = item
 
@@ -1696,12 +1709,12 @@ func TestRequestSniffer_DocsHandler(t *testing.T) {
 
 func TestRequestSniffer_sniff(t *testing.T) {
 	tests := []struct {
-		name          string
-		r             *http.Request
-		functions     []kdexv1alpha1.KDexFunction
-		securityModes []string
-		want          *kdexv1alpha1.KDexFunction
-		wantErr       string
+		name      string
+		r         *http.Request
+		functions []kdexv1alpha1.KDexFunction
+		security  *openapi.SecurityRequirements
+		want      *kdexv1alpha1.KDexFunction
+		wantErr   string
 	}{
 		{
 			name: "GET /~/internal",
@@ -1733,6 +1746,7 @@ func TestRequestSniffer_sniff(t *testing.T) {
 										}),
 									),
 									Summary: "gen-v1-foo-get",
+									Tags:    []string{"gen-v1-foo"},
 								}),
 							},
 						},
@@ -1824,6 +1838,7 @@ func TestRequestSniffer_sniff(t *testing.T) {
 										}),
 									),
 									Summary: "gen-v1-foo-bar-get",
+									Tags:    []string{"gen-v1-foo"},
 								}),
 							},
 						},
@@ -1890,6 +1905,7 @@ func TestRequestSniffer_sniff(t *testing.T) {
 										}),
 									),
 									Summary: "gen-v1-foo-get",
+									Tags:    []string{"gen-v1-foo"},
 								}),
 								Put: raw(&openapi.Operation{
 									Description: "PUT /v1/foo",
@@ -2020,6 +2036,7 @@ func TestRequestSniffer_sniff(t *testing.T) {
 										}),
 									),
 									Summary: "gen-v1-foo-get",
+									Tags:    []string{"gen-v1-foo"},
 								}),
 								Summary: "Auto-generated from request to /v1/foo",
 							},
@@ -2047,7 +2064,7 @@ func TestRequestSniffer_sniff(t *testing.T) {
 				HostName:      "test-host",
 				ItemPathRegex: (&kdexv1alpha1.API{}).ItemPathRegex(),
 				Namespace:     "test-namespace",
-				SecurityModes: tt.securityModes,
+				Security:      tt.security,
 			}
 
 			got, gotErr := s.sniff(tt.r)

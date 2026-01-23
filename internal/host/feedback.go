@@ -215,7 +215,7 @@ func (th *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate OpenAPI spec snippet
-	spec := ko.BuildOneOff(ko.Host(r), result.Function)
+	spec := th.openapiBuilder.BuildOneOff(ko.Host(r), result.Function)
 	specBytes, _ := json.MarshalIndent(spec, "", "  ")
 	specStr := string(specBytes)
 

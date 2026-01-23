@@ -40,6 +40,7 @@ type HostHandler struct {
 	importmap                 string
 	log                       logr.Logger
 	mu                        sync.RWMutex
+	openapiBuilder            ko.Builder
 	packageReferences         []kdexv1alpha1.PackageReference
 	pathsCollectedInReconcile map[string]ko.PathInfo
 	registeredPaths           map[string]ko.PathInfo

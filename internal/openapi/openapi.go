@@ -141,7 +141,11 @@ type PathInfo struct {
 	Type     PathType
 }
 
-func BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *openapi.T {
+type Builder struct {
+	Security *openapi.SecurityRequirements
+}
+
+func (b *Builder) BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *openapi.T {
 	api := FromKDexAPI(&fn.Spec.API)
 	info := PathInfo{
 		API:  *api,
@@ -151,10 +155,15 @@ func BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *openapi.T {
 		fn.Spec.API.BasePath: info,
 	}
 
-	return BuildOpenAPI(serverUrl, fn.Name, paths, Filter{})
+	return b.BuildOpenAPI(serverUrl, fn.Name, paths, Filter{})
 }
 
-func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filter Filter) *openapi.T {
+func (b *Builder) BuildOpenAPI(
+	serverUrl string,
+	name string,
+	paths map[string]PathInfo,
+	filter Filter,
+) *openapi.T {
 	doc := &openapi.T{
 		Components: &openapi.Components{
 			Schemas:         openapi.Schemas{},
@@ -165,15 +174,16 @@ func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filt
 			Description: "Auto-generated OpenAPI specification for KDex Host",
 			Version:     "1.0.0",
 		},
-		Paths:   &openapi.Paths{},
 		OpenAPI: "3.0.0",
+		Paths:   &openapi.Paths{},
 		Servers: openapi.Servers{
 			&openapi.Server{
 				URL: serverUrl,
 			},
 		},
-		Tags: openapi.Tags{},
 	}
+
+	tags := openapi.Tags{}
 
 	basePaths := slices.Collect(maps.Keys(paths))
 
@@ -194,7 +204,7 @@ func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filt
 				continue
 			}
 
-			doc.Tags = append(doc.Tags, collectTags(pathInfo)...)
+			collectTags(&tags, &pathInfo)
 
 			pathItem := &openapi.PathItem{
 				Description: curItem.Description,
@@ -278,56 +288,98 @@ func BuildOpenAPI(serverUrl string, name string, paths map[string]PathInfo, filt
 		}
 	}
 
+	doc.Tags = tags
+	if b.Security != nil {
+		doc.Security = *b.Security
+	}
+
 	return doc
 }
 
-func collectTags(pathInfo PathInfo) []*openapi.Tag {
-	tags := []string{}
-
+func collectTags(tags *openapi.Tags, pathInfo *PathInfo) {
 	for _, curItem := range pathInfo.API.Paths {
 		if curItem.Connect != nil {
-			tags = append(tags, curItem.Connect.Tags...)
+			for _, t := range curItem.Connect.Tags {
+				if tags.Get(t) == nil {
+					*tags = append(*tags, &openapi.Tag{
+						Name: t,
+					})
+				}
+			}
 		}
 		if curItem.Delete != nil {
-			tags = append(tags, curItem.Delete.Tags...)
+			for _, t := range curItem.Delete.Tags {
+				if tags.Get(t) == nil {
+					*tags = append(*tags, &openapi.Tag{
+						Name: t,
+					})
+				}
+			}
 		}
 		if curItem.Get != nil {
-			tags = append(tags, curItem.Get.Tags...)
+			for _, t := range curItem.Get.Tags {
+				if tags.Get(t) == nil {
+					*tags = append(*tags, &openapi.Tag{
+						Name: t,
+					})
+				}
+			}
 		}
 		if curItem.Head != nil {
-			tags = append(tags, curItem.Head.Tags...)
+			for _, t := range curItem.Head.Tags {
+				if tags.Get(t) == nil {
+					*tags = append(*tags, &openapi.Tag{
+						Name: t,
+					})
+				}
+			}
 		}
 		if curItem.Options != nil {
-			tags = append(tags, curItem.Options.Tags...)
+			for _, t := range curItem.Options.Tags {
+				if tags.Get(t) == nil {
+					*tags = append(*tags, &openapi.Tag{
+						Name: t,
+					})
+				}
+			}
 		}
 		if curItem.Patch != nil {
-			tags = append(tags, curItem.Patch.Tags...)
+			for _, t := range curItem.Patch.Tags {
+				if tags.Get(t) == nil {
+					*tags = append(*tags, &openapi.Tag{
+						Name: t,
+					})
+				}
+			}
 		}
 		if curItem.Post != nil {
-			tags = append(tags, curItem.Post.Tags...)
+			for _, t := range curItem.Post.Tags {
+				if tags.Get(t) == nil {
+					*tags = append(*tags, &openapi.Tag{
+						Name: t,
+					})
+				}
+			}
 		}
 		if curItem.Put != nil {
-			tags = append(tags, curItem.Put.Tags...)
+			for _, t := range curItem.Put.Tags {
+				if tags.Get(t) == nil {
+					*tags = append(*tags, &openapi.Tag{
+						Name: t,
+					})
+				}
+			}
 		}
 		if curItem.Trace != nil {
-			tags = append(tags, curItem.Trace.Tags...)
+			for _, t := range curItem.Trace.Tags {
+				if tags.Get(t) == nil {
+					*tags = append(*tags, &openapi.Tag{
+						Name: t,
+					})
+				}
+			}
 		}
 	}
-
-	openApiTags := []*openapi.Tag{}
-
-	seen := map[string]bool{}
-	for _, tag := range tags {
-		if seen[tag] {
-			continue
-		}
-		seen[tag] = true
-		openApiTags = append(openApiTags, &openapi.Tag{
-			Name: tag,
-		})
-	}
-
-	return openApiTags
 }
 
 func ExtractParameters(routePath string, query string, header http.Header) openapi.Parameters {

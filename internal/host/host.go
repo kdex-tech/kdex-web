@@ -355,19 +355,17 @@ func (th *HostHandler) RemoveUtilityPage(name string) {
 	th.RebuildMux() // Called after lock is released
 }
 
-func (th *HostHandler) SecurityModes() []string {
+func (th *HostHandler) SecurityModes() *openapi.SecurityRequirements {
+	req := openapi.NewSecurityRequirements()
 	// For now we assume that if a login page is specified we want to default to bearer auth
 	// as the preferred mode of authentication for auto-generated functions.
 	if th.host != nil && th.host.UtilityPages != nil && th.host.UtilityPages.LoginRef != nil {
-		return []string{"bearer"}
+		req.With(openapi.NewSecurityRequirement().Authenticate("bearer"))
+	} else if th.host != nil {
+		req.With(openapi.NewSecurityRequirement().Authenticate("bearer"))
 	}
 
-	// Fallback to bearer if we have a host at all, better than nothing for signaling auth intent.
-	if th.host != nil {
-		return []string{"bearer"}
-	}
-
-	return []string{}
+	return req
 }
 
 func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -401,6 +399,9 @@ func (th *HostHandler) SetHost(
 		DefaultLanguage: host.DefaultLang,
 		Organization:    host.Organization,
 	})
+	th.openapiBuilder = ko.Builder{
+		Security: th.SecurityModes(),
+	}
 	th.packageReferences = packageReferences
 	th.pathsCollectedInReconcile = paths
 	th.themeAssets = themeAssets
@@ -409,13 +410,14 @@ func (th *HostHandler) SetHost(
 	var snif *sniffer.RequestSniffer
 	if host.DevMode {
 		snif = &sniffer.RequestSniffer{
-			BasePathRegex: (&kdexv1alpha1.API{}).BasePathRegex(),
-			Client:        th.client,
-			Functions:     functions,
-			HostName:      th.Name,
-			ItemPathRegex: (&kdexv1alpha1.API{}).ItemPathRegex(),
-			Namespace:     th.Namespace,
-			SecurityModes: th.SecurityModes(),
+			BasePathRegex:  (&kdexv1alpha1.API{}).BasePathRegex(),
+			Client:         th.client,
+			Functions:      functions,
+			HostName:       th.Name,
+			ItemPathRegex:  (&kdexv1alpha1.API{}).ItemPathRegex(),
+			OpenAPIBuilder: th.openapiBuilder,
+			Namespace:      th.Namespace,
+			Security:       th.SecurityModes(),
 		}
 	}
 
@@ -777,7 +779,7 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 		th.mu.RLock()
 		defer th.mu.RUnlock()
 
-		spec := ko.BuildOpenAPI(ko.Host(r), th.Name, th.registeredPaths, filterFromQuery(r.URL.Query()))
+		spec := th.openapiBuilder.BuildOpenAPI(ko.Host(r), th.Name, th.registeredPaths, filterFromQuery(r.URL.Query()))
 
 		jsonBytes, err := json.Marshal(spec)
 		if err != nil {
