@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime/debug"
+	"sort"
 	"strings"
 	"time"
 
@@ -795,6 +796,12 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/~/schema/{path...}"
 
+	type schemaEntry struct {
+		name   string
+		path   string
+		schema *openapi.SchemaRef
+	}
+
 	// Register the path itself so it appears in the spec
 	th.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
@@ -835,12 +842,31 @@ func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 		th.mu.RLock()
 		defer th.mu.RUnlock()
 
+		orderedSchemaArray := []schemaEntry{}
+
+		for path, info := range th.registeredPaths {
+			for name, schema := range info.API.Schemas {
+				orderedSchemaArray = append(orderedSchemaArray, schemaEntry{
+					name:   name,
+					path:   path,
+					schema: schema,
+				})
+			}
+		}
+
+		sort.Slice(orderedSchemaArray, func(i, j int) bool {
+			if orderedSchemaArray[i].name < orderedSchemaArray[j].name {
+				return true
+			}
+			return orderedSchemaArray[i].path < orderedSchemaArray[j].path
+		})
+
 		var foundSchema *openapi.SchemaRef
 
 		// 1. Global lookup by schema name
-		for _, info := range th.registeredPaths {
-			if schema, ok := info.API.Schemas[requested]; ok {
-				foundSchema = schema
+		for _, schemaEntry := range orderedSchemaArray {
+			if schemaEntry.name == requested {
+				foundSchema = schemaEntry.schema
 				break
 			}
 		}
@@ -849,21 +875,17 @@ func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 		if foundSchema == nil {
 			fullPath := "/" + requested
 			var bestMatchPath string
-			var bestMatchInfo ko.PathInfo
+			var bestMatchSchema *openapi.SchemaRef
 
-			for basePath, info := range th.registeredPaths {
-				if strings.HasPrefix(fullPath, basePath) {
-					if len(basePath) > len(bestMatchPath) {
-						bestMatchPath = basePath
-						bestMatchInfo = info
-					}
+			for _, schemaEntry := range orderedSchemaArray {
+				if fullPath == (schemaEntry.path + "/" + schemaEntry.name) {
+					bestMatchPath = schemaEntry.path
+					bestMatchSchema = schemaEntry.schema
 				}
 			}
 
 			if bestMatchPath != "" {
-				schemaName := strings.TrimPrefix(fullPath, bestMatchPath)
-				schemaName = strings.TrimPrefix(schemaName, "/")
-				foundSchema = bestMatchInfo.API.Schemas[schemaName]
+				foundSchema = bestMatchSchema
 			}
 		}
 

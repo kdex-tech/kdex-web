@@ -8,14 +8,12 @@ import (
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-logr/logr"
-	G "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	ko "kdex.dev/web/internal/openapi"
 )
 
 func TestHostHandler_SchemaHandler(t *testing.T) {
-	g := G.NewGomegaWithT(t)
-
 	// Setup HostHandler
 	th := NewHostHandler(nil, "test-host", "default", logr.Discard())
 
@@ -89,7 +87,7 @@ func TestHostHandler_SchemaHandler(t *testing.T) {
 			name:       "global lookup - first win",
 			path:       "/~/schema/User",
 			wantCode:   http.StatusOK,
-			wantSchema: userSchema, // depends on map iteration order, but /v1/users is first in my map (not guaranteed)
+			wantSchema: addrSchema, // sorting order guarantees common schema will return first
 		},
 		{
 			name:       "namespaced lookup - User in v1/users",
@@ -122,17 +120,18 @@ func TestHostHandler_SchemaHandler(t *testing.T) {
 
 			th.ServeHTTP(w, req)
 
-			g.Expect(w.Code).To(G.Equal(tt.wantCode))
+			assert.Equal(t, tt.wantCode, w.Code)
+			if w.Code > 200 {
+				return
+			}
 
-			if tt.wantCode == http.StatusOK {
-				var gotSchema openapi.SchemaRef
-				err := json.Unmarshal(w.Body.Bytes(), &gotSchema)
-				g.Expect(err).NotTo(G.HaveOccurred())
-
-				// Compare marshaled bytes for simplicity
+			var gotSchema openapi.SchemaRef
+			err := json.Unmarshal(w.Body.Bytes(), &gotSchema)
+			if assert.NoError(t, err) {
+				assert.NoError(t, err)
 				gotBytes, _ := json.Marshal(gotSchema)
 				wantBytes, _ := json.Marshal(tt.wantSchema)
-				g.Expect(gotBytes).To(G.MatchJSON(wantBytes))
+				assert.Equal(t, wantBytes, gotBytes)
 			}
 		})
 	}
