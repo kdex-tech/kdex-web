@@ -357,15 +357,17 @@ func (th *HostHandler) RemoveUtilityPage(name string) {
 
 func (th *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 	req := &openapi.SecuritySchemes{}
+	bearerScheme := openapi.NewJWTSecurityScheme()
+	bearerScheme.Description = "Bearer Token - This is the default scheme"
 	// For now we assume that if a login page is specified we want to default to bearer auth
 	// as the preferred mode of authentication for auto-generated functions.
 	if th.host != nil && th.host.UtilityPages != nil && th.host.UtilityPages.LoginRef != nil {
 		(*req)["bearer"] = &openapi.SecuritySchemeRef{
-			Value: openapi.NewJWTSecurityScheme(),
+			Value: bearerScheme,
 		}
 	} else if th.host != nil {
 		(*req)["bearer"] = &openapi.SecuritySchemeRef{
-			Value: openapi.NewJWTSecurityScheme(),
+			Value: bearerScheme,
 		}
 	}
 

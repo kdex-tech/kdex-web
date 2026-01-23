@@ -185,6 +185,8 @@ func (b *Builder) BuildOpenAPI(
 
 	tags := openapi.Tags{}
 
+	securitySchemesUsed := map[string]bool{}
+
 	basePaths := slices.Collect(maps.Keys(paths))
 
 	sort.Slice(basePaths, func(i, j int) bool {
@@ -204,8 +206,6 @@ func (b *Builder) BuildOpenAPI(
 				continue
 			}
 
-			collectTags(&tags, &pathInfo)
-
 			pathItem := &openapi.PathItem{
 				Description: curItem.Description,
 				Summary:     curItem.Summary,
@@ -219,7 +219,7 @@ func (b *Builder) BuildOpenAPI(
 			}
 
 			// Fill path item operations
-			ensureOpMetadata := func(op *openapi.Operation) {
+			collectAndSetOpMetadata := func(op *openapi.Operation) {
 				if op == nil {
 					return
 				}
@@ -236,42 +236,56 @@ func (b *Builder) BuildOpenAPI(
 						}
 					}
 				}
+				for _, t := range op.Tags {
+					if tags.Get(t) == nil {
+						tags = append(tags, &openapi.Tag{
+							Name: t,
+						})
+					}
+				}
+				if op.Security != nil {
+					for _, scheme := range *op.Security {
+						for schemeName := range scheme {
+							securitySchemesUsed[schemeName] = true
+						}
+					}
+				}
 			}
 
 			if curItem.Get != nil {
-				ensureOpMetadata(curItem.Get)
+				collectAndSetOpMetadata(curItem.Get)
 				pathItem.Get = curItem.Get
 			}
 			if curItem.Put != nil {
-				ensureOpMetadata(curItem.Put)
+				collectAndSetOpMetadata(curItem.Put)
 				pathItem.Put = curItem.Put
 			}
 			if curItem.Post != nil {
-				ensureOpMetadata(curItem.Post)
+				collectAndSetOpMetadata(curItem.Post)
 				pathItem.Post = curItem.Post
 			}
 			if curItem.Delete != nil {
-				ensureOpMetadata(curItem.Delete)
+				collectAndSetOpMetadata(curItem.Delete)
 				pathItem.Delete = curItem.Delete
 			}
 			if curItem.Options != nil {
-				ensureOpMetadata(curItem.Options)
+				collectAndSetOpMetadata(curItem.Options)
 				pathItem.Options = curItem.Options
 			}
 			if curItem.Head != nil {
-				ensureOpMetadata(curItem.Head)
+				collectAndSetOpMetadata(curItem.Head)
 				pathItem.Head = curItem.Head
 			}
 			if curItem.Patch != nil {
-				ensureOpMetadata(curItem.Patch)
+				collectAndSetOpMetadata(curItem.Patch)
 				pathItem.Patch = curItem.Patch
 			}
 			if curItem.Trace != nil {
-				ensureOpMetadata(curItem.Trace)
+				collectAndSetOpMetadata(curItem.Trace)
 				pathItem.Trace = curItem.Trace
 			}
 			if curItem.Connect != nil {
-				ensureOpMetadata(curItem.Connect)
+				collectAndSetOpMetadata(curItem.Connect)
 				pathItem.Connect = curItem.Connect
 			}
 
@@ -292,17 +306,31 @@ func (b *Builder) BuildOpenAPI(
 	if b.Security != nil {
 		doc.Security = *b.Security
 	}
-	if b.SecuritySchemes != nil {
-		doc.Components.SecuritySchemes = *b.SecuritySchemes
 
-		if doc.Components.Responses == nil {
-			doc.Components.Responses = openapi.ResponseBodies{}
+	if b.SecuritySchemes != nil {
+		securitySchemes := openapi.SecuritySchemes{}
+
+		for name, scheme := range *b.SecuritySchemes {
+			if scheme.Ref != "" {
+				continue
+			}
+			if _, ok := securitySchemesUsed[name]; ok {
+				securitySchemes[name] = scheme
+			}
 		}
 
-		doc.Components.Responses["UnauthorizedError"] = &openapi.ResponseRef{
-			Value: &openapi.Response{
-				Description: openapi.Ptr("Unauthorized"),
-			},
+		doc.Components.SecuritySchemes = securitySchemes
+
+		if len(doc.Components.SecuritySchemes) > 0 {
+			if doc.Components.Responses == nil {
+				doc.Components.Responses = openapi.ResponseBodies{}
+			}
+
+			doc.Components.Responses["UnauthorizedError"] = &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("Unauthorized"),
+				},
+			}
 		}
 	}
 

@@ -718,7 +718,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 			name: "detect auth",
 			r: func() *http.Request {
 				r := httptest.NewRequest("GET", "/foo", http.NoBody)
-				r.Header.Set("Authorization", "Bearer token")
+				r.Header.Set("X-KDex-Function-Security", "bearer")
 				return r
 			}(),
 			assertions: func(t *testing.T, op map[string]*openapi.PathItem, schemas map[string]*openapi.SchemaRef, err error) {

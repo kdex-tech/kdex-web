@@ -48,12 +48,12 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
   - Variables are supported: "{name}", "{path...}"
 - **X-KDex-Function-Request-Schema-Ref**: Sets the OpenAPI operation request body schema reference. (e.g. "Foo", "#/components/schemas/Foo" or a URL to an external schema)
 - **X-KDex-Function-Response-Schema-Ref**: Sets the OpenAPI operation response schema reference. (e.g. "Foo", "#/components/schemas/Foo" or a URL to an external schema)
+- **X-KDex-Function-Security**: If present, the sniffer signals that the route requires authentication. It adds security requirements matching the comma deliminted scheme names in the value and injects a "401 Unauthorized" response.
 - **X-KDex-Function-Summary**: Sets the OpenAPI operation summary.
 - **X-KDex-Function-Tags**: Comma-separated list of tags for the OpenAPI operation.
 
 ### Core Header Introspection
 
-- **Authorization**: If present, the sniffer signals that the route requires authentication. It adds security requirements matching the host's available modes (e.g., "bearer") and injects a "401 Unauthorized" response.
 - **Accept**: If present and specific (not "*/*"), media types are used to populate the expected response "content" types in OpenAPI.
 - **Content-Type**:
   - "application/json": The sniffer peeks at the body and infers a basic schema (types: string, number, boolean, object, array).
@@ -171,8 +171,8 @@ func (s *RequestSniffer) analyze(r *http.Request) (*AnalysisResult, error) {
 
 	if fn != nil {
 		// Basic inference insights
-		if r.Header.Get("Authorization") != "" {
-			res.Lints = append(res.Lints, "[inference] Detected 'Authorization' header; secured endpoint inferred.")
+		if r.Header.Get("X-KDex-Function-Security") != "" {
+			res.Lints = append(res.Lints, "[inference] Detected 'X-KDex-Function-Security' header; secured endpoint inferred.")
 		}
 		if len(r.URL.Query()) > 0 {
 			res.Lints = append(res.Lints, fmt.Sprintf("[inference] Detected %d query parameters.", len(r.URL.Query())))
@@ -425,10 +425,10 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 	}
 
 	// Authentication signal
-	if r.Header.Get("Authorization") != "" {
+	if r.Header.Get("X-KDex-Function-Security") != "" {
 		if len(*s.SecuritySchemes) > 0 {
 			security := openapi.SecurityRequirements{}
-			for schemeName, _ := range *s.SecuritySchemes {
+			for schemeName := range *s.SecuritySchemes {
 				security = append(security, openapi.NewSecurityRequirement().Authenticate(schemeName))
 			}
 			op.Security = &security
@@ -714,7 +714,7 @@ func (s *RequestSniffer) generateCollectionOperations(item *openapi.PathItem, te
 		Summary:     "List Resources",
 		Description: "Retrieve a paginated list of resources.",
 		OperationID: "list-" + templateOp.OperationID, // simplified ID generation
-		Responses:   openapi.NewResponses(),
+		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
 	// Add pagination params
@@ -744,7 +744,7 @@ func (s *RequestSniffer) generateCollectionOperations(item *openapi.PathItem, te
 		Summary:     "Create Resource",
 		Description: "Create a new resource.",
 		OperationID: "create-" + templateOp.OperationID,
-		Responses:   openapi.NewResponses(),
+		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
 	if reqRef != "" {
@@ -782,7 +782,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 		Description: "Retrieve a single resource by ID.",
 		OperationID: "get-" + templateOp.OperationID,
 		Parameters:  pathParams,
-		Responses:   openapi.NewResponses(),
+		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
 	getResp := openapi.NewResponse().WithDescription("Resource found")
@@ -799,7 +799,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 		Description: "Replace a resource by ID.",
 		OperationID: "replace-" + templateOp.OperationID,
 		Parameters:  pathParams,
-		Responses:   openapi.NewResponses(),
+		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
 	if reqRef != "" {
@@ -824,7 +824,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 		Description: "Partially update a resource by ID.",
 		OperationID: "update-" + templateOp.OperationID,
 		Parameters:  pathParams,
-		Responses:   openapi.NewResponses(),
+		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
 	if reqRef != "" {
@@ -849,7 +849,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 		Description: "Delete a resource by ID.",
 		OperationID: "delete-" + templateOp.OperationID,
 		Parameters:  pathParams,
-		Responses:   openapi.NewResponses(),
+		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
 	deleteOp.Responses.Set("204", &openapi.ResponseRef{Value: openapi.NewResponse().WithDescription("Resource deleted")})
