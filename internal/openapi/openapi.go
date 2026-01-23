@@ -142,7 +142,8 @@ type PathInfo struct {
 }
 
 type Builder struct {
-	Security *openapi.SecurityRequirements
+	Security        *openapi.SecurityRequirements
+	SecuritySchemes *openapi.SecuritySchemes
 }
 
 func (b *Builder) BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *openapi.T {
@@ -166,8 +167,7 @@ func (b *Builder) BuildOpenAPI(
 ) *openapi.T {
 	doc := &openapi.T{
 		Components: &openapi.Components{
-			Schemas:         openapi.Schemas{},
-			SecuritySchemes: openapi.SecuritySchemes{},
+			Schemas: openapi.Schemas{},
 		},
 		Info: &openapi.Info{
 			Title:       fmt.Sprintf("KDex Host: %s", name),
@@ -291,6 +291,9 @@ func (b *Builder) BuildOpenAPI(
 	doc.Tags = tags
 	if b.Security != nil {
 		doc.Security = *b.Security
+	}
+	if b.SecuritySchemes != nil {
+		doc.Components.SecuritySchemes = *b.SecuritySchemes
 	}
 
 	return doc
