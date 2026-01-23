@@ -775,13 +775,14 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 		}
 	}
 
+	item.Parameters = pathParams
+
 	// GET /resources/{id} (Get)
 	getOp := &openapi.Operation{
 		Tags:        templateOp.Tags,
 		Summary:     "Get Resource",
 		Description: "Retrieve a single resource by ID.",
 		OperationID: "get-" + templateOp.OperationID,
-		Parameters:  pathParams,
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
@@ -798,7 +799,6 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 		Summary:     "Replace Resource",
 		Description: "Replace a resource by ID.",
 		OperationID: "replace-" + templateOp.OperationID,
-		Parameters:  pathParams,
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
@@ -823,7 +823,6 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 		Summary:     "Update Resource",
 		Description: "Partially update a resource by ID.",
 		OperationID: "update-" + templateOp.OperationID,
-		Parameters:  pathParams,
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
@@ -848,7 +847,6 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 		Summary:     "Delete Resource",
 		Description: "Delete a resource by ID.",
 		OperationID: "delete-" + templateOp.OperationID,
-		Parameters:  pathParams,
 		Responses:   &openapi.Responses{},
 		Security:    templateOp.Security,
 	}
