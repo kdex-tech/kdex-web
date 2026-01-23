@@ -1709,7 +1709,7 @@ func TestRequestSniffer_DocsHandler(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "X-KDex-Function-Name")
 }
 
-func TestRequestSniffer_sniff(t *testing.T) {
+func TestRequestSniffer_sniff_A(t *testing.T) {
 	tests := []struct {
 		name      string
 		r         *http.Request
@@ -2190,6 +2190,137 @@ func TestRequestSniffer_sniff(t *testing.T) {
 				return
 			}
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRequestSniffer_sniff(t *testing.T) {
+	tests := []struct {
+		name            string
+		r               *http.Request
+		functions       []kdexv1alpha1.KDexFunction
+		securitySchemes *openapi.SecuritySchemes
+		want            *kdexv1alpha1.KDexFunction
+		assertions      func(t *testing.T, fn *kdexv1alpha1.KDexFunction, err error)
+	}{
+		{
+			name: "set security, no schemes",
+			r: func() *http.Request {
+				r := httptest.NewRequest("GET", "/v1/users/1", http.NoBody)
+				r.Header.Set("X-KDex-Function-Pattern-Path", "/v1/users/{id}")
+				r.Header.Set("X-KDex-Function-Security", "foo")
+				return r
+			}(),
+			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction, err error) {
+				item := fn.Spec.API.Paths["/v1/users/{id}"]
+				assert.NotNil(t, item)
+				assert.NotNil(t, item.Get)
+				assert.Nil(t, item.GetGet().Security)
+			},
+		},
+		{
+			name: "set security, with schemes, wrong scheme name",
+			r: func() *http.Request {
+				r := httptest.NewRequest("GET", "/v1/users/1", http.NoBody)
+				r.Header.Set("X-KDex-Function-Pattern-Path", "/v1/users/{id}")
+				r.Header.Set("X-KDex-Function-Security", "foo")
+				return r
+			}(),
+			securitySchemes: &openapi.SecuritySchemes{
+				"bearer": &openapi.SecuritySchemeRef{
+					Value: openapi.NewJWTSecurityScheme(),
+				},
+			},
+			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction, err error) {
+				item := fn.Spec.API.Paths["/v1/users/{id}"]
+				assert.NotNil(t, item)
+				assert.NotNil(t, item.Get)
+				assert.Nil(t, item.GetGet().Security)
+			},
+		},
+		{
+			name: "set security, with schemes, right scheme name",
+			r: func() *http.Request {
+				r := httptest.NewRequest("GET", "/v1/users/1", http.NoBody)
+				r.Header.Set("X-KDex-Function-Pattern-Path", "/v1/users/{id}")
+				r.Header.Set("X-KDex-Function-Security", "bearer")
+				return r
+			}(),
+			securitySchemes: &openapi.SecuritySchemes{
+				"bearer": &openapi.SecuritySchemeRef{
+					Value: openapi.NewJWTSecurityScheme(),
+				},
+			},
+			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction, err error) {
+				item := fn.Spec.API.Paths["/v1/users/{id}"]
+				assert.NotNil(t, item)
+				assert.NotNil(t, item.Get)
+				assert.NotNil(t, item.GetGet().Security)
+				assert.NotNil(t, (*item.GetGet().Security)[0]["bearer"])
+			},
+		},
+		{
+			name: "set security, with schemes, multiple OR",
+			r: func() *http.Request {
+				r := httptest.NewRequest("GET", "/v1/users/1", http.NoBody)
+				r.Header.Set("X-KDex-Function-Pattern-Path", "/v1/users/{id}")
+				r.Header.Set("X-KDex-Function-Security", "bearer;apiKey")
+				return r
+			}(),
+			securitySchemes: &openapi.SecuritySchemes{
+				"bearer": &openapi.SecuritySchemeRef{
+					Value: openapi.NewJWTSecurityScheme(),
+				},
+				"apiKey": &openapi.SecuritySchemeRef{
+					Value: openapi.NewCSRFSecurityScheme(),
+				},
+			},
+			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction, err error) {
+				item := fn.Spec.API.Paths["/v1/users/{id}"]
+				assert.NotNil(t, item)
+				assert.NotNil(t, item.Get)
+				assert.NotNil(t, item.GetGet().Security)
+				assert.NotNil(t, (*item.GetGet().Security)[0]["bearer"])
+				assert.NotNil(t, (*item.GetGet().Security)[1]["apiKey"])
+			},
+		},
+		{
+			name: "set security, with schemes, with scopes",
+			r: func() *http.Request {
+				r := httptest.NewRequest("GET", "/v1/users/1", http.NoBody)
+				r.Header.Set("X-KDex-Function-Pattern-Path", "/v1/users/{id}")
+				r.Header.Set("X-KDex-Function-Security", "bearer=users:read")
+				return r
+			}(),
+			securitySchemes: &openapi.SecuritySchemes{
+				"bearer": &openapi.SecuritySchemeRef{
+					Value: openapi.NewJWTSecurityScheme(),
+				},
+			},
+			assertions: func(t *testing.T, fn *kdexv1alpha1.KDexFunction, err error) {
+				item := fn.Spec.API.Paths["/v1/users/{id}"]
+				assert.NotNil(t, item)
+				assert.NotNil(t, item.Get)
+				assert.NotNil(t, item.GetGet().Security)
+				bearer := (*item.GetGet().Security)[0]["bearer"]
+				assert.NotNil(t, bearer)
+				assert.Equal(t, []string{"users:read"}, bearer)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := RequestSniffer{
+				BasePathRegex:   (&kdexv1alpha1.API{}).BasePathRegex(),
+				Functions:       tt.functions,
+				HostName:        "test-host",
+				ItemPathRegex:   (&kdexv1alpha1.API{}).ItemPathRegex(),
+				Namespace:       "test-namespace",
+				SecuritySchemes: tt.securitySchemes,
+			}
+
+			got, gotErr := s.sniff(tt.r)
+			tt.assertions(t, got, gotErr)
 		})
 	}
 }
