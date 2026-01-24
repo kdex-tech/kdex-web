@@ -2,12 +2,12 @@ module kdex.dev/web
 
 go 1.25.0
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.64
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.65
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/coreos/go-oidc/v3 v3.17.0
-	github.com/daveshanley/vacuum v0.23.4
+	github.com/daveshanley/vacuum v0.23.1
 	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-logr/logr v1.4.3
@@ -15,6 +15,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.27.5
 	github.com/onsi/gomega v1.38.2
+	// Pin to compatible versions to avoid breaking changes
+	github.com/pb33f/libopenapi v0.31.2 // indirect
+	github.com/pb33f/libopenapi-validator v0.10.1 // indirect
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/text v0.33.0
 	k8s.io/api v0.35.0
@@ -88,8 +91,6 @@ require (
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/pb33f/doctor v0.0.41 // indirect
 	github.com/pb33f/jsonpath v0.7.1 // indirect
-	github.com/pb33f/libopenapi v0.33.0 // indirect
-	github.com/pb33f/libopenapi-validator v0.10.2 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.0 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
