@@ -49,10 +49,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	"kdex.dev/web/internal/auth"
 	"kdex.dev/web/internal/controller"
 	"kdex.dev/web/internal/host"
 	"kdex.dev/web/internal/web/server"
-	"kdex.dev/web/pkg/auth"
 	// +kubebuilder:scaffold:imports
 )
 

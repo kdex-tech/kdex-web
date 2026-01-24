@@ -3,9 +3,9 @@ package server
 import (
 	"net/http"
 
+	"kdex.dev/web/internal/auth"
 	"kdex.dev/web/internal/host"
 	"kdex.dev/web/internal/web/middleware"
-	"kdex.dev/web/pkg/auth"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
