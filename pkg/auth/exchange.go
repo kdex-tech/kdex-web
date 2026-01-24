@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/rsa"
 	"fmt"
 	"time"
 
@@ -14,11 +15,10 @@ import (
 )
 
 type Config struct {
-	OIDCProviderURL string
 	ClientID        string
-	JWTSecret       []byte
-	// LocalSecretRef is the reference to the secret containing local users
-	LocalSecretRef types.NamespacedName
+	JWTPrivateKey   *rsa.PrivateKey
+	LocalSecretRef  types.NamespacedName
+	OIDCProviderURL string
 }
 
 type Exchanger struct {
@@ -72,13 +72,13 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, rawIDToken string) (strin
 	}
 
 	// 2. Resolve Roles via UserPolicy
-	roles, err := e.resolveScopes(bindings, claims.Sub)
+	scopes, err := e.resolveScopes(bindings, claims.Sub)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve roles: %w", err)
 	}
 
 	// 3. Mint Local Token
-	return SignToken(claims.Sub, claims.Email, roles, e.Config.JWTSecret, 1*time.Hour)
+	return SignToken(claims.Sub, claims.Email, scopes, e.Config.JWTPrivateKey, 1*time.Hour)
 }
 
 // LoginLocal authenticates against a Kubernetes Secret and returns a local JWT.
@@ -102,7 +102,7 @@ func (e *Exchanger) LoginLocal(ctx context.Context, username, password string) (
 	}
 
 	// 3. Resolve Roles for local user (pseudo-sub)
-	roles, err := e.resolveScopes(bindings, username)
+	scopes, err := e.resolveScopes(bindings, username)
 	if err != nil {
 		// Fallback: if no policy maps "local:user", maybe give default roles or fail?
 		// For now, fail or return empty.
@@ -112,7 +112,7 @@ func (e *Exchanger) LoginLocal(ctx context.Context, username, password string) (
 
 	// 4. Mint Token
 	// Email is dummy or same as username
-	return SignToken(username, username, roles, e.Config.JWTSecret, 1*time.Hour)
+	return SignToken(username, username, scopes, e.Config.JWTPrivateKey, 1*time.Hour)
 }
 
 func (e *Exchanger) resolveBindings(ctx context.Context, sub string) (*kdexv1alpha1.KDexScopeBindingList, error) {

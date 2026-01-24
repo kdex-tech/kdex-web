@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/rsa"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -8,18 +9,18 @@ import (
 
 // Claims extends standard JWT claims with KDex specific fields.
 type Claims struct {
-	UID   string   `json:"uid"`
-	Email string   `json:"email"`
-	Roles []string `json:"roles"`
+	Email  string   `json:"email"`
+	Scopes []string `json:"scopes"`
+	UID    string   `json:"uid"`
 	jwt.RegisteredClaims
 }
 
-// SignToken creates a new signed JWT with the provided user details.
-func SignToken(uid, email string, roles []string, secret []byte, duration time.Duration) (string, error) {
+// SignToken creates a new signed JWT with the provided user details using RS256.
+func SignToken(uid, email string, scopes []string, privateKey *rsa.PrivateKey, duration time.Duration) (string, error) {
 	claims := Claims{
-		UID:   uid,
-		Email: email,
-		Roles: roles,
+		Email:  email,
+		Scopes: scopes,
+		UID:    uid,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -27,6 +28,6 @@ func SignToken(uid, email string, roles []string, secret []byte, duration time.D
 			Subject:   uid,
 		},
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(secret)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	return token.SignedString(privateKey)
 }

@@ -34,6 +34,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
@@ -51,6 +52,7 @@ import (
 	"kdex.dev/web/internal/controller"
 	"kdex.dev/web/internal/host"
 	"kdex.dev/web/internal/web/server"
+	"kdex.dev/web/pkg/auth"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -95,6 +97,9 @@ func main() {
 	flag.StringVar(&serviceName, "service-name", "", "The name of the controller service so it can self configure an "+
 		"ingress/httproute with itself as backend.")
 	flag.StringVar(&webserverAddr, "webserver-bind-address", ":8090", "The address the webserver binds to.")
+
+	var jwtKeysSecret string
+	flag.StringVar(&jwtKeysSecret, "jwt-keys-secret", "kdex-jwt-keys", "The name of the secret containing RSA keys for JWT signing.")
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
@@ -287,7 +292,19 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	srv := server.New(webserverAddr, hostHandler)
+	// Load or generate JWT signing keys
+	setupLog.Info("loading JWT signing keys", "secret", jwtKeysSecret)
+	keyPair, err := auth.LoadOrGenerateKeyPair(ctx, mgr.GetClient(), types.NamespacedName{
+		Name:      jwtKeysSecret,
+		Namespace: controllerNamespace,
+	})
+	if err != nil {
+		setupLog.Error(err, "failed to load or generate JWT keys")
+		os.Exit(1)
+	}
+	setupLog.Info("JWT keys loaded successfully")
+
+	srv := server.New(webserverAddr, hostHandler, keyPair)
 
 	go func() {
 		setupLog.Info("starting web server")
