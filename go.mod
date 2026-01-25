@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.25.0
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.69
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.70
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -28,7 +28,10 @@ require (
 	sigs.k8s.io/gateway-api v1.4.1
 )
 
-require golang.org/x/oauth2 v0.34.0
+require (
+	github.com/google/cel-go v0.26.1
+	golang.org/x/oauth2 v0.34.0
+)
 
 require (
 	cel.dev/expr v0.25.1 // indirect
@@ -72,7 +75,6 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
-	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
