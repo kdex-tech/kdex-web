@@ -18,6 +18,7 @@ import (
 	"golang.org/x/text/message"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
+	"kdex.dev/web/internal/auth"
 	"kdex.dev/web/internal/host/ico"
 	kdexhttp "kdex.dev/web/internal/http"
 	ko "kdex.dev/web/internal/openapi"
@@ -38,6 +39,7 @@ func NewHostHandler(c client.Client, name string, namespace string, log logr.Log
 		registeredPaths:           map[string]ko.PathInfo{},
 		pathsCollectedInReconcile: map[string]ko.PathInfo{},
 		analysisCache:             NewAnalysisCache(),
+		authChecker:               auth.NewAuthorizationChecker(),
 	}
 
 	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
@@ -448,7 +450,7 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 	finalPath := toFinalPath(pr.ph.BasePath())
 	label := pr.ph.Label()
 
-	handler := th.pageHandlerFunc(finalPath, pr.ph.Name, pr.l10nRenders)
+	handler := th.pageHandlerFunc(finalPath, pr.ph.Name, pr.l10nRenders, pr.ph)
 
 	mux.HandleFunc("GET "+finalPath, handler)
 	mux.HandleFunc("GET /{l10n}"+finalPath, handler)
@@ -589,6 +591,132 @@ func (th *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 	}
 }
 
+func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	const path = "/~/login"
+	mux.HandleFunc(
+		"GET "+path,
+		func(w http.ResponseWriter, r *http.Request) {
+			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			rendered := th.renderUtilityPage(
+				kdexv1alpha1.LoginUtilityPageType,
+				l,
+				map[string]any{},
+				&th.Translations,
+			)
+
+			if rendered == "" {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+
+			th.log.V(1).Info("serving login page", "language", l.String())
+
+			w.Header().Set("Content-Language", l.String())
+			w.Header().Set("Content-Type", "text/html")
+
+			_, err = w.Write([]byte(rendered))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+		},
+	)
+	mux.HandleFunc(
+		"POST "+path,
+		func(w http.ResponseWriter, r *http.Request) {
+			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			th.log.V(1).Info("processing login", "language", l.String())
+
+			// TODO: perform the token exchange depending on which auth we used
+
+			if false {
+				// FAILED: 401 Unauthorized / render login page again with error message
+				http.Redirect(w, r, "/~/login", http.StatusUnauthorized)
+			}
+
+			// SUCCESS: 303 See Other / Location (return url)
+
+			query := r.URL.Query()
+			returnURL := query.Get("return")
+
+			if returnURL == "" {
+				returnURL = "/"
+			}
+
+			http.Redirect(w, r, returnURL, http.StatusSeeOther)
+		},
+	)
+
+	th.registerPath(path, ko.PathInfo{
+		API: ko.OpenAPI{
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "Provides a localized login page.",
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(path, "return=foo", http.Header{}),
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										Format: "html",
+										Type:   &openapi.Types{openapi.TypeString},
+									},
+									[]string{"text/html"},
+								),
+								Description: openapi.Ptr("HTML login page"),
+							}),
+							openapi.WithName("400", &openapi.Response{
+								Description: openapi.Ptr("Unable to ascertain the locale from the {l10n} parameter"),
+							}),
+							openapi.WithName("404", &openapi.Response{
+								Description: openapi.Ptr("Resource not found"),
+							}),
+							openapi.WithName("500", &openapi.Response{
+								Description: openapi.Ptr("Internal server error"),
+							}),
+						),
+					},
+					Post: &openapi.Operation{
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										Format: "html",
+										Type:   &openapi.Types{openapi.TypeString},
+									},
+									[]string{"text/html"},
+								),
+								Description: openapi.Ptr("HTML login page"),
+							}),
+							openapi.WithName("400", &openapi.Response{
+								Description: openapi.Ptr("Unable to ascertain the locale from the {l10n} parameter"),
+							}),
+							openapi.WithName("404", &openapi.Response{
+								Description: openapi.Ptr("Resource not found"),
+							}),
+							openapi.WithName("500", &openapi.Response{
+								Description: openapi.Ptr("Internal server error"),
+							}),
+						),
+					},
+					Summary: "HTML login page",
+				},
+			},
+		},
+		Type: ko.InternalPathType,
+	}, registeredPaths)
+}
+
 func (th *HostHandler) messagePrinter(translations *Translations, tag language.Tag) *message.Printer {
 	return message.NewPrinter(
 		tag,
@@ -602,12 +730,10 @@ func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathI
 	th.faviconHandler(mux, registeredPaths)
 	th.navigationHandler(mux, registeredPaths)
 	th.translationHandler(mux, registeredPaths)
-	th.snifferHandler(mux, registeredPaths)
 	th.openapiHandler(mux, registeredPaths)
 	th.schemaHandler(mux, registeredPaths)
-
-	// Register Inspect Handler
-	mux.HandleFunc("/inspect/{uuid}", th.InspectHandler)
+	th.loginHandler(mux, registeredPaths)
+	th.snifferHandler(mux, registeredPaths)
 
 	// TODO: implement a state handler
 	// TODO: implement an oauth handler
@@ -920,8 +1046,45 @@ func (th *HostHandler) pageHandlerFunc(
 	basePath string,
 	name string,
 	l10nRenders map[string]string,
+	pageHandler page.PageHandler,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Check authorization before processing the request
+		th.mu.RLock()
+		var pageSecurity *[]kdexv1alpha1.SecurityRequirement
+		var hostSecurity *[]kdexv1alpha1.SecurityRequirement
+
+		if pageHandler.Page != nil {
+			pageSecurity = pageHandler.Page.Security
+		}
+		if th.host != nil {
+			hostSecurity = th.host.Security
+		}
+		th.mu.RUnlock()
+
+		// Perform authorization check
+		authorized, err := th.authChecker.CheckPageAccess(r.Context(), pageSecurity, hostSecurity)
+		if err != nil {
+			th.log.Error(err, "authorization check failed", "page", name, "basePath", basePath)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		if !authorized {
+			// User is not authorized - redirect to login page
+			th.log.V(1).Info("unauthorized access attempt", "page", name, "basePath", basePath)
+
+			// Redirect to login with return URL
+			returnURL := r.URL.Path
+			if r.URL.RawQuery != "" {
+				returnURL += "?" + r.URL.RawQuery
+			}
+			redirectURL := "/~/login?return=" + url.QueryEscape(returnURL)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
+
+		// User is authorized, proceed with serving the page
 		l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -1014,7 +1177,11 @@ func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 }
 
 func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+
 	if th.sniffer != nil {
+		// Register Inspect Handler
+		mux.HandleFunc("/~/sniffer/inspect/{uuid}", th.InspectHandler)
+
 		const path = "/~/sniffer/docs"
 		mux.HandleFunc("GET "+path, th.sniffer.DocsHandler)
 		registeredPaths[path] = ko.PathInfo{

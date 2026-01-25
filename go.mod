@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.25.0
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.66
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.67
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -27,6 +27,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.23.0
 	sigs.k8s.io/gateway-api v1.4.1
 )
+
+require golang.org/x/oauth2 v0.34.0
 
 require (
 	cel.dev/expr v0.25.1 // indirect
@@ -126,7 +128,6 @@ require (
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/oauth2 v0.34.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect

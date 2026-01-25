@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"net/http"
 	"sync"
 
@@ -50,6 +51,9 @@ type HostHandler struct {
 	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 
 	analysisCache *AnalysisCache
+	authChecker   interface {
+		CheckPageAccess(ctx context.Context, pageSecurity, hostSecurity *[]kdexv1alpha1.SecurityRequirement) (bool, error)
+	}
 
 	sniffer interface {
 		Analyze(r *http.Request) (*sniffer.AnalysisResult, error)

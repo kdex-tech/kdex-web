@@ -175,8 +175,8 @@ func (th *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 				format = "text"
 			}
 
-			absoluteURL := fmt.Sprintf("%s/inspect/%s?format=%s", ko.Host(r), id, format)
-			inspectURL := fmt.Sprintf("/inspect/%s?format=%s", id, format)
+			inspectURL := fmt.Sprintf("/~/sniffer/inspect/%s?format=%s", id, format)
+			absoluteURL := fmt.Sprintf("%s%s", ko.Host(r), inspectURL)
 
 			w.Header().Set("Location", inspectURL)
 			w.Header().Set("X-KDex-Sniffer-Docs", "/~/sniffer/docs")
