@@ -110,9 +110,7 @@ func MakeHandlerByReferencePath(
 			return []reconcile.Request{}
 		}
 
-		if err := c.List(ctx, list, &client.ListOptions{
-			Namespace: ControllerNamespace(),
-		}); err != nil {
+		if err := c.List(ctx, list, client.InNamespace(ControllerNamespace())); err != nil {
 			return []reconcile.Request{}
 		}
 

@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -67,9 +68,9 @@ func TestHostHandler_SchemaHandler(t *testing.T) {
 		},
 	}
 
-	th.SetHost(&kdexv1alpha1.KDexHostSpec{
+	th.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
-	}, nil, nil, nil, "", registeredPaths, nil)
+	}, nil, nil, nil, "", registeredPaths, nil, nil, nil)
 
 	tests := []struct {
 		name       string

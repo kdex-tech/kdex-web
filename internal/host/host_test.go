@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -291,7 +292,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
 			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard())
-			th.SetHost(&tt.host.host, nil, nil, nil, "", map[string]ko.PathInfo{}, nil)
+			th.SetHost(context.Background(), &tt.host.host, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil)
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
 			got, gotErr := th.L10nRender(tt.pageHandler, map[string]any{}, language.Make(tt.lang), tt.extraTemplateData, &th.Translations)
@@ -385,7 +386,7 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
 			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard())
-			th.SetHost(&tt.host.host, nil, nil, nil, "", map[string]ko.PathInfo{}, nil)
+			th.SetHost(context.Background(), &tt.host.host, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil)
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
 			got := th.L10nRenders(tt.pageHandler, map[language.Tag]map[string]any{}, &th.Translations)
@@ -470,7 +471,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
 			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard())
-			th.SetHost(&tt.host.host, nil, nil, nil, "", map[string]ko.PathInfo{}, nil)
+			th.SetHost(context.Background(), &tt.host.host, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil)
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
 			for lang, expected := range tt.langTests {

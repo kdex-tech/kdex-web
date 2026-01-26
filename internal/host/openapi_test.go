@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -17,12 +18,12 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 	g := G.NewGomegaWithT(t)
 
 	th := NewHostHandler(nil, "test-host", "default", logr.Discard())
-	th.SetHost(&kdexv1alpha1.KDexHostSpec{
+	th.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
 		Routing: kdexv1alpha1.Routing{
 			Domains: []string{"test.example.com"},
 		},
-	}, nil, nil, nil, "", map[string]ko.PathInfo{}, nil)
+	}, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil)
 
 	mux := th.muxWithDefaultsLocked(th.registeredPaths) // registeredPaths is empty, but muxWithDefaultsLocked populates it for defaults
 

@@ -2,6 +2,7 @@ package host
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -39,7 +40,6 @@ func NewHostHandler(c client.Client, name string, namespace string, log logr.Log
 		registeredPaths:           map[string]ko.PathInfo{},
 		pathsCollectedInReconcile: map[string]ko.PathInfo{},
 		analysisCache:             NewAnalysisCache(),
-		authChecker:               auth.NewAuthorizationChecker(),
 	}
 
 	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
@@ -386,11 +386,13 @@ func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	wrappedMux := th.DesignMiddleware(mux)
+	wrappedMux := th.authConfig.AddAuthentication(mux)
+	wrappedMux = th.DesignMiddleware(wrappedMux)
 	wrappedMux.ServeHTTP(w, r)
 }
 
 func (th *HostHandler) SetHost(
+	ctx context.Context,
 	host *kdexv1alpha1.KDexHostSpec,
 	packageReferences []kdexv1alpha1.PackageReference,
 	themeAssets []kdexv1alpha1.Asset,
@@ -398,6 +400,8 @@ func (th *HostHandler) SetHost(
 	importmap string,
 	paths map[string]ko.PathInfo,
 	functions []kdexv1alpha1.KDexFunction,
+	authExchanger *auth.Exchanger,
+	authConfig *auth.Config,
 ) {
 	th.mu.Lock()
 	th.host = host
@@ -431,6 +435,14 @@ func (th *HostHandler) SetHost(
 
 	th.sniffer = snif
 	th.importmap = importmap
+
+	if authConfig != nil {
+		th.authConfig = authConfig
+		th.authChecker = auth.NewAuthorizationChecker()
+	}
+
+	th.authExchanger = authExchanger
+
 	th.mu.Unlock()
 	th.RebuildMux()
 }
@@ -591,11 +603,59 @@ func (th *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 	}
 }
 
+func (th *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if th.authConfig == nil || th.authConfig.KeyPairs == nil {
+		return
+	}
+
+	const path = "/.well-known/jwks.json"
+	mux.HandleFunc("GET "+path, auth.JWKSHandler(th.authConfig.KeyPairs))
+	registeredPaths[path] = ko.PathInfo{
+		API: ko.OpenAPI{
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "Serve the JWT key set",
+					Get: &openapi.Operation{
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										Format: "json",
+										Type:   &openapi.Types{openapi.TypeString},
+									},
+									[]string{"application/json"},
+								),
+								Description: openapi.Ptr("The JWT key set"),
+							}),
+						),
+					},
+					Summary: "The JWT key set",
+				},
+			},
+		},
+		Type: ko.InternalPathType,
+	}
+}
+
 func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/~/login"
 	mux.HandleFunc(
 		"GET "+path,
 		func(w http.ResponseWriter, r *http.Request) {
+			query := r.URL.Query()
+			returnURL := query.Get("return")
+			if returnURL == "" {
+				returnURL = "/"
+			}
+
+			// If OIDC is configured, force login through it
+			if authCodeURL := th.authExchanger.AuthCodeURL(returnURL); authCodeURL != "" {
+				http.Redirect(w, r, authCodeURL, http.StatusSeeOther)
+				return
+			}
+
+			// Fallback: Local Login Page
 			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -628,29 +688,39 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 	mux.HandleFunc(
 		"POST "+path,
 		func(w http.ResponseWriter, r *http.Request) {
-			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+			if err := r.ParseForm(); err != nil {
+				http.Error(w, "failed to parse form", http.StatusBadRequest)
 				return
 			}
 
-			th.log.V(1).Info("processing login", "language", l.String())
-
-			// TODO: perform the token exchange depending on which auth we used
-
-			if false {
-				// FAILED: 401 Unauthorized / render login page again with error message
-				http.Redirect(w, r, "/~/login", http.StatusUnauthorized)
-			}
-
-			// SUCCESS: 303 See Other / Location (return url)
-
-			query := r.URL.Query()
-			returnURL := query.Get("return")
+			username := r.FormValue("username")
+			password := r.FormValue("password")
+			returnURL := r.FormValue("return")
 
 			if returnURL == "" {
 				returnURL = "/"
 			}
+
+			th.log.V(1).Info("processing local login", "user", username)
+
+			token, err := th.authExchanger.LoginLocal(r.Context(), username, password)
+			if err != nil {
+				// FAILED: 401 Unauthorized / render login page again with error message?
+				// For now simple redirect back to login
+				th.log.Error(err, "local login failed")
+				http.Redirect(w, r, "/~/login?error=invalid_credentials&return="+url.QueryEscape(returnURL), http.StatusSeeOther)
+				return
+			}
+
+			// SUCCESS: Set cookie and redirect
+			http.SetCookie(w, &http.Cookie{
+				Name:     "auth_token",
+				Value:    token,
+				Path:     "/",
+				HttpOnly: true,
+				Secure:   r.TLS != nil, // Approximation
+				SameSite: http.SameSiteLaxMode,
+			})
 
 			http.Redirect(w, r, returnURL, http.StatusSeeOther)
 		},
@@ -730,17 +800,17 @@ func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathI
 	th.faviconHandler(mux, registeredPaths)
 	th.navigationHandler(mux, registeredPaths)
 	th.translationHandler(mux, registeredPaths)
+	th.loginHandler(mux, registeredPaths)
+	th.jwksHandler(mux, registeredPaths)
+	th.oauthHandler(mux, registeredPaths)
+	th.snifferHandler(mux, registeredPaths)
 	th.openapiHandler(mux, registeredPaths)
 	th.schemaHandler(mux, registeredPaths)
-	th.loginHandler(mux, registeredPaths)
-	th.snifferHandler(mux, registeredPaths)
 
 	// TODO: implement a state handler
-	// TODO: implement an oauth handler
 	// TODO: implement a check handler
 
 	th.unimplementedHandler("GET /~/check/", mux, registeredPaths)
-	th.unimplementedHandler("GET /~/oauth/", mux, registeredPaths)
 	th.unimplementedHandler("GET /~/state/", mux, registeredPaths)
 
 	return mux
@@ -870,6 +940,77 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 	}, registeredPaths)
 }
 
+func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	const path = "/~/oauth/callback"
+	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+
+		if code == "" {
+			http.Error(w, "No code in request", http.StatusBadRequest)
+			return
+		}
+
+		// Exchange code for ID Token
+		rawIDToken, err := th.authExchanger.ExchangeCode(r.Context(), code)
+		if err != nil {
+			th.log.Error(err, "failed to exchange oauth code")
+			http.Error(w, "Failed to exchange token", http.StatusUnauthorized)
+			return
+		}
+
+		// Exchange ID Token for Local Token
+		localToken, err := th.authExchanger.ExchangeToken(r.Context(), rawIDToken)
+		if err != nil {
+			th.log.Error(err, "failed to exchange for local token")
+			http.Error(w, "Failed to exchange for local token", http.StatusUnauthorized)
+			return
+		}
+
+		// Set Cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "auth_token",
+			Value:    localToken,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   r.TLS != nil,
+			SameSite: http.SameSiteLaxMode,
+		})
+
+		// Validate state/redirect
+		redirectURL := state
+		if redirectURL == "" || !strings.HasPrefix(redirectURL, "/") {
+			redirectURL = "/"
+		}
+
+		http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	})
+
+	th.registerPath(path, ko.PathInfo{
+		API: ko.OpenAPI{
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "OAuth2 Callback Endpoint",
+					Get: &openapi.Operation{
+						Parameters: ko.ExtractParameters(path, "code=foo&state=bar", http.Header{}),
+						Responses: openapi.NewResponses(
+							openapi.WithName("303", &openapi.Response{
+								Description: openapi.Ptr("Redirect to original URL after successful login"),
+							}),
+							openapi.WithName("401", &openapi.Response{
+								Description: openapi.Ptr("Unauthorized"),
+							}),
+						),
+					},
+					Summary: "OAuth2 Callback",
+				},
+			},
+		},
+		Type: ko.InternalPathType,
+	}, registeredPaths)
+}
+
 func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/~/openapi"
 
@@ -925,6 +1066,110 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})
+}
+
+func (th *HostHandler) pageHandlerFunc(
+	basePath string,
+	name string,
+	l10nRenders map[string]string,
+	pageHandler page.PageHandler,
+) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if th.authConfig != nil {
+			// Check authorization before processing the request
+
+			th.mu.RLock()
+			var pageSecurity *[]kdexv1alpha1.SecurityRequirement
+			var hostSecurity *[]kdexv1alpha1.SecurityRequirement
+
+			if pageHandler.Page != nil {
+				pageSecurity = pageHandler.Page.Security
+			}
+			if th.host != nil {
+				hostSecurity = th.host.Security
+			}
+			th.mu.RUnlock()
+
+			// Perform authorization check
+			authorized, err := th.authChecker.CheckPageAccess(r.Context(), pageSecurity, hostSecurity)
+			if err != nil {
+				th.log.Error(err, "authorization check failed", "page", name, "basePath", basePath)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+
+			if !authorized {
+				// User is not authorized - redirect to login page
+				th.log.V(1).Info("unauthorized access attempt", "page", name, "basePath", basePath)
+
+				// Redirect to login with return URL
+				returnURL := r.URL.Path
+				if r.URL.RawQuery != "" {
+					returnURL += "?" + r.URL.RawQuery
+				}
+				redirectURL := "/~/login?return=" + url.QueryEscape(returnURL)
+				http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+				return
+			}
+		}
+
+		l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		rendered, ok := l10nRenders[l.String()]
+
+		if !ok {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		th.log.V(1).Info("serving", "page", name, "basePath", basePath, "language", l.String())
+
+		w.Header().Set("Content-Language", l.String())
+		w.Header().Set("Content-Type", "text/html")
+
+		_, err = w.Write([]byte(rendered))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+func (th *HostHandler) registerPath(path string, info ko.PathInfo, m map[string]ko.PathInfo) {
+	current, ok := m[path]
+	if !ok {
+		if info.API.BasePath == "" {
+			info.API.BasePath = path
+		}
+		m[path] = info
+		return
+	}
+
+	ko.MergeOperations(&current.API, &info.API)
+
+	if current.API.BasePath == "" {
+		current.API.BasePath = path
+	}
+
+	m[path] = current
+}
+
+func (th *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any, translations *Translations) string {
+	ph, ok := th.utilityPages[utilityType]
+	if !ok {
+		return ""
+	}
+
+	rendered, err := th.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
+	if err != nil {
+		th.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
+		return ""
+	}
+
+	return rendered
 }
 
 func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
@@ -1040,108 +1285,6 @@ func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 			th.log.Error(err, "failed to write schema response")
 		}
 	})
-}
-
-func (th *HostHandler) pageHandlerFunc(
-	basePath string,
-	name string,
-	l10nRenders map[string]string,
-	pageHandler page.PageHandler,
-) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Check authorization before processing the request
-		th.mu.RLock()
-		var pageSecurity *[]kdexv1alpha1.SecurityRequirement
-		var hostSecurity *[]kdexv1alpha1.SecurityRequirement
-
-		if pageHandler.Page != nil {
-			pageSecurity = pageHandler.Page.Security
-		}
-		if th.host != nil {
-			hostSecurity = th.host.Security
-		}
-		th.mu.RUnlock()
-
-		// Perform authorization check
-		authorized, err := th.authChecker.CheckPageAccess(r.Context(), pageSecurity, hostSecurity)
-		if err != nil {
-			th.log.Error(err, "authorization check failed", "page", name, "basePath", basePath)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
-		if !authorized {
-			// User is not authorized - redirect to login page
-			th.log.V(1).Info("unauthorized access attempt", "page", name, "basePath", basePath)
-
-			// Redirect to login with return URL
-			returnURL := r.URL.Path
-			if r.URL.RawQuery != "" {
-				returnURL += "?" + r.URL.RawQuery
-			}
-			redirectURL := "/~/login?return=" + url.QueryEscape(returnURL)
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-			return
-		}
-
-		// User is authorized, proceed with serving the page
-		l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		rendered, ok := l10nRenders[l.String()]
-
-		if !ok {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
-
-		th.log.V(1).Info("serving", "page", name, "basePath", basePath, "language", l.String())
-
-		w.Header().Set("Content-Language", l.String())
-		w.Header().Set("Content-Type", "text/html")
-
-		_, err = w.Write([]byte(rendered))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
-
-func (th *HostHandler) registerPath(path string, info ko.PathInfo, m map[string]ko.PathInfo) {
-	current, ok := m[path]
-	if !ok {
-		if info.API.BasePath == "" {
-			info.API.BasePath = path
-		}
-		m[path] = info
-		return
-	}
-
-	ko.MergeOperations(&current.API, &info.API)
-
-	if current.API.BasePath == "" {
-		current.API.BasePath = path
-	}
-
-	m[path] = current
-}
-
-func (th *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any, translations *Translations) string {
-	ph, ok := th.utilityPages[utilityType]
-	if !ok {
-		return ""
-	}
-
-	rendered, err := th.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
-	if err != nil {
-		th.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
-		return ""
-	}
-
-	return rendered
 }
 
 func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {

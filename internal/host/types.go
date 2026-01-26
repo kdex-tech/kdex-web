@@ -9,6 +9,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/web/internal/auth"
 	"kdex.dev/web/internal/host/ico"
 	ko "kdex.dev/web/internal/openapi"
 	"kdex.dev/web/internal/page"
@@ -34,6 +35,8 @@ type HostHandler struct {
 	Pages        *page.PageStore
 	Translations Translations
 
+	analysisCache             *AnalysisCache
+	authConfig                *auth.Config
 	client                    client.Client
 	defaultLanguage           string
 	favicon                   *ico.Ico
@@ -50,9 +53,15 @@ type HostHandler struct {
 	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 
-	analysisCache *AnalysisCache
-	authChecker   interface {
+	authChecker interface {
 		CheckPageAccess(ctx context.Context, pageSecurity, hostSecurity *[]kdexv1alpha1.SecurityRequirement) (bool, error)
+	}
+
+	authExchanger interface {
+		AuthCodeURL(state string) string
+		ExchangeCode(ctx context.Context, code string) (string, error)
+		ExchangeToken(ctx context.Context, rawIDToken string) (string, error)
+		LoginLocal(ctx context.Context, username, password string) (string, error)
 	}
 
 	sniffer interface {
