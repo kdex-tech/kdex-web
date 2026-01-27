@@ -32,7 +32,7 @@ type JWKSet struct {
 // JWKSHandler creates an HTTP handler that serves the JWKS endpoint.
 // This endpoint exposes the public key(s) used to verify JWT signatures.
 func JWKSHandler(keyPairs *KeyPairs) http.HandlerFunc {
-	var keys []JWK
+	keys := []JWK{}
 
 	for _, pair := range *keyPairs {
 		pub := pair.Private.Public()

@@ -159,6 +159,7 @@ func (b *Builder) BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *
 	return b.BuildOpenAPI(serverUrl, fn.Name, paths, Filter{})
 }
 
+// nolint:gocyclo
 func (b *Builder) BuildOpenAPI(
 	serverUrl string,
 	name string,
@@ -344,92 +345,6 @@ func (b *Builder) BuildOpenAPI(
 	}
 
 	return doc
-}
-
-func collectTags(tags *openapi.Tags, pathInfo *PathInfo) {
-	for _, curItem := range pathInfo.API.Paths {
-		if curItem.Connect != nil {
-			for _, t := range curItem.Connect.Tags {
-				if tags.Get(t) == nil {
-					*tags = append(*tags, &openapi.Tag{
-						Name: t,
-					})
-				}
-			}
-		}
-		if curItem.Delete != nil {
-			for _, t := range curItem.Delete.Tags {
-				if tags.Get(t) == nil {
-					*tags = append(*tags, &openapi.Tag{
-						Name: t,
-					})
-				}
-			}
-		}
-		if curItem.Get != nil {
-			for _, t := range curItem.Get.Tags {
-				if tags.Get(t) == nil {
-					*tags = append(*tags, &openapi.Tag{
-						Name: t,
-					})
-				}
-			}
-		}
-		if curItem.Head != nil {
-			for _, t := range curItem.Head.Tags {
-				if tags.Get(t) == nil {
-					*tags = append(*tags, &openapi.Tag{
-						Name: t,
-					})
-				}
-			}
-		}
-		if curItem.Options != nil {
-			for _, t := range curItem.Options.Tags {
-				if tags.Get(t) == nil {
-					*tags = append(*tags, &openapi.Tag{
-						Name: t,
-					})
-				}
-			}
-		}
-		if curItem.Patch != nil {
-			for _, t := range curItem.Patch.Tags {
-				if tags.Get(t) == nil {
-					*tags = append(*tags, &openapi.Tag{
-						Name: t,
-					})
-				}
-			}
-		}
-		if curItem.Post != nil {
-			for _, t := range curItem.Post.Tags {
-				if tags.Get(t) == nil {
-					*tags = append(*tags, &openapi.Tag{
-						Name: t,
-					})
-				}
-			}
-		}
-		if curItem.Put != nil {
-			for _, t := range curItem.Put.Tags {
-				if tags.Get(t) == nil {
-					*tags = append(*tags, &openapi.Tag{
-						Name: t,
-					})
-				}
-			}
-		}
-		if curItem.Trace != nil {
-			for _, t := range curItem.Trace.Tags {
-				if tags.Get(t) == nil {
-					*tags = append(*tags, &openapi.Tag{
-						Name: t,
-					})
-				}
-			}
-		}
-	}
 }
 
 func ExtractParameters(routePath string, query string, header http.Header) openapi.Parameters {
