@@ -77,6 +77,8 @@ rules:
   - kdexpagefooters
   - kdexpageheaders
   - kdexpagenavigations
+  - kdexrolebingings
+  - kdexroles
   - kdexscriptlibraries
   - kdexthemes
   verbs:

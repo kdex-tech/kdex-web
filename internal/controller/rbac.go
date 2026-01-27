@@ -37,6 +37,8 @@ package controller
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagefooters,                         verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpageheaders,                         verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexpagenavigations,                     verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexroles,                               verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexrolebingings,                        verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,                     verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,                              verbs=get;list;watch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,                      verbs=get;list;watch;create;update;patch;delete
