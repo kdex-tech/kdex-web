@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.25.0
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.74
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.75
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
