@@ -639,6 +639,10 @@ func (th *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 }
 
 func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if th.authExchanger == nil || th.authConfig == nil {
+		return
+	}
+
 	const path = "/~/login"
 	mux.HandleFunc(
 		"GET "+path,
@@ -703,7 +707,13 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 
 			th.log.V(1).Info("processing local login", "user", username)
 
-			token, err := th.authExchanger.LoginLocal(r.Context(), username, password)
+			scheme := r.URL.Scheme
+			if scheme == "" {
+				scheme = "http"
+			}
+			issuer := fmt.Sprintf("%s://%s", scheme, r.Host)
+
+			token, err := th.authExchanger.LoginLocal(r.Context(), issuer, username, password)
 			if err != nil {
 				// FAILED: 401 Unauthorized / render login page again with error message?
 				// For now simple redirect back to login
@@ -714,7 +724,7 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 
 			// SUCCESS: Set cookie and redirect
 			http.SetCookie(w, &http.Cookie{
-				Name:     "auth_token",
+				Name:     th.authConfig.CookieName,
 				Value:    token,
 				Path:     "/",
 				HttpOnly: true,
@@ -941,6 +951,10 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 }
 
 func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if th.authExchanger == nil || th.authConfig == nil || th.authConfig.OIDCProviderURL == "" {
+		return
+	}
+
 	const path = "/~/oauth/callback"
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
@@ -959,8 +973,14 @@ func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 			return
 		}
 
+		scheme := r.URL.Scheme
+		if scheme == "" {
+			scheme = "http"
+		}
+		issuer := fmt.Sprintf("%s://%s", scheme, r.Host)
+
 		// Exchange ID Token for Local Token
-		localToken, err := th.authExchanger.ExchangeToken(r.Context(), rawIDToken)
+		localToken, err := th.authExchanger.ExchangeToken(r.Context(), issuer, rawIDToken)
 		if err != nil {
 			th.log.Error(err, "failed to exchange for local token")
 			http.Error(w, "Failed to exchange for local token", http.StatusUnauthorized)
@@ -969,7 +989,7 @@ func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 
 		// Set Cookie
 		http.SetCookie(w, &http.Cookie{
-			Name:     "auth_token",
+			Name:     th.authConfig.CookieName,
 			Value:    localToken,
 			Path:     "/",
 			HttpOnly: true,
@@ -1320,7 +1340,6 @@ func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 }
 
 func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-
 	if th.sniffer != nil {
 		// Register Inspect Handler
 		mux.HandleFunc("/~/sniffer/inspect/{uuid}", th.InspectHandler)

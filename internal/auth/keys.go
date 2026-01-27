@@ -40,6 +40,9 @@ type KeyPair struct {
 type KeyPairs []*KeyPair
 
 func (p *KeyPairs) ActiveKey() *KeyPair {
+	if p == nil {
+		return nil
+	}
 	if len(*p) == 1 {
 		return (*p)[0]
 	}
@@ -62,15 +65,15 @@ func LoadOrGenerateKeyPair(
 ) (*KeyPairs, error) {
 	pairs := &KeyPairs{}
 	found := false
-	var secret corev1.Secret
 
 	for _, secRef := range jwt.JWTKeysSecrets {
+		var secret corev1.Secret
 		err := c.Get(ctx, client.ObjectKey{
 			Name:      secRef.SecretRef.Name,
 			Namespace: namespace,
 		}, &secret)
 
-		if client.IgnoreNotFound(err) != nil {
+		if err != nil {
 			return nil, err
 		}
 
@@ -84,19 +87,22 @@ func LoadOrGenerateKeyPair(
 	}
 
 	if found {
+		if len(*pairs) > 1 && pairs.ActiveKey() == nil {
+			return nil, fmt.Errorf("multiple keys exist but none are specified as the active key via spec.auth.jwt.activeKey=%s", jwt.ActiveKey)
+		}
+
 		return pairs, nil
 	}
 
 	if devMode {
-		// Generate new key pair
-		return GenerateKeyPair(), nil
+		return GenerateECDSAKeyPair(), nil
 	}
 
 	return nil, nil
 }
 
-// GenerateKeyPair generates a new RSA key pair for JWT signing.
-func GenerateKeyPair() *KeyPairs {
+// GenerateECDSAKeyPair generates a new ECDSA key pair for JWT signing.
+func GenerateECDSAKeyPair() *KeyPairs {
 	once.Do(func() {
 		// 1. Use P-256 (ES256). It's lightning fast for dev restarts.
 		privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -133,46 +139,39 @@ func loadKeysFromSecret(secret *corev1.Secret, activeKey string) (*KeyPair, erro
 		return nil, fmt.Errorf("failed to decode PEM block containing private key")
 	}
 
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	var privKey any // Use 'any' (interface{}) to hold RSA or ECDSA
+	var err error
+
+	// 1. Try PKCS8 first (Modern standard, supports both RSA and ECDSA)
+	privKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		// Try PKCS8 format
-		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		// 2. Fallback to PKCS1 (RSA Specific)
+		privKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse private key: %w", err)
+			// 3. Fallback to SEC1 (EC Specific)
+			privKey, err = x509.ParseECPrivateKey(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse private key in any format: %w", err)
+			}
 		}
-		var ok bool
-		privateKey, ok = key.(*rsa.PrivateKey)
-		if !ok {
-			return nil, fmt.Errorf("key is not RSA private key")
-		}
+	}
+
+	// Optional: Validation. Ensure it's a type your app actually supports.
+	switch privKey.(type) {
+	case *rsa.PrivateKey, *ecdsa.PrivateKey:
+		// Valid keys
+	default:
+		return nil, fmt.Errorf("unsupported private key type: %T", privKey)
+	}
+
+	signer, ok := privKey.(crypto.Signer)
+	if !ok {
+		return nil, fmt.Errorf("key type %T does not implement crypto.Signer", privKey)
 	}
 
 	return &KeyPair{
 		ActiveKey: activeKey == secret.Name,
 		KeyId:     secret.Name,
-		Private:   privateKey,
+		Private:   signer,
 	}, nil
 }
-
-// ExportToSecret exports the key pair to a format suitable for storing in a Kubernetes Secret.
-// func (kp *KeyPair) ExportToSecret() (map[string][]byte, error) {
-// 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(kp.Private)
-// 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
-// 		Type:  "RSA PRIVATE KEY",
-// 		Bytes: privateKeyBytes,
-// 	})
-
-// 	publicKeyBytes, err := x509.MarshalPKIXPublicKey(kp.Public)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to marshal public key: %w", err)
-// 	}
-// 	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
-// 		Type:  "PUBLIC KEY",
-// 		Bytes: publicKeyBytes,
-// 	})
-
-// 	return map[string][]byte{
-// 		PrivateKeySecretKey: privateKeyPEM,
-// 		PublicKeySecretKey:  publicKeyPEM,
-// 	}, nil
-// }

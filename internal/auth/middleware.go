@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -23,7 +22,7 @@ const (
 // It injects the claims into the request context if the token is valid.
 // If the Header is present but invalid, it returns 401 Unauthorized.
 // If the Header is missing, it proceeds without claims (anonymous access).
-func WithAuthentication(publicKey crypto.PublicKey) func(http.Handler) http.Handler {
+func WithAuthentication(publicKey crypto.PublicKey, cookieName string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			log := logf.FromContext(r.Context())
@@ -41,7 +40,7 @@ func WithAuthentication(publicKey crypto.PublicKey) func(http.Handler) http.Hand
 				tokenString = parts[1]
 			} else {
 				// Check for cookie
-				cookie, err := r.Cookie("auth_token")
+				cookie, err := r.Cookie(cookieName)
 				if err != nil {
 					// Anonymous access
 					next.ServeHTTP(w, r)
@@ -53,9 +52,6 @@ func WithAuthentication(publicKey crypto.PublicKey) func(http.Handler) http.Hand
 			claims := &Claims{}
 
 			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-				if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-					return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-				}
 				return publicKey, nil
 			})
 

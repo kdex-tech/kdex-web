@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
@@ -55,6 +54,7 @@ func (ac *AuthorizationChecker) validateSecurityRequirements(
 ) bool {
 	// If no requirements, access is granted
 	if len(requirements) == 0 {
+		// This is a safety net incase the method is called standalone, which should bever happpen
 		return true
 	}
 
@@ -92,11 +92,16 @@ func (ac *AuthorizationChecker) satisfiesRequirement(
 
 // hasScope checks if the user has a specific scope.
 // Supports exact match and wildcard patterns.
-// Format: resource:resourceName:verb
+// Format:     resource:resourceName:verb
+// Short Form: resource:verb (means wildcard resourceName)
 // Examples:
 //   - "pages::read" - read access to all pages
 //   - "pages:home:read" - read access to specific page "home"
 //   - "pages:*:read" - read access to all pages (explicit wildcard)
+//   - "pages:home:all" - all access to page "home" (wildcard verb)
+//   - "pages:all" - (short form) all access to all pages (wildcard resource name and verb)
+//   - "pages::all" - same as above
+//   - "pages:*:all" - same as above
 func (ac *AuthorizationChecker) hasScope(userScopes []string, requiredScope string) bool {
 	for _, userScope := range userScopes {
 		if ac.scopeMatches(userScope, requiredScope) {
@@ -116,7 +121,18 @@ func (ac *AuthorizationChecker) scopeMatches(userScope, requiredScope string) bo
 
 	// Parse scopes
 	userParts := strings.Split(userScope, ":")
+
+	if len(userParts) == 2 {
+		// short syntax was used <resource>:<verb> which is equal to <resource>::<verb>, or <resource>:*:<verb>
+		userParts = []string{userParts[0], "", userParts[1]}
+	}
+
 	requiredParts := strings.Split(requiredScope, ":")
+
+	if len(requiredParts) == 2 {
+		// short syntax was used <resource>:<verb> which is equal to <resource>::<verb>, or <resource>:*:<verb>
+		requiredParts = []string{requiredParts[0], "", requiredParts[1]}
+	}
 
 	// Must have same structure (resource:resourceName:verb)
 	if len(userParts) != 3 || len(requiredParts) != 3 {
@@ -129,7 +145,7 @@ func (ac *AuthorizationChecker) scopeMatches(userScope, requiredScope string) bo
 	}
 
 	// Verb must match
-	if userParts[2] != requiredParts[2] {
+	if userParts[2] != "all" && userParts[2] != requiredParts[2] {
 		return false
 	}
 
@@ -139,17 +155,12 @@ func (ac *AuthorizationChecker) scopeMatches(userScope, requiredScope string) bo
 		return true
 	}
 
+	// Check resource name with wildcard support
+	// Empty string or "*" in required scope means all resources
+	if requiredParts[1] == "" || requiredParts[1] == "*" {
+		return true
+	}
+
 	// Specific resource name must match
 	return userParts[1] == requiredParts[1]
-}
-
-// FormatPageReadScope creates a scope string for reading a specific page.
-// If pageName is empty, it grants access to all pages.
-func FormatPageReadScope(pageName string) string {
-	return fmt.Sprintf("pages:%s:read", pageName)
-}
-
-// FormatPageWriteScope creates a scope string for writing/editing a specific page.
-func FormatPageWriteScope(pageName string) string {
-	return fmt.Sprintf("pages:%s:write", pageName)
 }

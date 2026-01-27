@@ -60,8 +60,8 @@ type HostHandler struct {
 	authExchanger interface {
 		AuthCodeURL(state string) string
 		ExchangeCode(ctx context.Context, code string) (string, error)
-		ExchangeToken(ctx context.Context, rawIDToken string) (string, error)
-		LoginLocal(ctx context.Context, username, password string) (string, error)
+		ExchangeToken(ctx context.Context, issuer string, rawIDToken string) (string, error)
+		LoginLocal(ctx context.Context, issuer string, username, password string) (string, error)
 	}
 
 	sniffer interface {

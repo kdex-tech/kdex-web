@@ -425,7 +425,12 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	authExchanger, err := auth.NewExchanger(ctx, r.Client, internalHost.Name, internalHost.Namespace, authConfig)
+	rp, err := auth.NewRoleProvider(ctx, r.Client, internalHost.Name, internalHost.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	authExchanger, err := auth.NewExchanger(ctx, *authConfig, rp)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&internalHost.Status.Conditions,

@@ -15,8 +15,8 @@ func LoadClientSecret(
 	namespace string,
 	secretRef *kdexv1alpha1.LocalSecretWithKeyReference,
 ) (string, error) {
-	if secretRef == nil {
-		return "", nil
+	if secretRef == nil || secretRef.SecretRef.Name == "" {
+		return "", fmt.Errorf("there is no Secret containing the OIDC client_secret configured in spec.auth.oidcProvider.clientSecretRef")
 	}
 
 	var secret corev1.Secret
@@ -31,7 +31,7 @@ func LoadClientSecret(
 
 	clientSecret, ok := secret.Data[secretRef.KeyProperty]
 	if !ok {
-		return "", fmt.Errorf("secret %s/%s does not contain %s", namespace, secret.Name, secretRef.KeyProperty)
+		return "", fmt.Errorf("secret %s/%s does not contain the key '%s'", namespace, secret.Name, secretRef.KeyProperty)
 	}
 	return string(clientSecret), nil
 }
