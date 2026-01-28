@@ -602,6 +602,10 @@ func (hh *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 	}
 }
 
+func (hh *HostHandler) isSecure(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+}
+
 func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	if hh.authConfig == nil || hh.authConfig.KeyPairs == nil {
 		return
@@ -642,9 +646,9 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 		return
 	}
 
-	const path = "/~/login"
+	const loginPath = "/~/login"
 	mux.HandleFunc(
-		"GET "+path,
+		"GET "+loginPath,
 		func(w http.ResponseWriter, r *http.Request) {
 			query := r.URL.Query()
 			returnURL := query.Get("return")
@@ -689,7 +693,7 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 		},
 	)
 	mux.HandleFunc(
-		"POST "+path,
+		"POST "+loginPath,
 		func(w http.ResponseWriter, r *http.Request) {
 			if err := r.ParseForm(); err != nil {
 				http.Error(w, "failed to parse form", http.StatusBadRequest)
@@ -706,11 +710,7 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 
 			hh.log.V(1).Info("processing local login", "user", username)
 
-			scheme := r.URL.Scheme
-			if scheme == "" {
-				scheme = "http"
-			}
-			issuer := fmt.Sprintf("%s://%s", scheme, r.Host)
+			issuer := hh.serverAddress(r)
 
 			token, err := hh.authExchanger.LoginLocal(r.Context(), issuer, username, password)
 			if err != nil {
@@ -727,7 +727,7 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 				Value:    token,
 				Path:     "/",
 				HttpOnly: true,
-				Secure:   r.TLS != nil, // Approximation
+				Secure:   hh.isSecure(r),
 				SameSite: http.SameSiteLaxMode,
 			})
 
@@ -735,16 +735,71 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 		},
 	)
 
-	// TODO: add /~/logout handler
+	const logoutPath = "/~/logout"
+	mux.HandleFunc(
+		"POST "+logoutPath,
+		func(w http.ResponseWriter, r *http.Request) {
+			returnURL := "/"
+			refURL, _ := url.Parse(r.Header.Get("Referer"))
+			if refURL.Host == r.Host {
+				returnURL = refURL.Path
+			}
 
-	hh.registerPath(path, ko.PathInfo{
+			// Clear local cookies
+			http.SetCookie(w, &http.Cookie{
+				Name:     hh.authConfig.CookieName,
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1, // Tells browser to delete immediately
+				HttpOnly: true,
+				Secure:   hh.isSecure(r),
+				SameSite: http.SameSiteLaxMode,
+			})
+
+			// Build the OIDC Logout URL
+			logoutURLString, err := hh.authExchanger.EndSessionURL()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if logoutURLString != "" {
+				// Get the ID Token from the user's session
+				idToken, err := hh.getAndDecryptToken(r, "oidc_hint")
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+
+				logoutURL, err := url.Parse(logoutURLString)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+
+				returnURL := fmt.Sprintf("%s%s", hh.serverAddress(r), returnURL)
+
+				q := logoutURL.Query()
+				q.Add("id_token_hint", idToken)
+				q.Add("post_logout_redirect_uri", returnURL)
+				logoutURL.RawQuery = q.Encode()
+
+				// 4. Redirect the user's browser to the OIDC Provider
+				http.Redirect(w, r, logoutURL.String(), http.StatusFound)
+			} else {
+				http.Redirect(w, r, returnURL, http.StatusFound)
+			}
+		},
+	)
+
+	hh.registerPath(loginPath, ko.PathInfo{
 		API: ko.OpenAPI{
-			BasePath: path,
+			BasePath: loginPath,
 			Paths: map[string]ko.PathItem{
-				path: {
+				loginPath: {
 					Description: "Provides a localized login page.",
 					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(path, "return=foo", http.Header{}),
+						Parameters: ko.ExtractParameters(loginPath, "return=foo", http.Header{}),
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -976,11 +1031,7 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 			return
 		}
 
-		scheme := r.URL.Scheme
-		if scheme == "" {
-			scheme = "http"
-		}
-		issuer := fmt.Sprintf("%s://%s", scheme, r.Host)
+		issuer := hh.serverAddress(r)
 
 		// Exchange ID Token for Local Token
 		localToken, err := hh.authExchanger.ExchangeToken(r.Context(), issuer, rawIDToken)
@@ -990,13 +1041,23 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 			return
 		}
 
+		options := &http.Cookie{
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   hh.isSecure(r),
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   3600, // 1 hour
+		}
+
+		hh.encryptAndSplit(w, r, "oidc_hint", rawIDToken, options)
+
 		// Set Cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     hh.authConfig.CookieName,
 			Value:    localToken,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   r.TLS != nil,
+			Secure:   hh.isSecure(r),
 			SameSite: http.SameSiteLaxMode,
 		})
 
@@ -1318,6 +1379,14 @@ func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 			hh.log.Error(err, "failed to write schema response")
 		}
 	})
+}
+
+func (hh *HostHandler) serverAddress(r *http.Request) string {
+	scheme := "http"
+	if hh.isSecure(r) {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s", scheme, r.Host)
 }
 
 func (hh *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {

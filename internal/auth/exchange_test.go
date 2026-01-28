@@ -18,6 +18,60 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+type IH struct {
+	http.HandlerFunc
+	Handler http.HandlerFunc
+}
+
+func (f *IH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	f.Handler(w, r)
+}
+
+func MockOIDCProvider(cfg Config) http.HandlerFunc {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		// Use server.URL to get the actual assigned port/address
+		issuer := cfg.OIDCProviderURL
+
+		config := map[string]any{
+			"authorization_endpoint":                issuer + "/auth",
+			"end_session_endpoint":                  issuer + "/logout",
+			"id_token_signing_alg_values_supported": []string{"ES256", "RS256"},
+			"issuer":                                issuer,
+			"jwks_uri":                              issuer + "/jwks.json",
+			"response_types_supported":              []string{"code", "id_token"},
+			"subject_types_supported":               []string{"public"},
+			"token_endpoint":                        issuer + "/token",
+			"userinfo_endpoint":                     issuer + "/userinfo",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(config)
+	})
+
+	mux.HandleFunc("/jwks.json", JWKSHandler(cfg.KeyPairs))
+	mux.HandleFunc("POST /token", TokenHandler(cfg))
+	mux.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		// 1. Validate the id_token_hint (optional for mocks)
+		// 2. Redirect back to the post_logout_redirect_uri
+		redirectURI := r.URL.Query().Get("post_logout_redirect_uri")
+		if redirectURI == "" {
+			redirectURI = "/"
+		}
+		http.Redirect(w, r, redirectURI, http.StatusFound)
+	})
+	return mux.ServeHTTP
+}
+
+func MockRunningServer(innerHandler *IH) *httptest.Server {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		innerHandler.ServeHTTP(w, r)
+	})
+
+	return httptest.NewServer(handler)
+}
+
 func TestNewExchanger(t *testing.T) {
 	extra := map[string]any{
 		"firstName": "Joe",
@@ -42,7 +96,7 @@ func TestNewExchanger(t *testing.T) {
 			}, nil
 		},
 		resolveScopes: func(subject string) ([]string, error) {
-			return nil, nil
+			return []string{"page:read"}, nil
 		},
 	}
 
@@ -57,6 +111,7 @@ func TestNewExchanger(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
+				assert.Nil(t, goterr)
 			},
 		},
 		{
@@ -64,7 +119,8 @@ func TestNewExchanger(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				assert.Equal(t, "", got.AuthCodeURL("foo"))
+				url := got.AuthCodeURL("foo")
+				assert.Equal(t, "", url)
 			},
 		},
 		{
@@ -72,8 +128,7 @@ func TestNewExchanger(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				code, err := got.ExchangeCode(context.Background(), "foo")
-				assert.Equal(t, "", code)
+				_, err := got.ExchangeCode(context.Background(), "foo")
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "OIDC is not configured")
 			},
@@ -83,8 +138,7 @@ func TestNewExchanger(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, err := got.verifyIDToken(context.Background(), "foo")
-				assert.Nil(t, token)
+				_, err := got.verifyIDToken(context.Background(), "foo")
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "OIDC is not configured")
 			},
@@ -94,8 +148,7 @@ func TestNewExchanger(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, err := got.ExchangeToken(context.Background(), "issuer", "foo")
-				assert.Equal(t, "", token)
+				_, err := got.ExchangeToken(context.Background(), "issuer", "foo")
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "OIDC is not configured")
 			},
@@ -683,69 +736,6 @@ func TestNewExchanger_OIDC(t *testing.T) {
 	}
 }
 
-type IH struct {
-	http.HandlerFunc
-	Handler http.HandlerFunc
-}
-
-func (f *IH) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	f.Handler(w, r)
-}
-
-func MockRunningServer(innerHandler *IH) *httptest.Server {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		innerHandler.ServeHTTP(w, r)
-	})
-
-	return httptest.NewServer(handler)
-}
-
-func MockOIDCProvider(cfg Config) http.HandlerFunc {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
-		// Use server.URL to get the actual assigned port/address
-		issuer := cfg.OIDCProviderURL
-
-		config := map[string]any{
-			"issuer":                                issuer,
-			"authorization_endpoint":                issuer + "/auth",
-			"token_endpoint":                        issuer + "/token",
-			"userinfo_endpoint":                     issuer + "/userinfo",
-			"jwks_uri":                              issuer + "/jwks.json",
-			"response_types_supported":              []string{"code", "id_token"},
-			"subject_types_supported":               []string{"public"},
-			"id_token_signing_alg_values_supported": []string{"RS256", "ES256"},
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(config)
-	})
-
-	mux.HandleFunc("/jwks.json", JWKSHandler(cfg.KeyPairs))
-	mux.HandleFunc("POST /token", TokenHandler(cfg))
-
-	return mux.ServeHTTP
-}
-
-type mockScopeProvider struct {
-	resolveIdentity     func(subject string, password string, identity *Identity) error
-	resolveScopes       func(subject string) ([]string, error)
-	verifyLocalIdentity func(subject string, password string) (*Identity, error)
-}
-
-func (m *mockScopeProvider) ResolveIdentity(subject string, password string, identity *Identity) error {
-	return m.resolveIdentity(subject, password, identity)
-}
-
-func (m *mockScopeProvider) ResolveScopes(subject string) ([]string, error) {
-	return m.resolveScopes(subject)
-}
-
-func (m *mockScopeProvider) VerifyLocalIdentity(subject string, password string) (*Identity, error) {
-	return m.verifyLocalIdentity(subject, password)
-}
-
 func TokenHandler(cfg Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// 0. OIDC Token requests are almost always POST with form-encoded data
@@ -821,69 +811,20 @@ func TokenHandler(cfg Config) http.HandlerFunc {
 	}
 }
 
-// {
-// 	name: "OIDC - valid provider",
-// 	cfg: func(serverURL string) (Config, error) {
-// 		c, err := NewConfig(context.Background(), nil, &v1alpha1.Auth{
-// 			OIDCProvider: &v1alpha1.OIDCProvider{
-// 				OIDCProviderURL: serverURL,
-// 			},
-// 		}, "foo", true)
-// 		return *c, err
-// 	},
-// 	sp: scopeProvider,
-// 	assertions: func(t *testing.T, got *Exchanger, goterr error) {
-// 		assert.NotNil(t, got)
-// 		assert.Nil(t, goterr)
-// 	},
-// },
-// {
-// 	name: "OIDC - valid provider, extra scopes",
-// 	cfg: func(serverURL string) (Config, error) {
-// 		c, err := NewConfig(context.Background(), nil, &v1alpha1.Auth{}, "foo", true)
-// 		c.Scopes = []string{"foo", "bar"}
-// 		return *c, err
-// 	},
-// 	sp: scopeProvider,
-// 	assertions: func(t *testing.T, got *Exchanger, goterr error) {
-// 		assert.NotNil(t, got)
-// 		assert.Nil(t, goterr)
-// 	},
-// },
-// {
-// 	name: "OIDC - AuthCodeURL",
-// 	cfg: func(serverURL string) (Config, error) {
-// 		c, err := NewConfig(context.Background(), nil, &v1alpha1.Auth{
-// 			OIDCProvider: &v1alpha1.OIDCProvider{
-// 				OIDCProviderURL: serverURL,
-// 			},
-// 		}, "foo", true)
-// 		return *c, err
-// 	},
-// 	sp: scopeProvider,
-// 	assertions: func(t *testing.T, got *Exchanger, goterr error) {
-// 		assert.NotNil(t, got)
-// 		assert.Nil(t, goterr)
-// 		url := got.AuthCodeURL("foo")
-// 		assert.Contains(t, url, "http://")
-// 	},
-// },
-// {
-// 	name: "OIDC - ExchangeCode",
-// 	cfg: func(serverURL string) (Config, error) {
-// 		c, err := NewConfig(context.Background(), nil, &v1alpha1.Auth{
-// 			OIDCProvider: &v1alpha1.OIDCProvider{
-// 				OIDCProviderURL: serverURL,
-// 			},
-// 		}, "foo", true)
-// 		return *c, err
-// 	},
-// 	sp: scopeProvider,
-// 	assertions: func(t *testing.T, got *Exchanger, goterr error) {
-// 		assert.NotNil(t, got)
-// 		assert.Nil(t, goterr)
-// 		rawIDToken, err := got.ExchangeCode(t.Context(), "foo")
-// 		assert.Nil(t, err)
-// 		assert.Contains(t, rawIDToken, "foo")
-// 	},
-// },
+type mockScopeProvider struct {
+	resolveIdentity     func(subject string, password string, identity *Identity) error
+	resolveScopes       func(subject string) ([]string, error)
+	verifyLocalIdentity func(subject string, password string) (*Identity, error)
+}
+
+func (m *mockScopeProvider) ResolveIdentity(subject string, password string, identity *Identity) error {
+	return m.resolveIdentity(subject, password, identity)
+}
+
+func (m *mockScopeProvider) ResolveScopes(subject string) ([]string, error) {
+	return m.resolveScopes(subject)
+}
+
+func (m *mockScopeProvider) VerifyLocalIdentity(subject string, password string) (*Identity, error) {
+	return m.verifyLocalIdentity(subject, password)
+}

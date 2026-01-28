@@ -14,6 +14,11 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
+type CompiledMappingRule struct {
+	kdexv1alpha1.MappingRule
+	Program cel.Program
+}
+
 type Exchanger struct {
 	config       Config
 	oauth2Config *oauth2.Config
@@ -22,49 +27,6 @@ type Exchanger struct {
 	sp           ScopeProvider
 }
 
-type CompiledMappingRule struct {
-	kdexv1alpha1.MappingRule
-	Program cel.Program
-}
-
-func NewExchanger(
-	ctx context.Context,
-	cfg Config,
-	sp ScopeProvider,
-) (*Exchanger, error) {
-	ex := &Exchanger{
-		config: cfg,
-		sp:     sp,
-	}
-
-	if cfg.OIDCProviderURL != "" {
-		provider, err := oidc.NewProvider(ctx, cfg.OIDCProviderURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize OIDC provider: %w", err)
-		}
-		ex.oidcProvider = provider
-		ex.oidcVerifier = provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
-
-		scopes := []string{oidc.ScopeOpenID, "profile", "email"}
-		for _, newScope := range cfg.Scopes {
-			if !slices.Contains(scopes, newScope) {
-				scopes = append(scopes, newScope)
-			}
-		}
-
-		ex.oauth2Config = &oauth2.Config{
-			ClientID:     cfg.ClientID,
-			ClientSecret: cfg.ClientSecret,
-			Endpoint:     provider.Endpoint(),
-			RedirectURL:  cfg.RedirectURL,
-			Scopes:       scopes,
-		}
-	}
-
-	return ex, nil
-}
-
-// AuthCodeURL returns the URL to redirect the user to for OIDC login.
 func (e *Exchanger) AuthCodeURL(state string) string {
 	if e == nil || e.oauth2Config == nil {
 		return ""
@@ -72,7 +34,17 @@ func (e *Exchanger) AuthCodeURL(state string) string {
 	return e.oauth2Config.AuthCodeURL(state)
 }
 
-// Exchange converts an authorization code into a ID Token.
+func (e *Exchanger) EndSessionURL() (string, error) {
+	if e == nil || e.oidcProvider == nil {
+		return "", nil
+	}
+	var claims OIDCProviderClaims
+	if err := e.oidcProvider.Claims(&claims); err != nil {
+		return "", err
+	}
+	return claims.EndSessionURL, nil
+}
+
 func (e *Exchanger) ExchangeCode(ctx context.Context, code string) (string, error) {
 	if e == nil || e.oauth2Config == nil {
 		return "", fmt.Errorf("OIDC is not configured")
@@ -92,7 +64,6 @@ func (e *Exchanger) ExchangeCode(ctx context.Context, code string) (string, erro
 	return rawIDToken, nil
 }
 
-// ExchangeToken verifies a Google OIDC ID Token and exchanges it for a local JWT.
 func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken string) (string, error) {
 	if e == nil || e.oidcVerifier == nil {
 		return "", fmt.Errorf("OIDC is not configured")
@@ -125,7 +96,6 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken
 	return SignToken(sub, email, e.config.ClientID, issuer, scopes, extra, e.config.ActivePair, e.config.TokenTTL)
 }
 
-// LoginLocal authenticates against a Kubernetes Secret and returns a local JWT.
 func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, password string) (string, error) {
 	if e == nil || e.config.ActivePair == nil {
 		return "", fmt.Errorf("local auth not configured")
@@ -206,12 +176,52 @@ func (e *Exchanger) setNestedPath(m map[string]any, path string, value any) erro
 	return nil
 }
 
-// verifyIDToken verifies the raw ID Token and returns the ID Token object.
 func (e *Exchanger) verifyIDToken(ctx context.Context, rawIDToken string) (*oidc.IDToken, error) {
 	if e == nil || e.oidcVerifier == nil {
 		return nil, fmt.Errorf("OIDC is not configured")
 	}
 	return e.oidcVerifier.Verify(ctx, rawIDToken)
+}
+
+func NewExchanger(
+	ctx context.Context,
+	cfg Config,
+	sp ScopeProvider,
+) (*Exchanger, error) {
+	ex := &Exchanger{
+		config: cfg,
+		sp:     sp,
+	}
+
+	if cfg.OIDCProviderURL != "" {
+		provider, err := oidc.NewProvider(ctx, cfg.OIDCProviderURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize OIDC provider: %w", err)
+		}
+		ex.oidcProvider = provider
+		ex.oidcVerifier = provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
+
+		scopes := []string{oidc.ScopeOpenID, "profile", "email"}
+		for _, newScope := range cfg.Scopes {
+			if !slices.Contains(scopes, newScope) {
+				scopes = append(scopes, newScope)
+			}
+		}
+
+		ex.oauth2Config = &oauth2.Config{
+			ClientID:     cfg.ClientID,
+			ClientSecret: cfg.ClientSecret,
+			Endpoint:     provider.Endpoint(),
+			RedirectURL:  cfg.RedirectURL,
+			Scopes:       scopes,
+		}
+	}
+
+	return ex, nil
+}
+
+type OIDCProviderClaims struct {
+	EndSessionURL string `json:"end_session_endpoint"`
 }
 
 func compileMappers(rules []kdexv1alpha1.MappingRule) ([]CompiledMappingRule, error) {

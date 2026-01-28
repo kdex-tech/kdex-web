@@ -59,6 +59,7 @@ type HostHandler struct {
 
 	authExchanger interface {
 		AuthCodeURL(state string) string
+		EndSessionURL() (string, error)
 		ExchangeCode(ctx context.Context, code string) (string, error)
 		ExchangeToken(ctx context.Context, issuer string, rawIDToken string) (string, error)
 		LoginLocal(ctx context.Context, issuer string, username, password string) (string, error)
