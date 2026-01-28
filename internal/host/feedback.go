@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	ko "kdex.dev/web/internal/openapi"
 	"kdex.dev/web/internal/sniffer"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type FeedbackTheme struct {
@@ -146,8 +147,15 @@ func (th *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 		ew := &errorResponseWriter{ResponseWriter: w}
 		next.ServeHTTP(ew, r)
 
+		skipSniffer := r.Header.Get("X-KDex-Sniffer-Skip") == "true"
+
+		if skipSniffer {
+			log := logf.FromContext(r.Context())
+			log.V(2).Info("sniffer programatically skipped")
+		}
+
 		// If it was a 404, we hijack the response
-		if ew.statusCode == http.StatusNotFound {
+		if !skipSniffer && ew.statusCode == http.StatusNotFound {
 			// Restore body for analysis
 			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 

@@ -1117,9 +1117,16 @@ func (th *HostHandler) pageHandlerFunc(
 				return
 			}
 
+			// User is not authorized
 			if !authorized {
-				// User is not authorized - redirect to login page
 				th.log.V(1).Info("unauthorized access attempt", "page", name, "basePath", basePath)
+
+				// But is logged in, error page
+				if _, isLoggedIn := auth.GetClaims(r.Context()); isLoggedIn {
+					r.Header.Set("X-KDex-Sniffer-Skip", "true")
+					http.Error(w, http.StatusText(http.StatusNotFound)+" "+r.URL.Path, http.StatusNotFound)
+					return
+				}
 
 				// Redirect to login with return URL
 				returnURL := r.URL.Path
