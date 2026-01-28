@@ -54,7 +54,7 @@ func (s *PageStore) Get(name string) (PageHandler, bool) {
 }
 
 func (s *PageStore) List() []PageHandler {
-	s.log.V(2).Info("list")
+	s.log.V(3).Info("list")
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	pages := []PageHandler{}
