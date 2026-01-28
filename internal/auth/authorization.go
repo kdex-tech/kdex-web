@@ -6,18 +6,21 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/go-logr/logr"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
 // AuthorizationChecker validates whether a user has the required permissions.
 type AuthorizationChecker struct {
 	anonymousGrants []string
+	log             logr.Logger
 }
 
 // NewAuthorizationChecker creates a new authorization checker.
-func NewAuthorizationChecker(anonymousGrants []string) *AuthorizationChecker {
+func NewAuthorizationChecker(anonymousGrants []string, log logr.Logger) *AuthorizationChecker {
 	return &AuthorizationChecker{
 		anonymousGrants: anonymousGrants,
+		log:             log,
 	}
 }
 
@@ -64,6 +67,7 @@ func (ac *AuthorizationChecker) CheckAccess(
 		}
 	}
 
+	ac.log.V(2).Info("CheckAccess", "claim", claims, "requirements", requirements)
 
 	return ac.validateSecurityRequirements(requirements, claims.Scopes), nil
 }

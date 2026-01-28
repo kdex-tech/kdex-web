@@ -438,7 +438,7 @@ func (th *HostHandler) SetHost(
 
 	if authConfig != nil {
 		th.authConfig = authConfig
-		th.authChecker = auth.NewAuthorizationChecker(authConfig.AnonymousGrants)
+		th.authChecker = auth.NewAuthorizationChecker(authConfig.AnonymousGrants, th.log.WithName("authChecker"))
 		th.authExchanger = authExchanger
 	}
 

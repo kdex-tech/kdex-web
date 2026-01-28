@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/assert"
 	"kdex.dev/crds/api/v1alpha1"
 )
@@ -22,7 +23,7 @@ func TestNewAuthorizationChecker(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewAuthorizationChecker([]string{})
+			got := NewAuthorizationChecker([]string{}, logr.Logger{})
 			tt.assertions(t, got)
 		})
 	}
@@ -404,7 +405,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			if tt.claims != nil {
 				ctx = context.WithValue(context.Background(), ClaimsContextKey, tt.claims)
 			}
-			checker := NewAuthorizationChecker(tt.anonymousGrants)
+			checker := NewAuthorizationChecker(tt.anonymousGrants, logr.Logger{})
 			access, err := checker.CheckAccess(
 				ctx, tt.kind, tt.resourceName, tt.req)
 			if assert.NoError(t, err) {
