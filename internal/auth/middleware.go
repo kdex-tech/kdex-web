@@ -18,6 +18,14 @@ const (
 	ClaimsContextKey ContextKey = "claims"
 )
 
+// Claims extends standard JWT claims with KDex specific fields.
+type Claims struct {
+	Email  string   `json:"email"`
+	Scopes []string `json:"scopes"`
+	UID    string   `json:"uid"`
+	jwt.RegisteredClaims
+}
+
 // WithAuthentication creates a middleware that validates JWT tokens from the Authorization header.
 // It injects the claims into the request context if the token is valid.
 // If the Header is present but invalid, it returns 401 Unauthorized.

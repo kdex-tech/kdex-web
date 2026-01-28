@@ -20,16 +20,9 @@ func NewAuthorizationChecker() *AuthorizationChecker {
 // Returns true if access is granted, false otherwise.
 func (ac *AuthorizationChecker) CheckPageAccess(
 	ctx context.Context,
-	pageSecurity *[]kdexv1alpha1.SecurityRequirement,
-	hostSecurity *[]kdexv1alpha1.SecurityRequirement,
+	security []kdexv1alpha1.SecurityRequirement,
 ) (bool, error) {
-	// Determine which security requirements to use
-	var securityReqs *[]kdexv1alpha1.SecurityRequirement
-	if pageSecurity != nil && len(*pageSecurity) > 0 {
-		securityReqs = pageSecurity
-	} else if hostSecurity != nil && len(*hostSecurity) > 0 {
-		securityReqs = hostSecurity
-	} else {
+	if len(security) == 0 {
 		// No security requirements = public access
 		return true, nil
 	}
@@ -38,11 +31,13 @@ func (ac *AuthorizationChecker) CheckPageAccess(
 	claims, hasClaims := GetClaims(ctx)
 	if !hasClaims {
 		// Security requirements exist but no auth context = unauthorized
+		// here we should add minimal `page::read`
+
 		return false, nil
 	}
 
 	// Check if user has required scopes
-	return ac.validateSecurityRequirements(*securityReqs, claims.Scopes), nil
+	return ac.validateSecurityRequirements(security, claims.Scopes), nil
 }
 
 // validateSecurityRequirements checks if the user's scopes satisfy the security requirements.

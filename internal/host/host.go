@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime/debug"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -736,6 +737,8 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 		},
 	)
 
+	// TODO: add /~/logout handler
+
 	th.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
@@ -1099,19 +1102,18 @@ func (th *HostHandler) pageHandlerFunc(
 			// Check authorization before processing the request
 
 			th.mu.RLock()
-			var pageSecurity *[]kdexv1alpha1.SecurityRequirement
-			var hostSecurity *[]kdexv1alpha1.SecurityRequirement
-
-			if pageHandler.Page != nil {
-				pageSecurity = pageHandler.Page.Security
-			}
-			if th.host != nil {
-				hostSecurity = th.host.Security
+			security := slices.Concat(*th.host.Security)
+			if pageHandler.Page.Security != nil {
+				security = slices.Concat(*pageHandler.Page.Security)
 			}
 			th.mu.RUnlock()
 
+			security = append(security, kdexv1alpha1.SecurityRequirement{
+				"_": []string{fmt.Sprintf("page:%s:read", basePath)},
+			})
+
 			// Perform authorization check
-			authorized, err := th.authChecker.CheckPageAccess(r.Context(), pageSecurity, hostSecurity)
+			authorized, err := th.authChecker.CheckPageAccess(r.Context(), security)
 			if err != nil {
 				th.log.Error(err, "authorization check failed", "page", name, "basePath", basePath)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
