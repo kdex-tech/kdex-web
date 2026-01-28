@@ -64,32 +64,7 @@ func (ac *AuthorizationChecker) CheckAccess(
 		}
 	}
 
-	// Check if user has required scopes
-	return ac.validateSecurityRequirements(requirements, claims.Scopes), nil
-}
 
-// CheckPageAccess validates whether the user has access to a page based on security requirements.
-// It checks page-level security first, falling back to host-level security if page security is not defined.
-// Returns true if access is granted, false otherwise.
-func (ac *AuthorizationChecker) CheckPageAccess(
-	ctx context.Context,
-	requirements []kdexv1alpha1.SecurityRequirement,
-) (bool, error) {
-	if len(requirements) == 0 {
-		// No security requirements = public access
-		return true, nil
-	}
-
-	// Get claims from context
-	claims, hasClaims := GetClaims(ctx)
-	if !hasClaims {
-		// Security requirements exist but no auth context = unauthorized
-		// here we should add minimal `page::read`
-
-		return false, nil
-	}
-
-	// Check if user has required scopes
 	return ac.validateSecurityRequirements(requirements, claims.Scopes), nil
 }
 
