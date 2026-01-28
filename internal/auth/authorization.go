@@ -28,7 +28,7 @@ func (ac *AuthorizationChecker) CheckAccess(
 	ctx context.Context,
 	kind string,
 	resourceName string,
-	requirements []kdexv1alpha1.SecurityRequirement,
+	original []kdexv1alpha1.SecurityRequirement,
 ) (bool, error) {
 	if kind == "" || resourceName == "" {
 		return false, fmt.Errorf("kind, resourceName must not be empty")
@@ -36,6 +36,9 @@ func (ac *AuthorizationChecker) CheckAccess(
 
 	// The identity scope allows for pattern matching
 	identity := fmt.Sprintf("%s:%s:read", kind, resourceName)
+
+	// make sure never to write back
+	requirements := DeepCloneSecurityRequirements(original)
 
 	// The identity scope is added to all requirements
 	added := false
@@ -190,4 +193,36 @@ func (ac *AuthorizationChecker) scopeMatches(userScope, requiredScope string) bo
 
 	// Specific resource name must match
 	return userParts[1] == requiredParts[1]
+}
+
+func DeepCloneSecurityRequirements(input []kdexv1alpha1.SecurityRequirement) []kdexv1alpha1.SecurityRequirement {
+	if input == nil {
+		return nil
+	}
+
+	// 1. Clone the outer slice
+	clone := make([]kdexv1alpha1.SecurityRequirement, len(input))
+
+	for i, reqMap := range input {
+		if reqMap == nil {
+			continue
+		}
+
+		// 2. Clone the Map
+		newMap := make(kdexv1alpha1.SecurityRequirement, len(reqMap))
+		for key, scopes := range reqMap {
+			if scopes == nil {
+				newMap[key] = nil
+				continue
+			}
+
+			// 3. Clone the inner Slice
+			newScopes := make([]string, len(scopes))
+			copy(newScopes, scopes)
+			newMap[key] = newScopes
+		}
+		clone[i] = newMap
+	}
+
+	return clone
 }
