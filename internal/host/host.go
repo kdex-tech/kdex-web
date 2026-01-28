@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"runtime/debug"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -439,10 +438,9 @@ func (th *HostHandler) SetHost(
 
 	if authConfig != nil {
 		th.authConfig = authConfig
-		th.authChecker = auth.NewAuthorizationChecker()
+		th.authChecker = auth.NewAuthorizationChecker(authConfig.AnonymousGrants)
+		th.authExchanger = authExchanger
 	}
-
-	th.authExchanger = authExchanger
 
 	th.mu.Unlock()
 	th.RebuildMux()
@@ -640,7 +638,7 @@ func (th *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 }
 
 func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if th.authExchanger == nil || th.authConfig == nil {
+	if th.authConfig == nil || th.authExchanger == nil {
 		return
 	}
 
@@ -954,7 +952,7 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 }
 
 func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if th.authExchanger == nil || th.authConfig == nil || th.authConfig.OIDCProviderURL == "" {
+	if th.authConfig == nil || th.authConfig.OIDCProviderURL == "" || th.authExchanger == nil {
 		return
 	}
 
@@ -1102,18 +1100,17 @@ func (th *HostHandler) pageHandlerFunc(
 			// Check authorization before processing the request
 
 			th.mu.RLock()
-			security := slices.Concat(*th.host.Security)
+			var requirements []kdexv1alpha1.SecurityRequirement
+			if th.host.Security != nil {
+				requirements = *th.host.Security
+			}
 			if pageHandler.Page.Security != nil {
-				security = slices.Concat(*pageHandler.Page.Security)
+				requirements = *pageHandler.Page.Security
 			}
 			th.mu.RUnlock()
 
-			security = append(security, kdexv1alpha1.SecurityRequirement{
-				"_": []string{fmt.Sprintf("page:%s:read", basePath)},
-			})
-
 			// Perform authorization check
-			authorized, err := th.authChecker.CheckPageAccess(r.Context(), security)
+			authorized, err := th.authChecker.CheckAccess(r.Context(), "pages", basePath, requirements)
 			if err != nil {
 				th.log.Error(err, "authorization check failed", "page", name, "basePath", basePath)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)

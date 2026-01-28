@@ -2,17 +2,70 @@ package auth
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strings"
 
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
 // AuthorizationChecker validates whether a user has the required permissions.
-type AuthorizationChecker struct{}
+type AuthorizationChecker struct {
+	anonymousGrants []string
+}
 
 // NewAuthorizationChecker creates a new authorization checker.
-func NewAuthorizationChecker() *AuthorizationChecker {
-	return &AuthorizationChecker{}
+func NewAuthorizationChecker(anonymousGrants []string) *AuthorizationChecker {
+	return &AuthorizationChecker{
+		anonymousGrants: anonymousGrants,
+	}
+}
+
+func (ac *AuthorizationChecker) CheckAccess(
+	ctx context.Context,
+	kind string,
+	resourceName string,
+	requirements []kdexv1alpha1.SecurityRequirement,
+) (bool, error) {
+	if kind == "" || resourceName == "" {
+		return false, fmt.Errorf("kind, resourceName must not be empty")
+	}
+
+	// The identity scope allows for pattern matching
+	identity := fmt.Sprintf("%s:%s:read", kind, resourceName)
+
+	// The identity scope is added to all requirements
+	added := false
+	for _, req := range requirements {
+		for i, v := range req {
+			if !slices.Contains(v, identity) {
+				v = append(v, identity)
+				req[i] = v
+				added = true
+			}
+		}
+	}
+	// when there are no requirements, a fallback wit the identity is added
+	if !added {
+		requirements = append(requirements, kdexv1alpha1.SecurityRequirement{
+			"_": []string{identity},
+		})
+	}
+
+	// Get claims from context
+	claims, hasClaims := GetClaims(ctx)
+	if !hasClaims {
+		claims = &Claims{}
+	}
+	// the scopes grated to ananonymous, merge with any existing
+	for _, anonGrant := range ac.anonymousGrants {
+		if !slices.Contains(claims.Scopes, anonGrant) {
+			claims.Scopes = append(claims.Scopes, anonGrant)
+		}
+	}
+
+	// Check if user has required scopes
+	return ac.validateSecurityRequirements(requirements, claims.Scopes), nil
 }
 
 // CheckPageAccess validates whether the user has access to a page based on security requirements.
@@ -20,9 +73,9 @@ func NewAuthorizationChecker() *AuthorizationChecker {
 // Returns true if access is granted, false otherwise.
 func (ac *AuthorizationChecker) CheckPageAccess(
 	ctx context.Context,
-	security []kdexv1alpha1.SecurityRequirement,
+	requirements []kdexv1alpha1.SecurityRequirement,
 ) (bool, error) {
-	if len(security) == 0 {
+	if len(requirements) == 0 {
 		// No security requirements = public access
 		return true, nil
 	}
@@ -37,7 +90,7 @@ func (ac *AuthorizationChecker) CheckPageAccess(
 	}
 
 	// Check if user has required scopes
-	return ac.validateSecurityRequirements(security, claims.Scopes), nil
+	return ac.validateSecurityRequirements(requirements, claims.Scopes), nil
 }
 
 // validateSecurityRequirements checks if the user's scopes satisfy the security requirements.
@@ -75,7 +128,7 @@ func (ac *AuthorizationChecker) satisfiesRequirement(
 		requiredScopes = append(requiredScopes, scopes...)
 	}
 
-	// Check if user has all required scopes
+	// Requirements are AND'ed - Check if user has all required scopes
 	for _, requiredScope := range requiredScopes {
 		if !ac.hasScope(userScopes, requiredScope) {
 			return false

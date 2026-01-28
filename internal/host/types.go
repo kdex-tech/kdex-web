@@ -54,7 +54,7 @@ type HostHandler struct {
 	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 
 	authChecker interface {
-		CheckPageAccess(ctx context.Context, security []kdexv1alpha1.SecurityRequirement) (bool, error)
+		CheckAccess(ctx context.Context, kind string, resourceName string, requirements []kdexv1alpha1.SecurityRequirement) (bool, error)
 	}
 
 	authExchanger interface {

@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	ActivePair      *KeyPair
+	AnonymousGrants []string
 	ClientID        string
 	ClientSecret    string
 	CookieName      string
@@ -27,6 +28,7 @@ func NewConfig(ctx context.Context, c client.Client, auth *kdexv1alpha1.Auth, na
 	cfg := &Config{}
 
 	if auth != nil {
+		cfg.AnonymousGrants = auth.AnonymousGrants
 		cfg.CookieName = auth.JWT.CookieName
 
 		if cfg.CookieName == "" {
