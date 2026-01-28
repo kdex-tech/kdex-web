@@ -1,6 +1,7 @@
-package page
+package host
 
 import (
+	"context"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -11,24 +12,26 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
+	"kdex.dev/web/internal/page"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func Test_PageStore_BuildMenuEntries(t *testing.T) {
+func TestHostHandler_BuildMenuEntries(t *testing.T) {
 	tests := []struct {
 		name              string
-		items             *map[string]PageHandler
+		items             *map[string]page.PageHandler
 		isDefaultLanguage bool
 		want              *map[string]any
 	}{
 		{
 			name:  "empty",
-			items: &map[string]PageHandler{},
+			items: &map[string]page.PageHandler{},
 			want:  nil,
 		},
 		{
 			name:              "simple",
 			isDefaultLanguage: true,
-			items: &map[string]PageHandler{
+			items: &map[string]page.PageHandler{
 				"foo": {
 					Name: "foo",
 					Page: &kdexv1alpha1.KDexPageBindingSpec{
@@ -52,7 +55,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 		{
 			name:              "more complex",
 			isDefaultLanguage: true,
-			items: &map[string]PageHandler{
+			items: &map[string]page.PageHandler{
 				"foo": {
 					Name: "foo",
 					Page: &kdexv1alpha1.KDexPageBindingSpec{
@@ -116,7 +119,7 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 		{
 			name:              "none default language",
 			isDefaultLanguage: false,
-			items: &map[string]PageHandler{
+			items: &map[string]page.PageHandler{
 				"foo": {
 					Name: "foo",
 					Page: &kdexv1alpha1.KDexPageBindingSpec{
@@ -140,16 +143,17 @@ func Test_PageStore_BuildMenuEntries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ps := NewPageStore("test", nil, logr.Discard())
+			ctx := context.Background()
+			hh := NewHostHandler(fake.NewClientBuilder().Build(), "foo", "foo", logr.Logger{})
 			for _, it := range *tt.items {
-				ps.Set(it)
+				hh.Pages.Set(it)
 			}
 			tag := language.English
 			catalogBuilder := catalog.NewBuilder()
 			catalogBuilder.SetString(language.English, "Foo", "Foo Translated")
 			got := &render.PageEntry{}
 
-			ps.BuildMenuEntries(got, &tag, tt.isDefaultLanguage, nil)
+			hh.BuildMenuEntries(ctx, got, &tag, tt.isDefaultLanguage, nil)
 			children := got.Children
 			assert.Equal(t, tt.want, children)
 		})

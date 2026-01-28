@@ -128,10 +128,10 @@ func isCLI(userAgent string) bool {
 		strings.Contains(userAgent, "httpie")
 }
 
-func (th *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
+func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Only intercept if we have a sniffer (checker) and it's not an internal path
-		if th.sniffer == nil || strings.HasPrefix(r.URL.Path, "/~") {
+		if hh.sniffer == nil || strings.HasPrefix(r.URL.Path, "/~") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -160,22 +160,22 @@ func (th *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 			// Analyze
-			result, err := th.sniffer.Analyze(r)
+			result, err := hh.sniffer.Analyze(r)
 			if err != nil {
-				th.log.Error(err, "failed to analyze request", "path", r.URL.Path)
+				hh.log.Error(err, "failed to analyze request", "path", r.URL.Path)
 				// Fallback to standard error serving if analysis fails
-				th.serveError(w, r, http.StatusBadRequest, err.Error())
+				hh.serveError(w, r, http.StatusBadRequest, err.Error())
 				return
 			}
 
 			if result.Function == nil {
 				// Analysis yielded nothing (maybe pattern mismatch), serve 404 as usual
-				th.serveError(w, r, ew.statusCode, ew.statusMsg)
+				hh.serveError(w, r, ew.statusCode, ew.statusMsg)
 				return
 			}
 
 			// Store result
-			id := th.analysisCache.Store(result)
+			id := hh.analysisCache.Store(result)
 
 			// Smart Redirection
 			format := "html"
@@ -195,7 +195,7 @@ func (th *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 			link := fmt.Sprintf("\033]8;;%s\033\\%s\033]8;;\033\\", absoluteURL, absoluteURL)
 			_, err = fmt.Fprintf(w, "➔ API Draft Created. View at: %s\n(Note: Use 'curl -L' to follow automatically).\n", link)
 			if err != nil {
-				th.serveError(w, r, http.StatusInternalServerError, err.Error())
+				hh.serveError(w, r, http.StatusInternalServerError, err.Error())
 			}
 			return
 		}
@@ -206,24 +206,24 @@ func (th *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 		// If code >= 400, it buffered it.
 		if ew.statusCode >= 400 {
 			// Write the buffered status code structure
-			th.serveError(w, r, ew.statusCode, ew.statusMsg)
+			hh.serveError(w, r, ew.statusCode, ew.statusMsg)
 		}
 	})
 }
 
 // InspectHandler serves the feedback UI
-func (th *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
+func (hh *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("uuid")
 	format := r.URL.Query().Get("format")
 
-	result, ok := th.analysisCache.Get(id)
+	result, ok := hh.analysisCache.Get(id)
 	if !ok {
 		http.Error(w, "Analysis result expired or not found.", http.StatusNotFound)
 		return
 	}
 
 	// Generate OpenAPI spec snippet
-	spec := th.openapiBuilder.BuildOneOff(ko.Host(r), result.Function)
+	spec := hh.openapiBuilder.BuildOneOff(ko.Host(r), result.Function)
 	specBytes, _ := json.MarshalIndent(spec, "", "  ")
 	specStr := string(specBytes)
 

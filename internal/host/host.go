@@ -57,33 +57,33 @@ func NewHostHandler(c client.Client, name string, namespace string, log logr.Log
 	return th
 }
 
-func (th *HostHandler) AddOrUpdateTranslation(name string, translation *kdexv1alpha1.KDexTranslationSpec) {
+func (hh *HostHandler) AddOrUpdateTranslation(name string, translation *kdexv1alpha1.KDexTranslationSpec) {
 	if translation == nil {
 		return
 	}
-	th.log.V(1).Info("add or update translation", "translation", name)
-	th.mu.Lock()
-	th.translationResources[name] = *translation
-	th.mu.Unlock()
-	th.RebuildMux() // Called after lock is released
+	hh.log.V(1).Info("add or update translation", "translation", name)
+	hh.mu.Lock()
+	hh.translationResources[name] = *translation
+	hh.mu.Unlock()
+	hh.RebuildMux() // Called after lock is released
 }
 
-func (th *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
+func (hh *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
 	if ph.UtilityPage == nil {
 		return
 	}
-	th.log.V(1).Info("add or update utility page", "name", ph.Name, "type", ph.UtilityPage.Type)
-	th.mu.Lock()
-	th.utilityPages[ph.UtilityPage.Type] = ph
-	th.mu.Unlock()
-	th.RebuildMux()
+	hh.log.V(1).Info("add or update utility page", "name", ph.Name, "type", ph.UtilityPage.Type)
+	hh.mu.Lock()
+	hh.utilityPages[ph.UtilityPage.Type] = ph
+	hh.mu.Unlock()
+	hh.RebuildMux()
 }
 
-func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
+func (hh *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 	separator := ""
 
-	for _, script := range th.scripts {
+	for _, script := range hh.scripts {
 		buffer.WriteString(separator)
 		buffer.WriteString(script.ToFootTag())
 		separator = "\n"
@@ -97,19 +97,19 @@ func (th *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	return buffer.String()
 }
 
-func (th *HostHandler) GetUtilityPageHandler(name kdexv1alpha1.KDexUtilityPageType) page.PageHandler {
-	th.mu.RLock()
-	defer th.mu.RUnlock()
-	ph, ok := th.utilityPages[name]
+func (hh *HostHandler) GetUtilityPageHandler(name kdexv1alpha1.KDexUtilityPageType) page.PageHandler {
+	hh.mu.RLock()
+	defer hh.mu.RUnlock()
+	ph, ok := hh.utilityPages[name]
 	if !ok {
 		return page.PageHandler{}
 	}
 	return ph
 }
 
-func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
+func (hh *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	packageReferences := []kdexv1alpha1.PackageReference{}
-	packageReferences = append(packageReferences, th.packageReferences...)
+	packageReferences = append(packageReferences, hh.packageReferences...)
 	packageReferences = append(packageReferences, handler.PackageReferences...)
 
 	var buffer bytes.Buffer
@@ -117,7 +117,7 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 
 	if len(packageReferences) > 0 {
 		buffer.WriteString("<script type=\"importmap\">\n")
-		buffer.WriteString(th.importmap)
+		buffer.WriteString(hh.importmap)
 		buffer.WriteString("\n</script>\n")
 
 		buffer.WriteString("<script type=\"module\">\n")
@@ -129,7 +129,7 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 		buffer.WriteString("\n</script>")
 	}
 
-	for _, script := range th.scripts {
+	for _, script := range hh.scripts {
 		buffer.WriteString(separator)
 		buffer.WriteString(script.ToHeadTag())
 		separator = "\n"
@@ -143,7 +143,7 @@ func (th *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
 	return buffer.String()
 }
 
-func (th *HostHandler) L10nRender(
+func (hh *HostHandler) L10nRender(
 	handler page.PageHandler,
 	pageMap map[string]any,
 	l language.Tag,
@@ -155,42 +155,42 @@ func (th *HostHandler) L10nRender(
 
 	renderer := render.Renderer{
 		BasePath:        handler.BasePath(),
-		BrandName:       th.host.BrandName,
+		BrandName:       hh.host.BrandName,
 		Contents:        handler.ContentToHTMLMap(),
-		DefaultLanguage: th.defaultLanguage,
+		DefaultLanguage: hh.defaultLanguage,
 		Extra:           maps.Clone(extraTemplateData),
 		Footer:          handler.Footer,
-		FootScript:      th.FootScriptToHTML(handler),
+		FootScript:      hh.FootScriptToHTML(handler),
 		Header:          handler.Header,
-		HeadScript:      th.HeadScriptToHTML(handler),
+		HeadScript:      hh.HeadScriptToHTML(handler),
 		Language:        l.String(),
-		Languages:       th.availableLanguages(translations),
+		Languages:       hh.availableLanguages(translations),
 		LastModified:    time.Now(),
-		MessagePrinter:  th.messagePrinter(translations, l),
-		Meta:            th.MetaToString(handler, l),
+		MessagePrinter:  hh.messagePrinter(translations, l),
+		Meta:            hh.MetaToString(handler, l),
 		Navigations:     handler.NavigationToHTMLMap(),
-		Organization:    th.host.Organization,
+		Organization:    hh.host.Organization,
 		PageMap:         maps.Clone(pageMap),
 		PatternPath:     handler.PatternPath(),
 		TemplateContent: handler.MainTemplate,
 		TemplateName:    handler.Name,
-		Theme:           th.ThemeAssetsToString(),
+		Theme:           hh.ThemeAssetsToString(),
 		Title:           handler.Label(),
 	}
 
 	return renderer.RenderPage()
 }
 
-func (th *HostHandler) L10nRenders(
+func (hh *HostHandler) L10nRenders(
 	handler page.PageHandler,
 	pageMaps map[language.Tag]map[string]any,
 	translations *Translations,
 ) map[string]string {
 	l10nRenders := make(map[string]string)
 	for _, l := range translations.Languages() {
-		rendered, err := th.L10nRender(handler, pageMaps[l], l, map[string]any{}, translations)
+		rendered, err := hh.L10nRender(handler, pageMaps[l], l, map[string]any{}, translations)
 		if err != nil {
-			th.log.Error(err, "failed to render page for language", "page", handler.Name, "language", l)
+			hh.log.Error(err, "failed to render page for language", "page", handler.Name, "language", l)
 			continue
 		}
 		l10nRenders[l.String()] = rendered
@@ -198,20 +198,20 @@ func (th *HostHandler) L10nRenders(
 	return l10nRenders
 }
 
-func (th *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) string {
+func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) string {
 	var buffer bytes.Buffer
 
-	if len(th.host.Assets) > 0 {
-		buffer.WriteString(th.host.Assets.String())
+	if len(hh.host.Assets) > 0 {
+		buffer.WriteString(hh.host.Assets.String())
 		buffer.WriteRune('\n')
 	}
 
 	basePath := handler.BasePath()
-	if l.String() != th.defaultLanguage {
+	if l.String() != hh.defaultLanguage {
 		basePath = "/" + l.String() + basePath
 	}
 	patternPath := handler.PatternPath()
-	if l.String() != th.defaultLanguage {
+	if l.String() != hh.defaultLanguage {
 		patternPath = "/" + l.String() + patternPath
 	}
 
@@ -236,46 +236,46 @@ func (th *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 	return buffer.String()
 }
 
-func (th *HostHandler) RebuildMux() {
-	th.log.V(1).Info("rebuilding mux")
-	th.mu.RLock()
+func (hh *HostHandler) RebuildMux() {
+	hh.log.V(1).Info("rebuilding mux")
+	hh.mu.RLock()
 
-	if th.host == nil {
-		th.mu.RUnlock()
+	if hh.host == nil {
+		hh.mu.RUnlock()
 		return
 	}
 
 	// copy fields that we need while under RLock
-	defaultLanguageResource := th.defaultLanguage
-	translationResources := maps.Clone(th.translationResources)
+	defaultLanguageResource := hh.defaultLanguage
+	translationResources := maps.Clone(hh.translationResources)
 
 	newTranslations, err := NewTranslations(defaultLanguageResource, translationResources)
 	if err != nil {
-		th.log.Error(err, "failed to rebuild translations")
-		th.mu.RUnlock()
+		hh.log.Error(err, "failed to rebuild translations")
+		hh.mu.RUnlock()
 		return
 	}
 
 	registeredPaths := map[string]ko.PathInfo{}
-	maps.Copy(registeredPaths, th.pathsCollectedInReconcile)
+	maps.Copy(registeredPaths, hh.pathsCollectedInReconcile)
 
-	mux := th.muxWithDefaultsLocked(registeredPaths)
+	mux := hh.muxWithDefaultsLocked(registeredPaths)
 
-	pageHandlers := th.Pages.List()
+	pageHandlers := hh.Pages.List()
 
 	if len(pageHandlers) == 0 {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			rendered := th.renderUtilityPage(
+			rendered := hh.renderUtilityPage(
 				kdexv1alpha1.AnnouncementUtilityPageType,
 				l,
 				map[string]any{},
-				&th.Translations,
+				&hh.Translations,
 			)
 
 			if rendered == "" {
@@ -283,7 +283,7 @@ func (th *HostHandler) RebuildMux() {
 				return
 			}
 
-			th.log.V(1).Info("serving announcement page", "language", l.String())
+			hh.log.V(1).Info("serving announcement page", "language", l.String())
 
 			w.Header().Set("Content-Language", l.String())
 			w.Header().Set("Content-Type", "text/html")
@@ -297,12 +297,12 @@ func (th *HostHandler) RebuildMux() {
 		mux.HandleFunc("GET /{$}", handler)
 		mux.HandleFunc("GET /{l10n}/{$}", handler)
 
-		th.mu.RUnlock()
-		th.mu.Lock()
-		th.Translations = *newTranslations
-		th.registeredPaths = registeredPaths
-		th.Mux = mux
-		th.mu.Unlock()
+		hh.mu.RUnlock()
+		hh.mu.Lock()
+		hh.Translations = *newTranslations
+		hh.registeredPaths = registeredPaths
+		hh.Mux = mux
+		hh.mu.Unlock()
 
 		return
 	}
@@ -313,61 +313,61 @@ func (th *HostHandler) RebuildMux() {
 		basePath := ph.BasePath()
 
 		if basePath == "" {
-			th.log.V(1).Info("somehow page has empty basePath, skipping", "page", ph.Name)
+			hh.log.V(1).Info("somehow page has empty basePath, skipping", "page", ph.Name)
 			continue
 		}
 
-		l10nRenders := th.L10nRenders(ph, nil, newTranslations)
+		l10nRenders := hh.L10nRenders(ph, nil, newTranslations)
 		renderedPages = append(renderedPages, pageRender{ph: ph, l10nRenders: l10nRenders})
 	}
 
-	th.mu.RUnlock()
+	hh.mu.RUnlock()
 
 	for _, pr := range renderedPages {
-		th.addHandlerAndRegister(mux, pr, registeredPaths)
+		hh.addHandlerAndRegister(mux, pr, registeredPaths)
 	}
 
-	th.mu.Lock()
-	th.Translations = *newTranslations
-	th.registeredPaths = registeredPaths
-	th.Mux = mux
-	th.mu.Unlock()
+	hh.mu.Lock()
+	hh.Translations = *newTranslations
+	hh.registeredPaths = registeredPaths
+	hh.Mux = mux
+	hh.mu.Unlock()
 }
 
-func (th *HostHandler) RemoveTranslation(name string) {
-	th.log.V(1).Info("delete translation", "translation", name)
-	th.mu.Lock()
-	delete(th.translationResources, name)
-	th.mu.Unlock()
+func (hh *HostHandler) RemoveTranslation(name string) {
+	hh.log.V(1).Info("delete translation", "translation", name)
+	hh.mu.Lock()
+	delete(hh.translationResources, name)
+	hh.mu.Unlock()
 
-	th.RebuildMux() // Called after lock is released
+	hh.RebuildMux() // Called after lock is released
 }
 
-func (th *HostHandler) RemoveUtilityPage(name string) {
-	th.log.V(1).Info("delete utility page", "name", name)
-	th.mu.Lock()
-	for t, ph := range th.utilityPages {
+func (hh *HostHandler) RemoveUtilityPage(name string) {
+	hh.log.V(1).Info("delete utility page", "name", name)
+	hh.mu.Lock()
+	for t, ph := range hh.utilityPages {
 		if ph.Name == name {
-			delete(th.utilityPages, t)
+			delete(hh.utilityPages, t)
 			break
 		}
 	}
-	th.mu.Unlock()
+	hh.mu.Unlock()
 
-	th.RebuildMux() // Called after lock is released
+	hh.RebuildMux() // Called after lock is released
 }
 
-func (th *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
+func (hh *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 	req := &openapi.SecuritySchemes{}
 	bearerScheme := openapi.NewJWTSecurityScheme()
 	bearerScheme.Description = "Bearer Token - This is the default scheme"
 	// For now we assume that if a login page is specified we want to default to bearer auth
 	// as the preferred mode of authentication for auto-generated functions.
-	if th.host != nil && th.host.UtilityPages != nil && th.host.UtilityPages.LoginRef != nil {
+	if hh.host != nil && hh.host.UtilityPages != nil && hh.host.UtilityPages.LoginRef != nil {
 		(*req)["bearer"] = &openapi.SecuritySchemeRef{
 			Value: bearerScheme,
 		}
-	} else if th.host != nil {
+	} else if hh.host != nil {
 		(*req)["bearer"] = &openapi.SecuritySchemeRef{
 			Value: bearerScheme,
 		}
@@ -376,22 +376,22 @@ func (th *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 	return req
 }
 
-func (th *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	th.mu.RLock()
-	mux := th.Mux
-	th.mu.RUnlock()
+func (hh *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	hh.mu.RLock()
+	mux := hh.Mux
+	hh.mu.RUnlock()
 
 	if mux == nil {
-		th.serveError(w, r, http.StatusNotFound, "not found")
+		hh.serveError(w, r, http.StatusNotFound, "not found")
 		return
 	}
 
-	wrappedMux := th.authConfig.AddAuthentication(mux)
-	wrappedMux = th.DesignMiddleware(wrappedMux)
+	wrappedMux := hh.authConfig.AddAuthentication(mux)
+	wrappedMux = hh.DesignMiddleware(wrappedMux)
 	wrappedMux.ServeHTTP(w, r)
 }
 
-func (th *HostHandler) SetHost(
+func (hh *HostHandler) SetHost(
 	ctx context.Context,
 	host *kdexv1alpha1.KDexHostSpec,
 	packageReferences []kdexv1alpha1.PackageReference,
@@ -403,53 +403,53 @@ func (th *HostHandler) SetHost(
 	authExchanger *auth.Exchanger,
 	authConfig *auth.Config,
 ) {
-	th.mu.Lock()
-	th.host = host
-	th.defaultLanguage = host.DefaultLang
-	th.favicon = ico.NewICO(host.FaviconSVGTemplate, render.TemplateData{
+	hh.mu.Lock()
+	hh.host = host
+	hh.defaultLanguage = host.DefaultLang
+	hh.favicon = ico.NewICO(host.FaviconSVGTemplate, render.TemplateData{
 		BrandName:       host.BrandName,
 		DefaultLanguage: host.DefaultLang,
 		Organization:    host.Organization,
 	})
-	th.openapiBuilder = ko.Builder{
-		SecuritySchemes: th.SecuritySchemes(),
+	hh.openapiBuilder = ko.Builder{
+		SecuritySchemes: hh.SecuritySchemes(),
 	}
-	th.packageReferences = packageReferences
-	th.pathsCollectedInReconcile = paths
-	th.themeAssets = themeAssets
-	th.scripts = scripts
+	hh.packageReferences = packageReferences
+	hh.pathsCollectedInReconcile = paths
+	hh.themeAssets = themeAssets
+	hh.scripts = scripts
 
 	var snif *sniffer.RequestSniffer
 	if host.DevMode {
 		snif = &sniffer.RequestSniffer{
 			BasePathRegex:   (&kdexv1alpha1.API{}).BasePathRegex(),
-			Client:          th.client,
+			Client:          hh.client,
 			Functions:       functions,
-			HostName:        th.Name,
+			HostName:        hh.Name,
 			ItemPathRegex:   (&kdexv1alpha1.API{}).ItemPathRegex(),
-			OpenAPIBuilder:  th.openapiBuilder,
-			Namespace:       th.Namespace,
-			SecuritySchemes: th.SecuritySchemes(),
+			OpenAPIBuilder:  hh.openapiBuilder,
+			Namespace:       hh.Namespace,
+			SecuritySchemes: hh.SecuritySchemes(),
 		}
 	}
 
-	th.sniffer = snif
-	th.importmap = importmap
+	hh.sniffer = snif
+	hh.importmap = importmap
 
 	if authConfig != nil {
-		th.authConfig = authConfig
-		th.authChecker = auth.NewAuthorizationChecker(authConfig.AnonymousGrants, th.log.WithName("authChecker"))
-		th.authExchanger = authExchanger
+		hh.authConfig = authConfig
+		hh.authChecker = auth.NewAuthorizationChecker(authConfig.AnonymousGrants, hh.log.WithName("authChecker"))
+		hh.authExchanger = authExchanger
 	}
 
-	th.mu.Unlock()
-	th.RebuildMux()
+	hh.mu.Unlock()
+	hh.RebuildMux()
 }
 
-func (th *HostHandler) ThemeAssetsToString() string {
+func (hh *HostHandler) ThemeAssetsToString() string {
 	var buffer bytes.Buffer
 
-	for _, asset := range th.themeAssets {
+	for _, asset := range hh.themeAssets {
 		buffer.WriteString(asset.ToTag())
 		buffer.WriteRune('\n')
 	}
@@ -457,11 +457,11 @@ func (th *HostHandler) ThemeAssetsToString() string {
 	return buffer.String()
 }
 
-func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, registeredPaths map[string]ko.PathInfo) {
+func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, registeredPaths map[string]ko.PathInfo) {
 	finalPath := toFinalPath(pr.ph.BasePath())
 	label := pr.ph.Label()
 
-	handler := th.pageHandlerFunc(finalPath, pr.ph.Name, pr.l10nRenders, pr.ph)
+	handler := hh.pageHandlerFunc(finalPath, pr.ph.Name, pr.l10nRenders, pr.ph)
 
 	mux.HandleFunc("GET "+finalPath, handler)
 	mux.HandleFunc("GET /{l10n}"+finalPath, handler)
@@ -483,7 +483,7 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 		}),
 	)
 
-	th.registerPath(finalPath, ko.PathInfo{
+	hh.registerPath(finalPath, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: finalPath,
 			Paths: map[string]ko.PathItem{
@@ -501,7 +501,7 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 	}, registeredPaths)
 
 	l10nPath := "/{l10n}" + finalPath
-	th.registerPath(l10nPath, ko.PathInfo{
+	hh.registerPath(l10nPath, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: l10nPath,
 			Paths: map[string]ko.PathItem{
@@ -525,7 +525,7 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 		mux.HandleFunc("GET "+patternPath, handler)
 		mux.HandleFunc("GET "+l10nPatternPath, handler)
 
-		th.registerPath(patternPath, ko.PathInfo{
+		hh.registerPath(patternPath, ko.PathInfo{
 			API: ko.OpenAPI{
 				BasePath: patternPath,
 				Paths: map[string]ko.PathItem{
@@ -542,7 +542,7 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 			Type: ko.PagePathType,
 		}, registeredPaths)
 
-		th.registerPath(l10nPatternPath, ko.PathInfo{
+		hh.registerPath(l10nPatternPath, ko.PathInfo{
 			API: ko.OpenAPI{
 				BasePath: l10nPatternPath,
 				Paths: map[string]ko.PathItem{
@@ -561,7 +561,7 @@ func (th *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 	}
 }
 
-func (th *HostHandler) availableLanguages(translations *Translations) []string {
+func (hh *HostHandler) availableLanguages(translations *Translations) []string {
 	availableLangs := []string{}
 
 	for _, tag := range translations.Languages() {
@@ -571,9 +571,9 @@ func (th *HostHandler) availableLanguages(translations *Translations) []string {
 	return availableLangs
 }
 
-func (th *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+func (hh *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/favicon.ico"
-	mux.HandleFunc("GET "+path, th.favicon.FaviconHandler)
+	mux.HandleFunc("GET "+path, hh.favicon.FaviconHandler)
 	registeredPaths[path] = ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
@@ -602,13 +602,13 @@ func (th *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 	}
 }
 
-func (th *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if th.authConfig == nil || th.authConfig.KeyPairs == nil {
+func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if hh.authConfig == nil || hh.authConfig.KeyPairs == nil {
 		return
 	}
 
 	const path = "/.well-known/jwks.json"
-	mux.HandleFunc("GET "+path, auth.JWKSHandler(th.authConfig.KeyPairs))
+	mux.HandleFunc("GET "+path, auth.JWKSHandler(hh.authConfig.KeyPairs))
 	registeredPaths[path] = ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
@@ -637,8 +637,8 @@ func (th *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 	}
 }
 
-func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if th.authConfig == nil || th.authExchanger == nil {
+func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if hh.authConfig == nil || hh.authExchanger == nil {
 		return
 	}
 
@@ -653,23 +653,23 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 			}
 
 			// If OIDC is configured, force login through it
-			if authCodeURL := th.authExchanger.AuthCodeURL(returnURL); authCodeURL != "" {
+			if authCodeURL := hh.authExchanger.AuthCodeURL(returnURL); authCodeURL != "" {
 				http.Redirect(w, r, authCodeURL, http.StatusSeeOther)
 				return
 			}
 
 			// Fallback: Local Login Page
-			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			rendered := th.renderUtilityPage(
+			rendered := hh.renderUtilityPage(
 				kdexv1alpha1.LoginUtilityPageType,
 				l,
 				map[string]any{},
-				&th.Translations,
+				&hh.Translations,
 			)
 
 			if rendered == "" {
@@ -677,7 +677,7 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 				return
 			}
 
-			th.log.V(1).Info("serving login page", "language", l.String())
+			hh.log.V(1).Info("serving login page", "language", l.String())
 
 			w.Header().Set("Content-Language", l.String())
 			w.Header().Set("Content-Type", "text/html")
@@ -704,7 +704,7 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 				returnURL = "/"
 			}
 
-			th.log.V(1).Info("processing local login", "user", username)
+			hh.log.V(1).Info("processing local login", "user", username)
 
 			scheme := r.URL.Scheme
 			if scheme == "" {
@@ -712,18 +712,18 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 			}
 			issuer := fmt.Sprintf("%s://%s", scheme, r.Host)
 
-			token, err := th.authExchanger.LoginLocal(r.Context(), issuer, username, password)
+			token, err := hh.authExchanger.LoginLocal(r.Context(), issuer, username, password)
 			if err != nil {
 				// FAILED: 401 Unauthorized / render login page again with error message?
 				// For now simple redirect back to login
-				th.log.Error(err, "local login failed")
+				hh.log.Error(err, "local login failed")
 				http.Redirect(w, r, "/~/login?error=invalid_credentials&return="+url.QueryEscape(returnURL), http.StatusSeeOther)
 				return
 			}
 
 			// SUCCESS: Set cookie and redirect
 			http.SetCookie(w, &http.Cookie{
-				Name:     th.authConfig.CookieName,
+				Name:     hh.authConfig.CookieName,
 				Value:    token,
 				Path:     "/",
 				HttpOnly: true,
@@ -737,7 +737,7 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 
 	// TODO: add /~/logout handler
 
-	th.registerPath(path, ko.PathInfo{
+	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
@@ -798,52 +798,52 @@ func (th *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 	}, registeredPaths)
 }
 
-func (th *HostHandler) messagePrinter(translations *Translations, tag language.Tag) *message.Printer {
+func (hh *HostHandler) messagePrinter(translations *Translations, tag language.Tag) *message.Printer {
 	return message.NewPrinter(
 		tag,
 		message.Catalog(translations.Catalog()),
 	)
 }
 
-func (th *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathInfo) *http.ServeMux {
+func (hh *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathInfo) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	th.faviconHandler(mux, registeredPaths)
-	th.navigationHandler(mux, registeredPaths)
-	th.translationHandler(mux, registeredPaths)
-	th.loginHandler(mux, registeredPaths)
-	th.jwksHandler(mux, registeredPaths)
-	th.oauthHandler(mux, registeredPaths)
-	th.snifferHandler(mux, registeredPaths)
-	th.openapiHandler(mux, registeredPaths)
-	th.schemaHandler(mux, registeredPaths)
+	hh.faviconHandler(mux, registeredPaths)
+	hh.navigationHandler(mux, registeredPaths)
+	hh.translationHandler(mux, registeredPaths)
+	hh.loginHandler(mux, registeredPaths)
+	hh.jwksHandler(mux, registeredPaths)
+	hh.oauthHandler(mux, registeredPaths)
+	hh.snifferHandler(mux, registeredPaths)
+	hh.openapiHandler(mux, registeredPaths)
+	hh.schemaHandler(mux, registeredPaths)
 
 	// TODO: implement a state handler
 	// TODO: implement a check handler
 
-	th.unimplementedHandler("GET /~/check/", mux, registeredPaths)
-	th.unimplementedHandler("GET /~/state/", mux, registeredPaths)
+	hh.unimplementedHandler("GET /~/check/", mux, registeredPaths)
+	hh.unimplementedHandler("GET /~/state/", mux, registeredPaths)
 
 	return mux
 }
 
-func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/~/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}"
 	mux.HandleFunc(
 		"GET "+path,
 		func(w http.ResponseWriter, r *http.Request) {
-			th.mu.RLock()
-			defer th.mu.RUnlock()
+			hh.mu.RLock()
+			defer hh.mu.RUnlock()
 
 			basePath := "/" + r.PathValue("basePathMinusLeadingSlash")
 			l10n := r.PathValue("l10n")
 			navKey := r.PathValue("navKey")
 
-			th.log.V(2).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
+			hh.log.V(2).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
 
 			var pageHandler *page.PageHandler
 
-			for _, ph := range th.Pages.List() {
+			for _, ph := range hh.Pages.List() {
 				if ph.BasePath() == basePath {
 					pageHandler = &ph
 					break
@@ -869,25 +869,27 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 				return
 			}
 
-			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
+			// Filter navigation by page access checks
+
 			rootEntry := &render.PageEntry{}
-			th.Pages.BuildMenuEntries(rootEntry, &l, l.String() == th.defaultLanguage, nil)
+			hh.BuildMenuEntries(r.Context(), rootEntry, &l, l.String() == hh.defaultLanguage, nil)
 			pageMap := *rootEntry.Children
 
 			renderer := render.Renderer{
 				BasePath:        pageHandler.Page.BasePath,
-				BrandName:       th.host.BrandName,
-				DefaultLanguage: th.defaultLanguage,
+				BrandName:       hh.host.BrandName,
+				DefaultLanguage: hh.defaultLanguage,
 				Language:        l.String(),
-				Languages:       th.availableLanguages(&th.Translations),
+				Languages:       hh.availableLanguages(&hh.Translations),
 				LastModified:    time.Now(),
-				MessagePrinter:  th.messagePrinter(&th.Translations, l),
-				Organization:    th.host.Organization,
+				MessagePrinter:  hh.messagePrinter(&hh.Translations, l),
+				Organization:    hh.host.Organization,
 				PageMap:         pageMap,
 				PatternPath:     pageHandler.PatternPath(),
 				Title:           pageHandler.Label(),
@@ -913,7 +915,7 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 		},
 	)
 
-	th.registerPath(path, ko.PathInfo{
+	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
@@ -951,8 +953,8 @@ func (th *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 	}, registeredPaths)
 }
 
-func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if th.authConfig == nil || th.authConfig.OIDCProviderURL == "" || th.authExchanger == nil {
+func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if hh.authConfig == nil || hh.authConfig.OIDCProviderURL == "" || hh.authExchanger == nil {
 		return
 	}
 
@@ -967,9 +969,9 @@ func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 		}
 
 		// Exchange code for ID Token
-		rawIDToken, err := th.authExchanger.ExchangeCode(r.Context(), code)
+		rawIDToken, err := hh.authExchanger.ExchangeCode(r.Context(), code)
 		if err != nil {
-			th.log.Error(err, "failed to exchange oauth code")
+			hh.log.Error(err, "failed to exchange oauth code")
 			http.Error(w, "Failed to exchange token", http.StatusUnauthorized)
 			return
 		}
@@ -981,16 +983,16 @@ func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 		issuer := fmt.Sprintf("%s://%s", scheme, r.Host)
 
 		// Exchange ID Token for Local Token
-		localToken, err := th.authExchanger.ExchangeToken(r.Context(), issuer, rawIDToken)
+		localToken, err := hh.authExchanger.ExchangeToken(r.Context(), issuer, rawIDToken)
 		if err != nil {
-			th.log.Error(err, "failed to exchange for local token")
+			hh.log.Error(err, "failed to exchange for local token")
 			http.Error(w, "Failed to exchange for local token", http.StatusUnauthorized)
 			return
 		}
 
 		// Set Cookie
 		http.SetCookie(w, &http.Cookie{
-			Name:     th.authConfig.CookieName,
+			Name:     hh.authConfig.CookieName,
 			Value:    localToken,
 			Path:     "/",
 			HttpOnly: true,
@@ -1007,7 +1009,7 @@ func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 		http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 	})
 
-	th.registerPath(path, ko.PathInfo{
+	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
@@ -1032,11 +1034,11 @@ func (th *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 	}, registeredPaths)
 }
 
-func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/~/openapi"
 
 	// Register the path itself so it appears in the spec
-	th.registerPath(path, ko.PathInfo{
+	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
@@ -1070,10 +1072,10 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 	}, registeredPaths)
 
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
-		th.mu.RLock()
-		defer th.mu.RUnlock()
+		hh.mu.RLock()
+		defer hh.mu.RUnlock()
 
-		spec := th.openapiBuilder.BuildOpenAPI(ko.Host(r), th.Name, th.registeredPaths, filterFromQuery(r.URL.Query()))
+		spec := hh.openapiBuilder.BuildOpenAPI(ko.Host(r), hh.Name, hh.registeredPaths, filterFromQuery(r.URL.Query()))
 
 		jsonBytes, err := json.Marshal(spec)
 		if err != nil {
@@ -1089,37 +1091,29 @@ func (th *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 	})
 }
 
-func (th *HostHandler) pageHandlerFunc(
+func (hh *HostHandler) pageHandlerFunc(
 	basePath string,
 	name string,
 	l10nRenders map[string]string,
 	pageHandler page.PageHandler,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if th.authConfig != nil {
+		if hh.authConfig != nil {
 			// Check authorization before processing the request
 
-			th.mu.RLock()
-			var requirements []kdexv1alpha1.SecurityRequirement
-			if th.host.Security != nil {
-				requirements = *th.host.Security
-			}
-			if pageHandler.Page.Security != nil {
-				requirements = *pageHandler.Page.Security
-			}
-			th.mu.RUnlock()
-
 			// Perform authorization check
-			authorized, err := th.authChecker.CheckAccess(r.Context(), "pages", basePath, requirements)
+			authorized, err := hh.authChecker.CheckAccess(
+				r.Context(), "pages", basePath, hh.pageRequirements(&pageHandler))
+
 			if err != nil {
-				th.log.Error(err, "authorization check failed", "page", name, "basePath", basePath)
+				hh.log.Error(err, "authorization check failed", "page", name, "basePath", basePath)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				return
 			}
 
 			// User is not authorized
 			if !authorized {
-				th.log.V(1).Info("unauthorized access attempt", "page", name, "basePath", basePath)
+				hh.log.V(1).Info("unauthorized access attempt", "page", name, "basePath", basePath)
 
 				// But is logged in, error page
 				if _, isLoggedIn := auth.GetClaims(r.Context()); isLoggedIn {
@@ -1139,7 +1133,7 @@ func (th *HostHandler) pageHandlerFunc(
 			}
 		}
 
-		l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+		l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -1152,7 +1146,7 @@ func (th *HostHandler) pageHandlerFunc(
 			return
 		}
 
-		th.log.V(1).Info("serving", "page", name, "basePath", basePath, "language", l.String())
+		hh.log.V(1).Info("serving", "page", name, "basePath", basePath, "language", l.String())
 
 		w.Header().Set("Content-Language", l.String())
 		w.Header().Set("Content-Type", "text/html")
@@ -1164,7 +1158,20 @@ func (th *HostHandler) pageHandlerFunc(
 	}
 }
 
-func (th *HostHandler) registerPath(path string, info ko.PathInfo, m map[string]ko.PathInfo) {
+func (hh *HostHandler) pageRequirements(ph *page.PageHandler) []kdexv1alpha1.SecurityRequirement {
+	hh.mu.RLock()
+	defer hh.mu.RUnlock()
+	var requirements []kdexv1alpha1.SecurityRequirement
+	if hh.host.Security != nil {
+		requirements = *hh.host.Security
+	}
+	if ph.Page.Security != nil {
+		requirements = *ph.Page.Security
+	}
+	return requirements
+}
+
+func (hh *HostHandler) registerPath(path string, info ko.PathInfo, m map[string]ko.PathInfo) {
 	current, ok := m[path]
 	if !ok {
 		if info.API.BasePath == "" {
@@ -1183,22 +1190,22 @@ func (th *HostHandler) registerPath(path string, info ko.PathInfo, m map[string]
 	m[path] = current
 }
 
-func (th *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any, translations *Translations) string {
-	ph, ok := th.utilityPages[utilityType]
+func (hh *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPageType, l language.Tag, extraTemplateData map[string]any, translations *Translations) string {
+	ph, ok := hh.utilityPages[utilityType]
 	if !ok {
 		return ""
 	}
 
-	rendered, err := th.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
+	rendered, err := hh.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
 	if err != nil {
-		th.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
+		hh.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
 		return ""
 	}
 
 	return rendered
 }
 
-func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/~/schema/{path...}"
 
 	type schemaEntry struct {
@@ -1208,7 +1215,7 @@ func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 	}
 
 	// Register the path itself so it appears in the spec
-	th.registerPath(path, ko.PathInfo{
+	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
@@ -1244,12 +1251,12 @@ func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
 		requested := r.PathValue("path")
 
-		th.mu.RLock()
-		defer th.mu.RUnlock()
+		hh.mu.RLock()
+		defer hh.mu.RUnlock()
 
 		orderedSchemaArray := []schemaEntry{}
 
-		for path, info := range th.registeredPaths {
+		for path, info := range hh.registeredPaths {
 			for name, schema := range info.API.Schemas {
 				orderedSchemaArray = append(orderedSchemaArray, schemaEntry{
 					name:   name,
@@ -1308,30 +1315,30 @@ func (th *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 		w.Header().Set("Content-Type", "application/json")
 		_, err = w.Write(jsonBytes)
 		if err != nil {
-			th.log.Error(err, "failed to write schema response")
+			hh.log.Error(err, "failed to write schema response")
 		}
 	})
 }
 
-func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {
-	th.mu.RLock()
-	l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+func (hh *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {
+	hh.mu.RLock()
+	l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
 	if err != nil {
-		l = language.Make(th.defaultLanguage)
+		l = language.Make(hh.defaultLanguage)
 	}
 
 	// collect stacktrace
 	stacktrace := string(debug.Stack())
 
-	th.log.V(2).Info("generating error page", "requestURI", r.URL.Path, "code", code, "msg", msg, "language", l, "stacktrace", stacktrace)
+	hh.log.V(2).Info("generating error page", "requestURI", r.URL.Path, "code", code, "msg", msg, "language", l, "stacktrace", stacktrace)
 
-	rendered := th.renderUtilityPage(
+	rendered := hh.renderUtilityPage(
 		kdexv1alpha1.ErrorUtilityPageType,
 		l,
 		map[string]any{"ErrorCode": code, "ErrorCodeString": http.StatusText(code), "ErrorMessage": msg},
-		&th.Translations,
+		&hh.Translations,
 	)
-	th.mu.RUnlock()
+	hh.mu.RUnlock()
 
 	if rendered == "" {
 		// Fallback to standard http error if no custom error page
@@ -1345,13 +1352,13 @@ func (th *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 	_, _ = w.Write([]byte(rendered))
 }
 
-func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if th.sniffer != nil {
+func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if hh.sniffer != nil {
 		// Register Inspect Handler
-		mux.HandleFunc("/~/sniffer/inspect/{uuid}", th.InspectHandler)
+		mux.HandleFunc("/~/sniffer/inspect/{uuid}", hh.InspectHandler)
 
 		const path = "/~/sniffer/docs"
-		mux.HandleFunc("GET "+path, th.sniffer.DocsHandler)
+		mux.HandleFunc("GET "+path, hh.sniffer.DocsHandler)
 		registeredPaths[path] = ko.PathInfo{
 			API: ko.OpenAPI{
 				BasePath: path,
@@ -1382,22 +1389,22 @@ func (th *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 	}
 }
 
-func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+func (hh *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/~/translation/{l10n}"
 	mux.HandleFunc(
 		"GET "+path,
 		func(w http.ResponseWriter, r *http.Request) {
-			th.mu.RLock()
-			defer th.mu.RUnlock()
+			hh.mu.RLock()
+			defer hh.mu.RUnlock()
 
-			l, err := kdexhttp.GetLang(r, th.defaultLanguage, th.Translations.Languages())
+			l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
 			// Get all the keys and values for the given language
-			keys := th.Translations.Keys()
+			keys := hh.Translations.Keys()
 			// check query parameters for array of keys
 			queryParams := r.URL.Query()
 			keyParams := queryParams["key"]
@@ -1406,7 +1413,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 			}
 
 			keysAndValues := map[string]string{}
-			printer := th.messagePrinter(&th.Translations, l)
+			printer := hh.messagePrinter(&hh.Translations, l)
 			for _, key := range keys {
 				keysAndValues[key] = printer.Sprintf(key)
 				// replace each occurrence of the string `%!s(MISSING)` with a placeholder `{{n}}` where `n` is the alphabetic index of the placeholder
@@ -1459,7 +1466,7 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 		),
 	}
 
-	th.registerPath(path, ko.PathInfo{
+	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
@@ -1474,11 +1481,11 @@ func (th *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 	}, registeredPaths)
 }
 
-func (th *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+func (hh *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	mux.HandleFunc(
 		pattern,
 		func(w http.ResponseWriter, r *http.Request) {
-			th.log.V(1).Info("unimplemented handler", "path", r.URL.Path)
+			hh.log.V(1).Info("unimplemented handler", "path", r.URL.Path)
 			err := fmt.Errorf(`{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
 			http.Error(w, err.Error(), http.StatusNotImplemented)
 		},
@@ -1511,7 +1518,7 @@ func (th *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, 
 		Type: ko.InternalPathType,
 	}
 
-	th.registerPath(path, info, registeredPaths)
+	hh.registerPath(path, info, registeredPaths)
 }
 
 func filterFromQuery(queryParams url.Values) ko.Filter {

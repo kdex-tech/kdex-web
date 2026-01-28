@@ -4,9 +4,6 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	"golang.org/x/text/language"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"kdex.dev/crds/render"
 )
 
 type PageStore struct {
@@ -71,53 +68,5 @@ func (s *PageStore) Set(handler PageHandler) {
 	s.mu.Unlock()
 	if s.onUpdate != nil {
 		s.onUpdate()
-	}
-}
-
-func (s *PageStore) BuildMenuEntries(
-	entry *render.PageEntry,
-	l *language.Tag,
-	isDefaultLanguage bool,
-	parent *PageHandler,
-) {
-	for _, handler := range s.List() {
-		page := handler.Page
-
-		if (parent == nil && page.ParentPageRef == nil) ||
-			(parent != nil && page.ParentPageRef != nil &&
-				parent.Name == page.ParentPageRef.Name) {
-
-			if parent != nil && parent.Name == handler.Name {
-				continue
-			}
-
-			if entry.Children == nil {
-				entry.Children = &map[string]any{}
-			}
-
-			label := page.Label
-
-			href := page.BasePath
-			if !isDefaultLanguage {
-				href = "/" + l.String() + page.BasePath
-			}
-
-			pageEntry := render.PageEntry{
-				BasePath: page.BasePath,
-				Href:     href,
-				Label:    label,
-				Name:     handler.Name,
-				Weight:   resource.MustParse("0"),
-			}
-
-			if page.NavigationHints != nil {
-				pageEntry.Icon = page.NavigationHints.Icon
-				pageEntry.Weight = page.NavigationHints.Weight
-			}
-
-			s.BuildMenuEntries(&pageEntry, l, isDefaultLanguage, &handler)
-
-			(*entry.Children)[label] = pageEntry
-		}
 	}
 }
