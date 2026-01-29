@@ -9,14 +9,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func LoadClientSecret(
+func LoadValueFromSecret(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
 	secretRef *kdexv1alpha1.LocalSecretWithKeyReference,
 ) (string, error) {
 	if secretRef == nil || secretRef.SecretRef.Name == "" {
-		return "", fmt.Errorf("there is no Secret containing the OIDC client_secret configured in spec.auth.oidcProvider.clientSecretRef")
+		return "", nil
 	}
 
 	var secret corev1.Secret

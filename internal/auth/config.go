@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"net/http"
 	"time"
@@ -13,6 +14,7 @@ import (
 type Config struct {
 	ActivePair      *KeyPair
 	AnonymousGrants []string
+	BlockKey        string
 	ClientID        string
 	ClientSecret    string
 	CookieName      string
@@ -73,11 +75,21 @@ func NewConfig(ctx context.Context, c client.Client, auth *kdexv1alpha1.Auth, na
 				return nil, fmt.Errorf("there is no client id configured in spec.auth.oidcProvider.clientID")
 			}
 
-			clientSecret, err := LoadClientSecret(ctx, c, namespace, &auth.OIDCProvider.ClientSecretRef)
+			clientSecret, err := LoadValueFromSecret(ctx, c, namespace, &auth.OIDCProvider.ClientSecretRef)
 			if err != nil {
 				return nil, err
 			}
 
+			if clientSecret == "" {
+				return nil, fmt.Errorf("there is no Secret containing the OIDC client_secret configured")
+			}
+
+			blockKey, err := LoadValueFromSecret(ctx, c, namespace, auth.OIDCProvider.BlockKeySecretRef)
+			if err != nil {
+				return nil, err
+			}
+
+			cfg.BlockKey = getOrGenerate(blockKey)
 			cfg.ClientID = auth.OIDCProvider.ClientID
 			cfg.ClientSecret = clientSecret
 			cfg.OIDCProviderURL = auth.OIDCProvider.OIDCProviderURL
@@ -94,4 +106,11 @@ func (c *Config) AddAuthentication(mux http.Handler) http.Handler {
 		return mux
 	}
 	return WithAuthentication(c.ActivePair.Private.Public(), c.CookieName)(mux)
+}
+
+func getOrGenerate(blockKey string) string {
+	if blockKey == "" {
+		return rand.Text()
+	}
+	return blockKey
 }

@@ -12,12 +12,9 @@ import (
 	"strings"
 )
 
-// We assume you have a 32-byte secret key defined
-var blockKey = []byte("a-very-secret-32-byte-key-here!!")
-
 func (hh *HostHandler) encryptAndSplit(w http.ResponseWriter, r *http.Request, name string, token string, options *http.Cookie) error {
 	// 1. Encrypt the whole string first
-	block, err := aes.NewCipher(blockKey)
+	block, err := aes.NewCipher([]byte(hh.authConfig.BlockKey))
 	if err != nil {
 		return fmt.Errorf("failed to create cipher: %w", err)
 	}
@@ -55,7 +52,7 @@ func (hh *HostHandler) getAndDecryptToken(r *http.Request, name string) (string,
 	}
 
 	// 3. Decrypt
-	block, err := aes.NewCipher(blockKey)
+	block, err := aes.NewCipher([]byte(hh.authConfig.BlockKey))
 	if err != nil {
 		return "", fmt.Errorf("failed to create cipher: %w", err)
 	}
