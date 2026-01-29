@@ -341,13 +341,9 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 ) {
 	if job.CreationTimestamp.IsZero() {
 		job.Annotations = make(map[string]string)
-		for key, value := range internalPackageReferences.Annotations {
-			job.Annotations[key] = value
-		}
+		maps.Copy(job.Annotations, internalPackageReferences.Annotations)
 		job.Labels = make(map[string]string)
-		for key, value := range internalPackageReferences.Labels {
-			job.Labels[key] = value
-		}
+		maps.Copy(job.Labels, internalPackageReferences.Labels)
 
 		job.Annotations["kdex.dev/packages"] = internalPackageReferences.Name
 
@@ -520,13 +516,9 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJobConfigMap(
 		func() error {
 			if configmap.CreationTimestamp.IsZero() {
 				configmap.Annotations = make(map[string]string)
-				for key, value := range internalPackageReferences.Annotations {
-					configmap.Annotations[key] = value
-				}
+				maps.Copy(configmap.Annotations, internalPackageReferences.Annotations)
 				configmap.Labels = make(map[string]string)
-				for key, value := range internalPackageReferences.Labels {
-					configmap.Labels[key] = value
-				}
+				maps.Copy(configmap.Labels, internalPackageReferences.Labels)
 
 				configmap.Labels["kdex.dev/packages"] = internalPackageReferences.Name
 			}
@@ -653,13 +645,9 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJobSecret(
 		func() error {
 			if secret.CreationTimestamp.IsZero() {
 				secret.Annotations = make(map[string]string)
-				for key, value := range internalPackageReferences.Annotations {
-					secret.Annotations[key] = value
-				}
+				maps.Copy(secret.Annotations, internalPackageReferences.Annotations)
 				secret.Labels = make(map[string]string)
-				for key, value := range internalPackageReferences.Labels {
-					secret.Labels[key] = value
-				}
+				maps.Copy(secret.Labels, internalPackageReferences.Labels)
 
 				secret.Labels["kdex.dev/packages"] = internalPackageReferences.Name
 
