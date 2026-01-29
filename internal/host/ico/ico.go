@@ -2,12 +2,14 @@ package ico
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"sync"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
 	"kdex.dev/crds/render"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -23,7 +25,7 @@ const svgTemplateDefault = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
           font-weight="bold"
           fill="white" 
           text-anchor="middle" 
-          dominant-baseline="central">{{ slice .BrandName 0 1 }}</text>
+          dominant-baseline="central">{{ .BrandName | trunc 1 }}</text>
 </svg>`
 
 type Ico struct {
@@ -38,7 +40,7 @@ func NewICO(svgTemplate string, data render.TemplateData) *Ico {
 
 	return &Ico{
 		data:     data,
-		template: template.Must(template.New("favicon").Parse(svgTemplate)),
+		template: template.Must(template.New("favicon").Funcs(sprig.FuncMap()).Parse(svgTemplate)),
 	}
 }
 
@@ -51,8 +53,10 @@ func (i *Ico) FaviconHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Generate SVG
 	var buf bytes.Buffer
-	if err := i.template.Funcs(sprig.TxtFuncMap()).Execute(&buf, i.data); err != nil {
-		http.Error(w, "Template error", 500)
+	if err := i.template.Execute(&buf, i.data); err != nil {
+		log := logf.FromContext(r.Context())
+		log.Error(err, "error rendering favicon template")
+		http.Error(w, fmt.Sprintf("Favicon template error: %s", err.Error()), 500)
 		return
 	}
 	svgContent := buf.Bytes()
