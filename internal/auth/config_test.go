@@ -580,8 +580,8 @@ func TestConfig_AddAuthentication(t *testing.T) {
 				r := httptest.NewRequest("GET", "/foo", http.NoBody)
 				r.Header.Set("Cookie", "auth_token=foo")
 				handler.ServeHTTP(w, r)
-				assert.Equal(t, 401, w.Code)
-				assert.Contains(t, w.Body.String(), "Invalid token")
+				assert.Equal(t, 303, w.Code)
+				assert.Contains(t, w.Body.String(), "See Other")
 			},
 		},
 		{
@@ -656,7 +656,8 @@ func TestConfig_AddAuthentication(t *testing.T) {
 
 				r.Header.Set("Cookie", "auth_token="+token)
 				handler.ServeHTTP(w, r)
-				assert.Equal(t, 401, w.Code)
+				assert.Equal(t, 303, w.Code)
+				assert.Contains(t, w.Body.String(), "See Other")
 			},
 		},
 	}
