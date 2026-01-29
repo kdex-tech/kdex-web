@@ -372,7 +372,7 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 			},
 		}
 
-		npmInstallVolumeMounts := []corev1.VolumeMount{
+		volumeMounts := []corev1.VolumeMount{
 			{
 				Name:      "workspace",
 				MountPath: "/workspace",
@@ -393,7 +393,7 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 					},
 				},
 			})
-			npmInstallVolumeMounts = append(npmInstallVolumeMounts, corev1.VolumeMount{
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
 				Name:      "npmrc",
 				MountPath: "/workspace/.npmrc",
 				SubPath:   ".npmrc",
@@ -416,20 +416,9 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "kaniko",
-							Image: "gcr.io/kaniko-project/executor:latest",
-							VolumeMounts: []corev1.VolumeMount{
-								{
-									Name:      "build-scripts",
-									MountPath: "/scripts",
-									ReadOnly:  true,
-								},
-								{
-									Name:      "workspace",
-									MountPath: "/workspace",
-									ReadOnly:  true,
-								},
-							},
+							Name:         "kaniko",
+							Image:        "gcr.io/kaniko-project/executor:latest",
+							VolumeMounts: volumeMounts,
 						},
 					},
 					InitContainers: []corev1.Container{
@@ -454,7 +443,7 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 							npx esbuild node_modules/**/*.js --allow-overwrite --outdir=node_modules --define:process.env.NODE_ENV=\"production\"
 							`,
 							},
-							VolumeMounts: npmInstallVolumeMounts,
+							VolumeMounts: volumeMounts,
 						},
 						{
 							Name:  "importmap-generator",
@@ -466,11 +455,14 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 							set -e
 							
 							cp /scripts/generate.js /workspace/generate.js
+							
+							cd /workspace
 							node generate.js
+
 							cat importmap.json > /dev/termination-log
 							`,
 							},
-							VolumeMounts: npmInstallVolumeMounts,
+							VolumeMounts: volumeMounts,
 						},
 					},
 					RestartPolicy: "Never",
