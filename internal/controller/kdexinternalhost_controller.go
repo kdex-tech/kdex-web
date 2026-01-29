@@ -410,6 +410,128 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		importMap = internalPackageReferences.Status.Attributes["importmap"]
 	}
 
+	if internalPackageReferences != nil {
+		// Synthetic Backend for the packages
+		packagesBackend := resolvedBackend{
+			Backend: kdexv1alpha1.Backend{
+				IngressPath:           r.Configuration.BackendDefault.ModulePath,
+				StaticImage:           internalPackageReferences.Status.Attributes["image"],
+				StaticImagePullPolicy: corev1.PullIfNotPresent,
+			},
+			Name: "packages",
+			Kind: "KDexInternalPackageReferences",
+		}
+
+		requiredBackends = append(requiredBackends, packagesBackend)
+	}
+
+	backendOps := map[string]controllerutil.OperationResult{}
+	deployments := make([]*appsv1.Deployment, len(requiredBackends))
+
+	for i, backend := range requiredBackends {
+		keyBase := fmt.Sprintf("%s/%s", strings.ToLower(backend.Kind), backend.Name)
+		name := fmt.Sprintf("%s-%s", internalHost.Name, backend.Name)
+
+		backendOps[keyBase+"/deployment"], deployments[i], err = r.createOrUpdateBackendDeployment(ctx, &internalHost, name, backend)
+		if err != nil {
+			kdexv1alpha1.SetConditions(
+				&internalHost.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				err.Error(),
+			)
+			return ctrl.Result{}, err
+		}
+		backendOps[keyBase+"/service"], err = r.createOrUpdateBackendService(ctx, &internalHost, name, backend)
+		if err != nil {
+			kdexv1alpha1.SetConditions(
+				&internalHost.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				err.Error(),
+			)
+			return ctrl.Result{}, err
+		}
+	}
+
+	if err := r.cleanupObsoleteBackends(ctx, &internalHost, requiredBackends); err != nil {
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, err
+	}
+
+	var ingressOrHTTPRouteOp controllerutil.OperationResult
+	if internalHost.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
+		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, &internalHost, requiredBackends)
+		if err != nil {
+			kdexv1alpha1.SetConditions(
+				&internalHost.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				err.Error(),
+			)
+			return ctrl.Result{}, err
+		}
+	} else {
+		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, &internalHost, requiredBackends)
+		if err != nil {
+			kdexv1alpha1.SetConditions(
+				&internalHost.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				err.Error(),
+			)
+			return ctrl.Result{}, err
+		}
+	}
+
+	for _, dep := range deployments {
+		for _, cond := range dep.Status.Conditions {
+			if cond.Type == appsv1.DeploymentAvailable && cond.Status != corev1.ConditionTrue {
+				kdexv1alpha1.SetConditions(
+					&internalHost.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionFalse,
+						Progressing: metav1.ConditionTrue,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconciling,
+					fmt.Sprintf("Waiting for deployment/%s to be ready.", dep.Name),
+				)
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			}
+			internalHost.Status.Attributes[dep.Name+".deployment"] = "ready"
+		}
+	}
+
+	// if val, ok := internalHost.Status.Attributes["ingress"]; !ok || val == "" {
+	// 	kdexv1alpha1.SetConditions(
+	// 		&internalHost.Status.Conditions,
+	// 		kdexv1alpha1.ConditionStatuses{
+	// 			Degraded:    metav1.ConditionFalse,
+	// 			Progressing: metav1.ConditionTrue,
+	// 			Ready:       metav1.ConditionFalse,
+	// 		},
+	// 		kdexv1alpha1.ConditionReasonReconciling,
+	// 		"Waiting for ingress to be ready.",
+	// 	)
+	// 	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+	// }
+
 	authConfig, err := auth.NewConfig(ctx, r.Client, internalHost.Spec.Auth, internalHost.Namespace, internalHost.Spec.DevMode)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
@@ -427,6 +549,16 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	rp, err := auth.NewRoleProvider(ctx, r.Client, internalHost.Name, internalHost.Namespace)
 	if err != nil {
+		kdexv1alpha1.SetConditions(
+			&internalHost.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			err.Error(),
+		)
 		return ctrl.Result{}, err
 	}
 
@@ -458,7 +590,24 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		authConfig,
 	)
 
-	return ctrl.Result{}, r.innerReconcile(ctx, &internalHost, internalPackageReferences, requiredBackends)
+	kdexv1alpha1.SetConditions(
+		&internalHost.Status.Conditions,
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionFalse,
+			Ready:       metav1.ConditionTrue,
+		},
+		kdexv1alpha1.ConditionReasonReconcileSuccess,
+		"Reconciliation successful",
+	)
+
+	log.V(1).Info(
+		"reconciled",
+		"backendOps", backendOps,
+		"ingressOrHTTPRouteOp", ingressOrHTTPRouteOp,
+	)
+
+	return ctrl.Result{}, nil
 }
 
 type resolvedBackend struct {
@@ -777,84 +926,6 @@ func (r *KDexInternalHostReconciler) getMemoizedService() *corev1.ServiceSpec {
 	return r.memoizedService
 }
 
-func (r *KDexInternalHostReconciler) innerReconcile(
-	ctx context.Context,
-	internalHost *kdexv1alpha1.KDexInternalHost,
-	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
-	backends []resolvedBackend,
-) error {
-	if internalPackageReferences != nil {
-		// Synthetic Backend for the packages
-
-		packagesBackend := resolvedBackend{
-			Backend: kdexv1alpha1.Backend{
-				IngressPath:           r.Configuration.BackendDefault.ModulePath,
-				StaticImage:           internalPackageReferences.Status.Attributes["image"],
-				StaticImagePullPolicy: corev1.PullIfNotPresent,
-			},
-			Name: "packages",
-			Kind: "KDexInternalPackageReferences",
-		}
-
-		backends = append(backends, packagesBackend)
-	}
-
-	backendOps := map[string]controllerutil.OperationResult{}
-	var err error
-
-	for _, backend := range backends {
-		keyBase := fmt.Sprintf("%s/%s", strings.ToLower(backend.Kind), backend.Name)
-		name := fmt.Sprintf("%s-%s", internalHost.Name, backend.Name)
-
-		backendOps[keyBase+"/deployment"], err = r.createOrUpdateBackendDeployment(ctx, internalHost, name, backend)
-		if err != nil {
-			return err
-		}
-		backendOps[keyBase+"/service"], err = r.createOrUpdateBackendService(ctx, internalHost, name, backend)
-		if err != nil {
-			return err
-		}
-	}
-
-	if err := r.cleanupObsoleteBackends(ctx, internalHost, backends); err != nil {
-		return err
-	}
-
-	var ingressOrHTTPRouteOp controllerutil.OperationResult
-	if internalHost.Spec.Routing.Strategy == kdexv1alpha1.HTTPRouteRoutingStrategy {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateHTTPRoute(ctx, internalHost, backends)
-		if err != nil {
-			return err
-		}
-	} else {
-		ingressOrHTTPRouteOp, err = r.createOrUpdateIngress(ctx, internalHost, backends)
-		if err != nil {
-			return err
-		}
-	}
-
-	kdexv1alpha1.SetConditions(
-		&internalHost.Status.Conditions,
-		kdexv1alpha1.ConditionStatuses{
-			Degraded:    metav1.ConditionFalse,
-			Progressing: metav1.ConditionFalse,
-			Ready:       metav1.ConditionTrue,
-		},
-		kdexv1alpha1.ConditionReasonReconcileSuccess,
-		"Reconciliation successful",
-	)
-
-	log := logf.FromContext(ctx)
-
-	log.V(1).Info(
-		"reconciled",
-		"backendOps", backendOps,
-		"ingressOrHTTPRouteOp", ingressOrHTTPRouteOp,
-	)
-
-	return nil
-}
-
 func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 	ctx context.Context,
 	internalHost *kdexv1alpha1.KDexInternalHost,
@@ -1048,6 +1119,21 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 		return controllerutil.OperationResultNone, err
 	}
 
+	if len(ingress.Status.LoadBalancer.Ingress) > 0 {
+		var addresses strings.Builder
+		separator := ""
+		for _, ing := range ingress.Status.LoadBalancer.Ingress {
+			if ing.IP != "" {
+				addresses.WriteString(separator + ing.IP)
+				separator = ","
+			} else if ing.Hostname != "" {
+				addresses.WriteString(separator + ing.Hostname)
+				separator = ","
+			}
+		}
+		internalHost.Status.Attributes["ingress"] = addresses.String()
+	}
+
 	return op, nil
 }
 
@@ -1064,7 +1150,7 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 	internalHost *kdexv1alpha1.KDexInternalHost,
 	name string,
 	resolvedBackend resolvedBackend,
-) (controllerutil.OperationResult, error) {
+) (controllerutil.OperationResult, *appsv1.Deployment, error) {
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -1206,10 +1292,10 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 			err.Error(),
 		)
 
-		return controllerutil.OperationResultNone, err
+		return controllerutil.OperationResultNone, nil, err
 	}
 
-	return op, nil
+	return op, deployment, nil
 }
 
 func (r *KDexInternalHostReconciler) createOrUpdateBackendService(
@@ -1304,6 +1390,7 @@ func (r *KDexInternalHostReconciler) cleanupObsoleteBackends(
 			if err := r.Delete(ctx, &deployment); err != nil {
 				return err
 			}
+			delete(internalHost.Status.Attributes, deployment.Name+".deployment")
 		}
 	}
 

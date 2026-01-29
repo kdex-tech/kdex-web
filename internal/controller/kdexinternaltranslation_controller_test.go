@@ -100,6 +100,10 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 			)
 
 			assertResourceReady(
+				ctx, k8sClient, focalHost, namespace,
+				&kdexv1alpha1.KDexInternalHost{}, true)
+
+			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexInternalTranslation{}, true)
 
