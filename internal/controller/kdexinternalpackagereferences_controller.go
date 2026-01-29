@@ -18,9 +18,15 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"maps"
 	"net/url"
+	"slices"
+	"sort"
+	"strings"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -492,6 +498,7 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 	}
 
 	job.Spec.Template.Annotations["kdex.dev/generation"] = fmt.Sprintf("%d", internalPackageReferences.Generation)
+	job.Spec.Template.Annotations["kdex.dev/confighash"] = generateHashOf(configMap.Data)
 	job.Spec.Template.Spec.Containers[0].Args = kanikoArgs
 }
 
@@ -686,4 +693,17 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJobSecret(
 	log.V(1).Info("reconciled", "as", op)
 
 	return op, secret, nil
+}
+
+func generateHashOf(data map[string]string) string {
+	keys := slices.Collect(maps.Keys(data))
+	sort.Strings(keys)
+
+	h := sha256.New()
+	for _, k := range keys {
+		h.Write([]byte(k))
+		h.Write([]byte(data[k]))
+	}
+
+	return hex.EncodeToString(h.Sum(nil))
 }
