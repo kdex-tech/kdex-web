@@ -432,6 +432,29 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 					},
 					InitContainers: []corev1.Container{
 						{
+							Name:  "npm-build",
+							Image: "node:25-alpine",
+							Command: []string{
+								"sh",
+								"-c",
+								`
+							set -e
+
+							cp /scripts/package.json /workspace/package.json
+							
+							echo "======== package.json ========="
+							cat /workspace/package.json
+							echo "==============================="
+							
+							cd /workspace
+							npm install
+
+							npx esbuild node_modules/**/*.js --allow-overwrite --outdir=node_modules --define:process.env.NODE_ENV=\"production\"
+							`,
+							},
+							VolumeMounts: npmInstallVolumeMounts,
+						},
+						{
 							Name:  "importmap-generator",
 							Image: "node:25-alpine",
 							Command: []string{
@@ -439,12 +462,6 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 								"-c",
 								`
 							set -e
-							
-							cp /scripts/package.json /workspace/package.json
-							cd /workspace
-							npm install
-
-							npx esbuild node_modules/**/*.js --allow-overwrite --outdir=node_modules --define:process.env.NODE_ENV=\"production\"
 							
 							cp /scripts/generate.js /workspace/generate.js
 							node generate.js
@@ -549,26 +566,27 @@ try {
 }
 `, modulePath)
 
-			packageJSON := `{
+			var packageJSON strings.Builder
+			packageJSON.WriteString(`{
   "name": "importmap",
   "type": "module",
   "devDependencies": {
     "@jspm/generator": "^2.7.6",
     "esbuild": "^0.27.0"
   },
-  "dependencies": {`
+  "dependencies": {`)
 			for i, pkg := range internalPackageReferences.Spec.PackageReferences {
 				if i > 0 {
-					packageJSON += ","
+					packageJSON.WriteString(",")
 				}
-				packageJSON += fmt.Sprintf("\n    \"%s\": \"%s\"", pkg.Name, pkg.Version)
+				fmt.Fprintf(&packageJSON, "\n    \"%s\": \"%s\"", pkg.Name, pkg.Version)
 			}
-			packageJSON += "\n  }\n}"
+			packageJSON.WriteString("\n  }\n}")
 
 			configmap.Data = map[string]string{
 				"Dockerfile":   dockerfile,
 				"generate.js":  generateJS,
-				"package.json": packageJSON,
+				"package.json": packageJSON.String(),
 			}
 
 			return ctrl.SetControllerReference(internalPackageReferences, configmap, r.Scheme)
