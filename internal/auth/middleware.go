@@ -45,6 +45,7 @@ func WithAuthentication(publicKey crypto.PublicKey, cookieName string) func(http
 			authHeader := r.Header.Get("Authorization")
 			var tokenString string
 
+			var authSource string
 			if authHeader != "" {
 				// Expect "Bearer <token>"
 				parts := strings.Split(authHeader, " ")
@@ -53,6 +54,7 @@ func WithAuthentication(publicKey crypto.PublicKey, cookieName string) func(http
 					return
 				}
 				tokenString = parts[1]
+				authSource = "header"
 			} else {
 				// Check for cookie
 				cookie, err := r.Cookie(cookieName)
@@ -62,6 +64,7 @@ func WithAuthentication(publicKey crypto.PublicKey, cookieName string) func(http
 					return
 				}
 				tokenString = cookie.Value
+				authSource = "cookie"
 			}
 
 			claims := &Claims{}
@@ -70,13 +73,22 @@ func WithAuthentication(publicKey crypto.PublicKey, cookieName string) func(http
 				return publicKey, nil
 			})
 
-			if err != nil {
+			if err != nil || !token.Valid {
 				log.Error(err, "Failed to parse JWT")
-				http.Error(w, "Invalid token", http.StatusUnauthorized)
-				return
-			}
 
-			if !token.Valid {
+				if authSource == "cookie" {
+					// Clear the cookie
+					http.SetCookie(w, &http.Cookie{
+						Name:   cookieName,
+						Value:  "",
+						Path:   "/",
+						MaxAge: -1,
+					})
+					// Redirect to root
+					http.Redirect(w, r, "/", http.StatusSeeOther)
+					return
+				}
+
 				http.Error(w, "Invalid token", http.StatusUnauthorized)
 				return
 			}
