@@ -17,19 +17,19 @@ func (hh *HostHandler) BuildMenuEntries(
 	parent *page.PageHandler,
 ) {
 	for _, handler := range hh.Pages.List() {
-		page := handler.Page
+		ph := handler.Page
 
 		if hh.authChecker != nil {
-			access, _ := hh.authChecker.CheckAccess(ctx, "pages", page.BasePath, hh.pageRequirements(&handler))
+			access, _ := hh.authChecker.CheckAccess(ctx, "pages", ph.BasePath, hh.pageRequirements(&handler))
 
 			if !access {
 				continue
 			}
 		}
 
-		if (parent == nil && page.ParentPageRef == nil) ||
-			(parent != nil && page.ParentPageRef != nil &&
-				parent.Name == page.ParentPageRef.Name) {
+		if (parent == nil && ph.ParentPageRef == nil) ||
+			(parent != nil && ph.ParentPageRef != nil &&
+				parent.Name == ph.ParentPageRef.Name) {
 
 			if parent != nil && parent.Name == handler.Name {
 				continue
@@ -39,24 +39,24 @@ func (hh *HostHandler) BuildMenuEntries(
 				entry.Children = &map[string]any{}
 			}
 
-			label := page.Label
+			label := ph.Label
 
-			href := page.BasePath
+			href := ph.BasePath
 			if !isDefaultLanguage {
-				href = "/" + l.String() + page.BasePath
+				href = "/" + l.String() + ph.BasePath
 			}
 
 			pageEntry := render.PageEntry{
-				BasePath: page.BasePath,
+				BasePath: ph.BasePath,
 				Href:     href,
 				Label:    label,
 				Name:     handler.Name,
 				Weight:   resource.MustParse("0"),
 			}
 
-			if page.NavigationHints != nil {
-				pageEntry.Icon = page.NavigationHints.Icon
-				pageEntry.Weight = page.NavigationHints.Weight
+			if ph.NavigationHints != nil {
+				pageEntry.Icon = ph.NavigationHints.Icon
+				pageEntry.Weight = ph.NavigationHints.Weight
 			}
 
 			hh.BuildMenuEntries(ctx, &pageEntry, l, isDefaultLanguage, &handler)

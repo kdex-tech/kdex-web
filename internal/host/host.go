@@ -936,10 +936,17 @@ func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 			hh.BuildMenuEntries(r.Context(), rootEntry, &l, l.String() == hh.defaultLanguage, nil)
 			pageMap := *rootEntry.Children
 
+			claims, _ := auth.GetClaims(r.Context())
+			extra := map[string]any{}
+			if claims != nil {
+				extra["Identity"] = claims
+			}
+
 			renderer := render.Renderer{
 				BasePath:        pageHandler.Page.BasePath,
 				BrandName:       hh.host.BrandName,
 				DefaultLanguage: hh.defaultLanguage,
+				Extra:           extra,
 				Language:        l.String(),
 				Languages:       hh.availableLanguages(&hh.Translations),
 				LastModified:    time.Now(),
@@ -1049,7 +1056,11 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 			MaxAge:   3600, // 1 hour
 		}
 
-		hh.encryptAndSplit(w, r, "oidc_hint", rawIDToken, options)
+		if err := hh.encryptAndSplit(w, r, "oidc_hint", rawIDToken, options); err != nil {
+			hh.log.Error(err, "failed to encrypt and split oidc token")
+			http.Error(w, "Failed to store session hint", http.StatusInternalServerError)
+			return
+		}
 
 		// Set Cookie
 		http.SetCookie(w, &http.Cookie{

@@ -20,9 +20,16 @@ const (
 
 // Claims extends standard JWT claims with KDex specific fields.
 type Claims struct {
-	Email  string   `json:"email"`
-	Scopes []string `json:"scopes"`
-	UID    string   `json:"uid"`
+	Email      string   `json:"email"`
+	FamilyName string   `json:"family_name,omitempty"`
+	GivenName  string   `json:"given_name,omitempty"`
+	MiddleName string   `json:"middle_name,omitempty"`
+	Name       string   `json:"name"`
+	Nickname   string   `json:"nickname,omitempty"`
+	Picture    string   `json:"picture"`
+	Scopes     []string `json:"scopes"`
+	UID        string   `json:"uid"`
+	UpdatedAt  int64    `json:"updated_at,omitempty"`
 	jwt.RegisteredClaims
 }
 

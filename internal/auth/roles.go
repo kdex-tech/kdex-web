@@ -11,10 +11,17 @@ import (
 )
 
 type Identity struct {
-	Email   string
-	Extra   map[string]any
-	Subject string
-	Scopes  []string
+	Email      string
+	Extra      map[string]any
+	FamilyName string
+	GivenName  string
+	MiddleName string
+	Name       string
+	Nickname   string
+	Picture    string
+	Scopes     []string
+	Subject    string
+	UpdatedAt  int64
 }
 
 type ScopeProvider interface {

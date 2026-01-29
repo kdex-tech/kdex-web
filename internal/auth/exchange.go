@@ -92,6 +92,13 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken
 		return "", fmt.Errorf("failed to map claims: %w", err)
 	}
 
+	// 2. Add OIDC standard profile claims if they exist
+	for _, k := range []string{"family_name", "given_name", "middle_name", "name", "nickname", "picture", "updated_at"} {
+		if v, ok := claims[k]; ok {
+			extra[k] = v
+		}
+	}
+
 	// 3. Mint Local Token
 	return SignToken(sub, email, e.config.ClientID, issuer, scopes, extra, e.config.ActivePair, e.config.TokenTTL)
 }
@@ -109,6 +116,29 @@ func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, pas
 	extra, err := e.MapClaims(e.config.MappingRules, identity.Extra)
 	if err != nil {
 		return "", fmt.Errorf("failed to map claims: %w", err)
+	}
+
+	// 2. Add profile fields if they exist
+	if identity.FamilyName != "" {
+		extra["family_name"] = identity.FamilyName
+	}
+	if identity.GivenName != "" {
+		extra["given_name"] = identity.GivenName
+	}
+	if identity.MiddleName != "" {
+		extra["middle_name"] = identity.MiddleName
+	}
+	if identity.Name != "" {
+		extra["name"] = identity.Name
+	}
+	if identity.Nickname != "" {
+		extra["nickname"] = identity.Nickname
+	}
+	if identity.Picture != "" {
+		extra["picture"] = identity.Picture
+	}
+	if identity.UpdatedAt != 0 {
+		extra["updated_at"] = identity.UpdatedAt
 	}
 
 	return SignToken(username, identity.Email, e.config.ClientID, issuer, identity.Scopes, extra, e.config.ActivePair, e.config.TokenTTL)
