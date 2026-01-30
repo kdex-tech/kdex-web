@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
-	"net/url"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -222,14 +221,8 @@ func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 
 	// data-check-batch-endpoint="/~/check/batch"
 	// data-check-single-endpoint="/~/check/single"
-	// data-login-path="/~/oauth/login"
-	// data-login-label="Login"
-	// data-login-css-query="nav.nav .nav-dropdown a.login"
-	// data-logout-path="/~/oauth/logout"
-	// data-logout-label="Logout"
-	// data-logout-css-query="nav.nav .nav-dropdown a.logout"
 	// data-path-separator="/_/"
-	// data-state-endpoint="/~/state/out"
+	// data-state-endpoint="/~/state"
 
 	return buffer.String()
 }
@@ -582,38 +575,6 @@ func (hh *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 	w.Header().Set("Content-Language", l.String())
 	w.WriteHeader(code)
 	_, _ = w.Write([]byte(rendered))
-}
-
-func filterFromQuery(queryParams url.Values) ko.Filter {
-	filter := ko.Filter{}
-
-	pathParams := queryParams["path"]
-	if len(pathParams) > 0 {
-		filter.Paths = pathParams
-	}
-
-	tagParams := queryParams["tag"]
-	if len(tagParams) > 0 {
-		filter.Tags = tagParams
-	}
-
-	typeParam := queryParams["type"]
-	if len(typeParam) > 0 {
-		t := strings.ToUpper(typeParam[0])
-
-		switch t {
-		case string(ko.BackendPathType):
-			filter.Type = ko.BackendPathType
-		case string(ko.FunctionPathType):
-			filter.Type = ko.FunctionPathType
-		case string(ko.InternalPathType):
-			filter.Type = ko.InternalPathType
-		case string(ko.PagePathType):
-			filter.Type = ko.PagePathType
-		}
-	}
-
-	return filter
 }
 
 func toFinalPath(path string) string {

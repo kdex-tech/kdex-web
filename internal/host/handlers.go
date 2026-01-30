@@ -149,7 +149,7 @@ func (hh *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}
 }
 
@@ -184,7 +184,7 @@ func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}
 }
 
@@ -396,7 +396,7 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}, registeredPaths)
 }
 
@@ -529,7 +529,7 @@ func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}, registeredPaths)
 }
 
@@ -620,7 +620,7 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}, registeredPaths)
 }
 
@@ -635,7 +635,10 @@ func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 				path: {
 					Description: "Serves the generated OpenAPI 3.0 specification for this host.",
 					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(path, "path=one&path=two&tag=one&tag=two&type=one", http.Header{}),
+						Parameters: ko.ExtractParameters(
+							path, "path=one&path=two&tag=one&tag=two&type=one&type=two",
+							http.Header{},
+						),
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -658,7 +661,7 @@ func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}, registeredPaths)
 
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
@@ -788,7 +791,7 @@ func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}, registeredPaths)
 
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
@@ -895,7 +898,7 @@ func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 					},
 				},
 			},
-			Type: ko.InternalPathType,
+			Type: ko.SystemPathType,
 		}
 	}
 }
@@ -943,7 +946,7 @@ func (hh *HostHandler) stateHandler(mux *http.ServeMux, registeredPaths map[stri
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}, registeredPaths)
 }
 
@@ -1035,7 +1038,7 @@ func (hh *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}, registeredPaths)
 }
 
@@ -1073,7 +1076,7 @@ func (hh *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, 
 				},
 			},
 		},
-		Type: ko.InternalPathType,
+		Type: ko.SystemPathType,
 	}
 
 	hh.registerPath(path, info, registeredPaths)

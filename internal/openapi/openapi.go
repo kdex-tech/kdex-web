@@ -28,7 +28,7 @@ var wildcardRegex = regexp.MustCompile(`\.\.\.\}`)
 type Filter struct {
 	Paths []string
 	Tags  []string
-	Type  PathType
+	Type  []PathType
 }
 
 type OpenAPI struct {
@@ -156,7 +156,7 @@ func (b *Builder) BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *
 		fn.Spec.API.BasePath: info,
 	}
 
-	return b.BuildOpenAPI(serverUrl, fn.Name, paths, Filter{})
+	return b.BuildOpenAPI(serverUrl, fn.Name, paths, &Filter{})
 }
 
 // nolint:gocyclo
@@ -164,7 +164,7 @@ func (b *Builder) BuildOpenAPI(
 	serverUrl string,
 	name string,
 	paths map[string]PathInfo,
-	filter Filter,
+	filter *Filter,
 ) *openapi.T {
 	doc := &openapi.T{
 		Components: &openapi.Components{
@@ -648,7 +648,7 @@ func ExtractSchemaName(schemaString string) (string, error) {
 	return base, nil
 }
 
-func matchFilter(routePath string, info PathInfo, filter Filter) bool {
+func matchFilter(routePath string, info PathInfo, filter *Filter) bool {
 	if len(filter.Paths) > 0 && !slices.Contains(filter.Paths, routePath) {
 		return false
 	}
@@ -664,7 +664,7 @@ func matchFilter(routePath string, info PathInfo, filter Filter) bool {
 		}
 	}
 
-	if filter.Type != "" && info.Type != filter.Type {
+	if len(filter.Type) > 0 && !slices.Contains(filter.Type, info.Type) {
 		return false
 	}
 
