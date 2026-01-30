@@ -498,7 +498,7 @@ func (hh *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathI
 
 	// TODO: implement a check handler
 
-	hh.unimplementedHandler("GET /~/check/", mux, registeredPaths)
+	// hh.unimplementedHandler("GET /~/check/", mux, registeredPaths)
 
 	return mux
 }
