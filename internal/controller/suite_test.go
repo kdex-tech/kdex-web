@@ -117,8 +117,8 @@ var _ = BeforeSuite(func() {
 	}
 	defer os.RemoveAll(tempDir)
 
-	crdModulePath := getCRDModulePath()
-	testEnv.CRDDirectoryPaths = append(testEnv.CRDDirectoryPaths, filepath.Join(crdModulePath, "config", "crd", "bases"))
+	crdPath := getCRDPath()
+	testEnv.CRDDirectoryPaths = append(testEnv.CRDDirectoryPaths, filepath.Join(crdPath, "config", "crd", "bases"))
 
 	addRemoteCRD(&testEnv.CRDDirectoryPaths, tempDir, "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml")
 
@@ -307,7 +307,7 @@ func downloadCRD(url, tempDir string) (string, error) {
 	return filePath, nil
 }
 
-func getCRDModulePath() string {
+func getCRDPath() string {
 	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", "kdex.dev/crds")
 	out, err := cmd.Output()
 	if err != nil {
