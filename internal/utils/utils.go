@@ -30,3 +30,11 @@ func IfElse[T any](predicate bool, trueVal T, elseVal T) T {
 	}
 	return elseVal
 }
+
+func MapSlice[T any, U any](slice []T, mapper func(T) U) []U {
+	result := make([]U, len(slice))
+	for i, v := range slice {
+		result[i] = mapper(v)
+	}
+	return result
+}

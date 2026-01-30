@@ -20,6 +20,14 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 	th := NewHostHandler(nil, "test-host", "default", logr.Discard())
 	th.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
+		OpenAPI: kdexv1alpha1.OpenAPI{
+			TypesToInclude: []kdexv1alpha1.TypeToInclude{
+				kdexv1alpha1.TypeBACKEND,
+				kdexv1alpha1.TypeFUNCTION,
+				kdexv1alpha1.TypePAGE,
+				kdexv1alpha1.TypeSYSTEM,
+			},
+		},
 		Routing: kdexv1alpha1.Routing{
 			Domains: []string{"test.example.com"},
 		},

@@ -22,6 +22,7 @@ import (
 	ko "kdex.dev/web/internal/openapi"
 	"kdex.dev/web/internal/page"
 	"kdex.dev/web/internal/sniffer"
+	"kdex.dev/web/internal/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -404,6 +405,18 @@ func (hh *HostHandler) SetHost(
 	})
 	hh.openapiBuilder = ko.Builder{
 		SecuritySchemes: hh.SecuritySchemes(),
+		TypesToInclude: utils.MapSlice(host.OpenAPI.TypesToInclude, func(i kdexv1alpha1.TypeToInclude) ko.PathType {
+			switch i {
+			case kdexv1alpha1.TypeBACKEND:
+				return ko.BackendPathType
+			case kdexv1alpha1.TypeFUNCTION:
+				return ko.FunctionPathType
+			case kdexv1alpha1.TypePAGE:
+				return ko.PagePathType
+			default:
+				return ko.SystemPathType
+			}
+		}),
 	}
 	hh.packageReferences = packageReferences
 	hh.pathsCollectedInReconcile = paths

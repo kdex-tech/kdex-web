@@ -9,7 +9,6 @@ import (
 	"path"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
@@ -19,8 +18,8 @@ import (
 const (
 	BackendPathType  PathType = "BACKEND"
 	FunctionPathType PathType = "FUNCTION"
-	InternalPathType PathType = "INTERNAL"
 	PagePathType     PathType = "PAGE"
+	SystemPathType   PathType = "SYSTEM"
 )
 
 var wildcardRegex = regexp.MustCompile(`\.\.\.\}`)
@@ -137,13 +136,14 @@ type PathType string
 
 type PathInfo struct {
 	API      OpenAPI
-	Metadata *kdexv1alpha1.Metadata
+	Metadata kdexv1alpha1.Metadata
 	Type     PathType
 }
 
 type Builder struct {
 	Security        *openapi.SecurityRequirements
 	SecuritySchemes *openapi.SecuritySchemes
+	TypesToInclude  []PathType
 }
 
 func (b *Builder) BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *openapi.T {
@@ -156,7 +156,7 @@ func (b *Builder) BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *
 		fn.Spec.API.BasePath: info,
 	}
 
-	return b.BuildOpenAPI(serverUrl, fn.Name, paths, &Filter{})
+	return b.BuildOpenAPI(serverUrl, fn.Name, paths, Filter{})
 }
 
 // nolint:gocyclo
@@ -164,7 +164,7 @@ func (b *Builder) BuildOpenAPI(
 	serverUrl string,
 	name string,
 	paths map[string]PathInfo,
-	filter *Filter,
+	filter Filter,
 ) *openapi.T {
 	doc := &openapi.T{
 		Components: &openapi.Components{
@@ -190,12 +190,14 @@ func (b *Builder) BuildOpenAPI(
 
 	basePaths := slices.Collect(maps.Keys(paths))
 
-	sort.Slice(basePaths, func(i, j int) bool {
-		return basePaths[i] < basePaths[j]
-	})
+	slices.Sort(basePaths)
 
 	for _, basePath := range basePaths {
 		pathInfo := paths[basePath]
+
+		if !slices.Contains(b.TypesToInclude, pathInfo.Type) {
+			continue
+		}
 
 		for curPatternPath, curItem := range pathInfo.API.Paths {
 			openapiPath := toOpenAPIPath(curPatternPath)
@@ -224,9 +226,7 @@ func (b *Builder) BuildOpenAPI(
 				Summary:    curItem.Summary,
 			}
 
-			if pathInfo.Metadata != nil {
-				pathItem.Extensions["x-kdex-metadata"] = pathInfo.Metadata
-			}
+			pathItem.Extensions["x-kdex-metadata"] = pathInfo.Metadata
 
 			// Fill path item operations
 			collectAndSetOpMetadata := func(op *openapi.Operation) {
@@ -239,11 +239,9 @@ func (b *Builder) BuildOpenAPI(
 				if op.Description == "" {
 					op.Description = curItem.Description
 				}
-				if pathInfo.Metadata != nil {
-					for _, tag := range pathInfo.Metadata.Tags {
-						if !slices.Contains(op.Tags, tag) {
-							op.Tags = append(op.Tags, tag)
-						}
+				for _, tag := range pathInfo.Metadata.Tags {
+					if !slices.Contains(op.Tags, tag) {
+						op.Tags = append(op.Tags, tag)
 					}
 				}
 				for _, t := range op.Tags {
@@ -648,15 +646,12 @@ func ExtractSchemaName(schemaString string) (string, error) {
 	return base, nil
 }
 
-func matchFilter(routePath string, info PathInfo, filter *Filter) bool {
+func matchFilter(routePath string, info PathInfo, filter Filter) bool {
 	if len(filter.Paths) > 0 && !slices.Contains(filter.Paths, routePath) {
 		return false
 	}
 
 	if len(filter.Tags) > 0 {
-		if info.Metadata == nil {
-			info.Metadata = &kdexv1alpha1.Metadata{}
-		}
 		for _, tag := range filter.Tags {
 			if !slices.Contains(info.Metadata.Tags, tag) {
 				return false
