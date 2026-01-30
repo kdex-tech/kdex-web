@@ -2,10 +2,14 @@ package host
 
 import (
 	"context"
+	"net/http"
+	"time"
 
 	"golang.org/x/text/language"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"kdex.dev/crds/render"
+	"kdex.dev/web/internal/auth"
+	kdexhttp "kdex.dev/web/internal/http"
 	"kdex.dev/web/internal/page"
 )
 
@@ -63,5 +67,95 @@ func (hh *HostHandler) BuildMenuEntries(
 
 			(*entry.Children)[label] = pageEntry
 		}
+	}
+}
+
+func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
+	hh.mu.RLock()
+	defer hh.mu.RUnlock()
+
+	basePath := "/" + r.PathValue("basePathMinusLeadingSlash")
+	l10n := r.PathValue("l10n")
+	navKey := r.PathValue("navKey")
+
+	hh.log.V(2).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
+
+	var pageHandler *page.PageHandler
+
+	for _, ph := range hh.Pages.List() {
+		if ph.BasePath() == basePath {
+			pageHandler = &ph
+			break
+		}
+	}
+
+	if pageHandler == nil {
+		http.Error(w, "page not found", http.StatusNotFound)
+		return
+	}
+
+	var nav string
+
+	for key, n := range pageHandler.Navigations {
+		if key == navKey {
+			nav = n
+			break
+		}
+	}
+
+	if nav == "" {
+		http.Error(w, "navigation not found", http.StatusNotFound)
+		return
+	}
+
+	l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Filter navigation by page access checks
+
+	rootEntry := &render.PageEntry{}
+	hh.BuildMenuEntries(r.Context(), rootEntry, &l, l.String() == hh.defaultLanguage, nil)
+	pageMap := *rootEntry.Children
+
+	claims, _ := auth.GetClaims(r.Context())
+	extra := map[string]any{}
+	if claims != nil {
+		extra["Identity"] = claims
+	}
+
+	renderer := render.Renderer{
+		BasePath:        pageHandler.Page.BasePath,
+		BrandName:       hh.host.BrandName,
+		DefaultLanguage: hh.defaultLanguage,
+		Extra:           extra,
+		Language:        l.String(),
+		Languages:       hh.availableLanguages(&hh.Translations),
+		LastModified:    time.Now(),
+		MessagePrinter:  hh.messagePrinter(&hh.Translations, l),
+		Organization:    hh.host.Organization,
+		PageMap:         pageMap,
+		PatternPath:     pageHandler.PatternPath(),
+		Title:           pageHandler.Label(),
+	}
+
+	templateData, err := renderer.TemplateData()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	rendered, err := renderer.RenderOne(navKey, nav, templateData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	_, err = w.Write([]byte(rendered))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

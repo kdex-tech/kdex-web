@@ -154,7 +154,10 @@ func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
 
 func (s *RequestSniffer) DocsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/markdown")
-	_, _ = w.Write([]byte(docs))
+	_, err := w.Write([]byte(docs))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (s *RequestSniffer) analyze(r *http.Request) (*AnalysisResult, error) {
@@ -459,7 +462,7 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 			if found {
 				op.Security = &security
 				op.Responses.Set("401", &openapi.ResponseRef{
-					Ref: "#/components/responses/UnauthorizedError",
+					Ref: "#/components/responses/Unauthorized",
 				})
 			}
 		}

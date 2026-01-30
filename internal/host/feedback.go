@@ -235,9 +235,9 @@ func (hh *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(&out, "%s✓ Analyzed Request:%s %s %s\n", defaultTheme.CLISuccess, defaultTheme.CLIReset, result.OriginalRequest.Method, result.OriginalRequest.URL.Path)
 
 		if len(result.Lints) > 0 {
-			out.WriteString(fmt.Sprintf("\n%sWarnings / Insights:%s\n", defaultTheme.CLIWarning, defaultTheme.CLIReset))
+			fmt.Fprintf(&out, "\n%sWarnings / Insights:%s\n", defaultTheme.CLIWarning, defaultTheme.CLIReset)
 			for _, lint := range result.Lints {
-				out.WriteString(fmt.Sprintf("  • %s\n", lint))
+				fmt.Fprintf(&out, "  • %s\n", lint)
 			}
 		}
 

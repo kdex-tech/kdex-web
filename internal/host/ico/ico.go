@@ -56,7 +56,7 @@ func (i *Ico) FaviconHandler(w http.ResponseWriter, r *http.Request) {
 	if err := i.template.Execute(&buf, i.data); err != nil {
 		log := logf.FromContext(r.Context())
 		log.Error(err, "error rendering favicon template")
-		http.Error(w, fmt.Sprintf("Favicon template error: %s", err.Error()), 500)
+		http.Error(w, fmt.Sprintf("Favicon template error: %s", err.Error()), http.StatusInternalServerError)
 		return
 	}
 	svgContent := buf.Bytes()

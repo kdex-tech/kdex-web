@@ -1,11 +1,15 @@
 package host
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	kdexhttp "kdex.dev/web/internal/http"
 )
 
 func NewTranslations(defaultLanguage string, translations map[string]kdexv1alpha1.KDexTranslationSpec) (*Translations, error) {
@@ -31,4 +35,55 @@ func NewTranslations(defaultLanguage string, translations map[string]kdexv1alpha
 		catalog: catalogBuilder,
 		keys:    keys,
 	}, nil
+}
+
+func (hh *HostHandler) TranslationGet(w http.ResponseWriter, r *http.Request) {
+	hh.mu.RLock()
+	defer hh.mu.RUnlock()
+
+	l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get all the keys and values for the given language
+	keys := hh.Translations.Keys()
+	// check query parameters for array of keys
+	queryParams := r.URL.Query()
+	keyParams := queryParams["key"]
+	if len(keyParams) > 0 {
+		keys = keyParams
+	}
+
+	keysAndValues := map[string]string{}
+	printer := hh.messagePrinter(&hh.Translations, l)
+	for _, key := range keys {
+		keysAndValues[key] = printer.Sprintf(key)
+		// replace each occurrence of the string `%!s(MISSING)` with a placeholder `{{n}}` where `n` is the alphabetic index of the placeholder
+		parts := strings.Split(keysAndValues[key], "%!s(MISSING)")
+		if len(parts) > 1 {
+			var builder strings.Builder
+			for i, part := range parts {
+				builder.WriteString(part)
+				if i < len(parts)-1 {
+					// Convert index to alphabetic character (0 -> a, 1 -> b, etc.)
+					placeholder := 'a' + i
+					if placeholder > 'z' {
+						// Fallback or handle wrap if more than 26 placeholders are present
+						fmt.Fprintf(&builder, "{{%d}}", i)
+					} else {
+						fmt.Fprintf(&builder, "{{%c}}", placeholder)
+					}
+				}
+			}
+			keysAndValues[key] = builder.String()
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(keysAndValues)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

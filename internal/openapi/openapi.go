@@ -315,6 +315,36 @@ func (b *Builder) BuildOpenAPI(
 		doc.Security = *b.Security
 	}
 
+	if doc.Components.Responses == nil {
+		doc.Components.Responses = openapi.ResponseBodies{
+			"BadRequest": &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("Bad Request"),
+				},
+			},
+			"Found": &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("Found"),
+				},
+			},
+			"InternalServerError": &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("Internal Server Error"),
+				},
+			},
+			"NotFound": &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("Not Found"),
+				},
+			},
+			"SeeOther": &openapi.ResponseRef{
+				Value: &openapi.Response{
+					Description: openapi.Ptr("See Other"),
+				},
+			},
+		}
+	}
+
 	if b.SecuritySchemes != nil {
 		securitySchemes := openapi.SecuritySchemes{}
 
@@ -330,11 +360,7 @@ func (b *Builder) BuildOpenAPI(
 		doc.Components.SecuritySchemes = securitySchemes
 
 		if len(doc.Components.SecuritySchemes) > 0 {
-			if doc.Components.Responses == nil {
-				doc.Components.Responses = openapi.ResponseBodies{}
-			}
-
-			doc.Components.Responses["UnauthorizedError"] = &openapi.ResponseRef{
+			doc.Components.Responses["Unauthorized"] = &openapi.ResponseRef{
 				Value: &openapi.Response{
 					Description: openapi.Ptr("Unauthorized"),
 				},
