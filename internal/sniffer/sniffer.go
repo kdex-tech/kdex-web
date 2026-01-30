@@ -64,7 +64,7 @@ The KDex Request Sniffer automatically generates or updates KDexFunction resourc
 - Multi-value parameters (e.g., "?id=1&id=2") are detected and documented as "array" types in OpenAPI with "Explode: true".
 
 ---
-*Note: The sniffer only processes non-internal paths (paths not starting with "/~") that result in a 404.*
+*Note: The sniffer only processes non-internal paths (paths not starting with "/-/") that result in a 404.*
 `
 	TRUE = "true"
 )
@@ -106,7 +106,7 @@ func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
 			Namespace: fnMutated.Namespace,
 		},
 		Status: kdexv1alpha1.KDexFunctionStatus{
-			OpenAPISchemaURL: ko.Host(r) + "/~/openapi?tag=" + fnMutated.Name,
+			OpenAPISchemaURL: ko.Host(r) + "/-/openapi?tag=" + fnMutated.Name,
 		},
 	}
 
@@ -143,7 +143,7 @@ func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
 	)
 
 	if err == nil {
-		fn.Status.OpenAPISchemaURL = ko.Host(r) + "/~/openapi?tag=" + fn.Name
+		fn.Status.OpenAPISchemaURL = ko.Host(r) + "/-/openapi?tag=" + fn.Name
 		if statusErr := s.Client.Status().Update(context.Background(), fn); statusErr != nil {
 			log.Error(statusErr, "failed to update function status", "name", fn.Name)
 		}
@@ -898,7 +898,7 @@ func (s *RequestSniffer) generateResourceOperations(resourcePath string, item *o
 // (This is called when HostHandler hits a 404)
 func (s *RequestSniffer) sniff(r *http.Request) (*kdexv1alpha1.KDexFunction, error) {
 	// Skip internal paths
-	if strings.HasPrefix(r.URL.Path, "/~") {
+	if strings.HasPrefix(r.URL.Path, "/-/") {
 		return nil, nil
 	}
 

@@ -109,7 +109,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 					},
 				},
 			},
-			want: []string{"FOOTER", "ENGLISH_TRANSLATION", "/~/navigation/main/en/", "MAIN", "TITLE"},
+			want: []string{"FOOTER", "ENGLISH_TRANSLATION", "/-/navigation/main/en/", "MAIN", "TITLE"},
 		},
 		{
 			name: "french translation",
@@ -164,7 +164,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 					},
 				},
 			},
-			want: []string{"FOOTER", "FRENCH_TRANSLATION", "/~/navigation/main/fr/", "MAIN", "TITLE"},
+			want: []string{"FOOTER", "FRENCH_TRANSLATION", "/-/navigation/main/fr/", "MAIN", "TITLE"},
 		},
 		{
 			name: "no translation",
@@ -202,7 +202,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 				},
 			},
 			lang: "en",
-			want: []string{"FOOTER", "key", "/~/navigation/main/en/", "MAIN", "TITLE"},
+			want: []string{"FOOTER", "key", "/-/navigation/main/en/", "MAIN", "TITLE"},
 		},
 		{
 			name: "basic web component",
@@ -243,7 +243,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 				},
 			},
 			lang: "en",
-			want: []string{"FOOTER", "key", "/~/navigation/main/en/", `<sample-element id="content-main" data-app-name="sample-app" data-app-generation="1" data-test="test"></sample-element>`, "TITLE"},
+			want: []string{"FOOTER", "key", "/-/navigation/main/en/", `<sample-element id="content-main" data-app-name="sample-app" data-app-generation="1" data-test="test"></sample-element>`, "TITLE"},
 		},
 		{
 			name: "extra template data",
@@ -284,7 +284,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 			extraTemplateData: map[string]any{
 				"extra": "extra data",
 			},
-			want: []string{"FOOTER extra data", "key", "/~/navigation/main/en/", "MAIN", "TITLE"},
+			want: []string{"FOOTER extra data", "key", "/-/navigation/main/en/", "MAIN", "TITLE"},
 		},
 	}
 	for _, tt := range tests {
@@ -373,10 +373,10 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 			},
 			want: map[string][]string{
 				"en": {
-					"FOOTER", "ENGLISH_TRANSLATION", "/~/navigation/main/en/", "MAIN", "TITLE",
+					"FOOTER", "ENGLISH_TRANSLATION", "/-/navigation/main/en/", "MAIN", "TITLE",
 				},
 				"fr": {
-					"FOOTER", "FRENCH_TRANSLATION", "/~/navigation/main/fr/", "MAIN", "TITLE",
+					"FOOTER", "FRENCH_TRANSLATION", "/-/navigation/main/fr/", "MAIN", "TITLE",
 				},
 			},
 		},

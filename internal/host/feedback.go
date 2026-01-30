@@ -131,7 +131,7 @@ func isCLI(userAgent string) bool {
 func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Only intercept if we have a sniffer (checker) and it's not an internal path
-		if hh.sniffer == nil || strings.HasPrefix(r.URL.Path, "/~") {
+		if hh.sniffer == nil || strings.HasPrefix(r.URL.Path, "/-/") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -183,11 +183,11 @@ func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 				format = "text"
 			}
 
-			inspectURL := fmt.Sprintf("/~/sniffer/inspect/%s?format=%s", id, format)
+			inspectURL := fmt.Sprintf("/-/sniffer/inspect/%s?format=%s", id, format)
 			absoluteURL := fmt.Sprintf("%s%s", ko.Host(r), inspectURL)
 
 			w.Header().Set("Location", inspectURL)
-			w.Header().Set("X-KDex-Sniffer-Docs", "/~/sniffer/docs")
+			w.Header().Set("X-KDex-Sniffer-Docs", "/-/sniffer/docs")
 			w.WriteHeader(http.StatusSeeOther)
 
 			// Fallback body for those who don't follow redirects

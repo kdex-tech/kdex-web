@@ -33,7 +33,7 @@ func Test_ExtractPathParameters(t *testing.T) {
 		},
 		{
 			name:          "multiple path parameters",
-			path:          "/~/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}",
+			path:          "/-/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}",
 			expectedCount: 3,
 			expectedNames: []string{"navKey", "l10n", "basePathMinusLeadingSlash"},
 			expectedIn:    []string{"path", "path", "path"},
@@ -42,7 +42,7 @@ func Test_ExtractPathParameters(t *testing.T) {
 		},
 		{
 			name:          "localized path parameter",
-			path:          "/~/translation/{l10n}",
+			path:          "/-/translation/{l10n}",
 			expectedCount: 1,
 			expectedNames: []string{"l10n"},
 			expectedIn:    []string{"path"},
@@ -51,7 +51,7 @@ func Test_ExtractPathParameters(t *testing.T) {
 		},
 		{
 			name:          "no parameters",
-			path:          "/~/check/",
+			path:          "/-/check/",
 			expectedCount: 0,
 			expectedNames: []string{},
 			expectedIn:    []string{},

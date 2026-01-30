@@ -39,7 +39,7 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 	// Actually we need to call RebuildMux to fully populate everything but we can test defaults.
 
 	// Test OpenAPI endpoint
-	req := httptest.NewRequest("GET", "/~/openapi", nil)
+	req := httptest.NewRequest("GET", "/-/openapi", nil)
 	w := httptest.NewRecorder()
 
 	mux.ServeHTTP(w, req)
@@ -54,12 +54,12 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 	g.Expect(doc.Info.Title).To(G.Equal("KDex Host: test-host"))
 
 	// Check if paths are present
-	// We should see /~/openapi and /~/sniffer/docs at least (sniffer if sniffer != nil)
+	// We should see /-/openapi and /-/sniffer/docs at least (sniffer if sniffer != nil)
 	// th.Sniffer is nil in test-host unless we set it.
 
-	// Check /~/openapi
-	pathItem := doc.Paths.Find("/~/openapi")
+	// Check /-/openapi
+	pathItem := doc.Paths.Find("/-/openapi")
 	g.Expect(pathItem).NotTo(G.BeNil())
 	g.Expect(pathItem.Get).NotTo(G.BeNil())
-	g.Expect(pathItem.Get.Summary).To(G.Equal("OpenAPI Specification"))
+	g.Expect(pathItem.Get.Summary).To(G.Equal("OpenAPI 3.0 Spec"))
 }

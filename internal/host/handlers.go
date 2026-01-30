@@ -16,7 +16,10 @@ import (
 	kdexhttp "kdex.dev/web/internal/http"
 	ko "kdex.dev/web/internal/openapi"
 	"kdex.dev/web/internal/page"
+	"kdex.dev/web/internal/utils"
 )
+
+// TODO: run the openapi through the vacuum linter and fix
 
 func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, registeredPaths map[string]ko.PathInfo) {
 	finalPath := toFinalPath(pr.ph.BasePath())
@@ -24,101 +27,57 @@ func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 
 	handler := hh.pageHandlerFunc(finalPath, pr.ph.Name, pr.l10nRenders, pr.ph)
 
+	regFunc := func(p string, n string, l string, pattern bool, localized bool) {
+		hh.registerPath(p, ko.PathInfo{
+			API: ko.OpenAPI{
+				BasePath: p,
+				Paths: map[string]ko.PathItem{
+					p: {
+						Description: fmt.Sprintf("HTML page %s%s%s", l, utils.IfElse(pattern, " (pattern)", ""), utils.IfElse(localized, " (localized)", "")),
+						Get: &openapi.Operation{
+							Description: fmt.Sprintf("Get HTML for %s%s%s", l, utils.IfElse(pattern, " (pattern)", ""), utils.IfElse(localized, " (localized)", "")),
+							OperationID: fmt.Sprintf("%s%s%s-get", n, utils.IfElse(pattern, "-pattern", ""), utils.IfElse(localized, "-localized", "")),
+							Parameters:  ko.ExtractParameters(p, "", http.Header{}),
+							Responses: openapi.NewResponses(
+								openapi.WithStatus(200, &openapi.ResponseRef{
+									Value: &openapi.Response{
+										Content: openapi.Content{
+											"text/html": &openapi.MediaType{
+												Schema: &openapi.SchemaRef{
+													Value: &openapi.Schema{
+														Format: "html",
+														Type:   &openapi.Types{openapi.TypeString},
+													},
+												},
+											},
+										},
+										Description: openapi.Ptr(fmt.Sprintf("HTML for %s%s%s", l, utils.IfElse(pattern, " (pattern)", ""), utils.IfElse(localized, " (localized)", ""))),
+									},
+								}),
+							),
+							Summary: fmt.Sprintf("Get %s%s%s", l, utils.IfElse(pattern, " (pattern)", ""), utils.IfElse(localized, " (localized)", "")),
+							Tags:    []string{n, "page"},
+						},
+						Summary: fmt.Sprintf("Page %s%s%s", l, utils.IfElse(pattern, " (pattern)", ""), utils.IfElse(localized, " (localized)", "")),
+					},
+				},
+			},
+			Type: ko.PagePathType,
+		}, registeredPaths)
+	}
+
 	mux.HandleFunc("GET "+finalPath, handler)
 	mux.HandleFunc("GET /{l10n}"+finalPath, handler)
 
-	response := openapi.NewResponses(
-		openapi.WithStatus(200, &openapi.ResponseRef{
-			Value: &openapi.Response{
-				Content: openapi.Content{
-					"text/html": &openapi.MediaType{
-						Schema: &openapi.SchemaRef{
-							Value: &openapi.Schema{
-								Format: "html",
-								Type:   &openapi.Types{openapi.TypeString},
-							},
-						},
-					},
-				},
-			},
-		}),
-	)
+	regFunc(finalPath, pr.ph.Name, label, false, false)
+	regFunc("/{l10n}"+finalPath, pr.ph.Name, label, false, true)
 
-	hh.registerPath(finalPath, ko.PathInfo{
-		API: ko.OpenAPI{
-			BasePath: finalPath,
-			Paths: map[string]ko.PathItem{
-				finalPath: {
-					Description: fmt.Sprintf("Rendered HTML page for %s", label),
-					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(finalPath, "", http.Header{}),
-						Responses:  response,
-					},
-					Summary: label,
-				},
-			},
-		},
-		Type: ko.PagePathType,
-	}, registeredPaths)
+	if pr.ph.Page.PatternPath != "" {
+		mux.HandleFunc("GET "+pr.ph.Page.PatternPath, handler)
+		mux.HandleFunc("GET /{l10n}"+pr.ph.Page.PatternPath, handler)
 
-	l10nPath := "/{l10n}" + finalPath
-	hh.registerPath(l10nPath, ko.PathInfo{
-		API: ko.OpenAPI{
-			BasePath: l10nPath,
-			Paths: map[string]ko.PathItem{
-				l10nPath: {
-					Description: fmt.Sprintf("Localized rendered HTML page for %s", label),
-					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(l10nPath, "", http.Header{}),
-						Responses:  response,
-					},
-					Summary: fmt.Sprintf("%s (Localized)", label),
-				},
-			},
-		},
-		Type: ko.PagePathType,
-	}, registeredPaths)
-
-	patternPath := pr.ph.Page.PatternPath
-	l10nPatternPath := "/{l10n}" + patternPath
-
-	if patternPath != "" {
-		mux.HandleFunc("GET "+patternPath, handler)
-		mux.HandleFunc("GET "+l10nPatternPath, handler)
-
-		hh.registerPath(patternPath, ko.PathInfo{
-			API: ko.OpenAPI{
-				BasePath: patternPath,
-				Paths: map[string]ko.PathItem{
-					patternPath: {
-						Description: fmt.Sprintf("Rendered HTML page for %s using pattern %s", label, patternPath),
-						Get: &openapi.Operation{
-							Parameters: ko.ExtractParameters(patternPath, "", http.Header{}),
-							Responses:  response,
-						},
-						Summary: label,
-					},
-				},
-			},
-			Type: ko.PagePathType,
-		}, registeredPaths)
-
-		hh.registerPath(l10nPatternPath, ko.PathInfo{
-			API: ko.OpenAPI{
-				BasePath: l10nPatternPath,
-				Paths: map[string]ko.PathItem{
-					l10nPatternPath: {
-						Description: fmt.Sprintf("Localized rendered HTML page for %s using pattern %s", label, l10nPatternPath),
-						Get: &openapi.Operation{
-							Parameters: ko.ExtractParameters(l10nPatternPath, "", http.Header{}),
-							Responses:  response,
-						},
-						Summary: fmt.Sprintf("%s (Localized)", label),
-					},
-				},
-			},
-			Type: ko.PagePathType,
-		}, registeredPaths)
+		regFunc(pr.ph.Page.PatternPath, pr.ph.Name, label, true, false)
+		regFunc("/{l10n}"+pr.ph.Page.PatternPath, pr.ph.Name, label, true, true)
 	}
 }
 
@@ -130,8 +89,10 @@ func (hh *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
 				path: {
-					Description: "A default favicon",
+					Description: "The favicon SVG resource",
 					Get: &openapi.Operation{
+						Description: "GET the favicon SVG",
+						OperationID: "favicon-get",
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -144,8 +105,10 @@ func (hh *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 								Description: openapi.Ptr("SVG Favicon"),
 							}),
 						),
+						Summary: "Favicon SVG",
+						Tags:    []string{"system", "favicon"},
 					},
-					Summary: "The site favicon",
+					Summary: "Favicon SVG resource",
 				},
 			},
 		},
@@ -167,6 +130,8 @@ func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 				path: {
 					Description: "Serve the JWT key set",
 					Get: &openapi.Operation{
+						Description: "GET the JWT key set",
+						OperationID: "jwks-get",
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -176,9 +141,11 @@ func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 									},
 									[]string{"application/json"},
 								),
-								Description: openapi.Ptr("The JWT key set"),
+								Description: openapi.Ptr("JWKS"),
 							}),
 						),
+						Summary: "The JWKS",
+						Tags:    []string{"system", "jwks", "jwt", "auth"},
 					},
 					Summary: "The JWT key set",
 				},
@@ -193,7 +160,7 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 		return
 	}
 
-	const loginPath = "/~/login"
+	const loginPath = "/-/login"
 	mux.HandleFunc(
 		"GET "+loginPath,
 		func(w http.ResponseWriter, r *http.Request) {
@@ -202,6 +169,8 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 			if returnURL == "" {
 				returnURL = "/"
 			}
+
+			// TODO: when OIDC is enabled show it on the Login screen so that we retain ability to login locally
 
 			// If OIDC is configured, force login through it
 			if authCodeURL := hh.authExchanger.AuthCodeURL(returnURL); authCodeURL != "" {
@@ -264,7 +233,7 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 				// FAILED: 401 Unauthorized / render login page again with error message?
 				// For now simple redirect back to login
 				hh.log.Error(err, "local login failed")
-				http.Redirect(w, r, "/~/login?error=invalid_credentials&return="+url.QueryEscape(returnURL), http.StatusSeeOther)
+				http.Redirect(w, r, "/-/login?error=invalid_credentials&return="+url.QueryEscape(returnURL), http.StatusSeeOther)
 				return
 			}
 
@@ -282,7 +251,7 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 		},
 	)
 
-	const logoutPath = "/~/logout"
+	const logoutPath = "/-/logout"
 	mux.HandleFunc(
 		"POST "+logoutPath,
 		func(w http.ResponseWriter, r *http.Request) {
@@ -344,9 +313,11 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 			BasePath: loginPath,
 			Paths: map[string]ko.PathItem{
 				loginPath: {
-					Description: "Provides a localized login page.",
+					Description: "Provides the login experience",
 					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(loginPath, "return=foo", http.Header{}),
+						Description: "GET the login view",
+						OperationID: "login-get",
+						Parameters:  ko.ExtractParameters(loginPath, "return=foo", http.Header{}),
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -368,31 +339,42 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 								Description: openapi.Ptr("Internal server error"),
 							}),
 						),
+						Summary: "Get login experience",
+						Tags:    []string{"system", "login", "auth"},
 					},
 					Post: &openapi.Operation{
+						Description: "POST to login action",
+						OperationID: "login-post",
 						Responses: openapi.NewResponses(
-							openapi.WithName("200", &openapi.Response{
-								Content: openapi.NewContentWithSchema(
-									&openapi.Schema{
-										Format: "html",
-										Type:   &openapi.Types{openapi.TypeString},
-									},
-									[]string{"text/html"},
-								),
-								Description: openapi.Ptr("HTML login page"),
+							openapi.WithName("303", &openapi.Response{
+								Description: openapi.Ptr("See Other"),
 							}),
 							openapi.WithName("400", &openapi.Response{
-								Description: openapi.Ptr("Unable to ascertain the locale from the {l10n} parameter"),
+								Description: openapi.Ptr("Bad Request"),
 							}),
-							openapi.WithName("404", &openapi.Response{
-								Description: openapi.Ptr("Resource not found"),
+						),
+						Summary: "Login action",
+						Tags:    []string{"system", "login", "auth"},
+					},
+					Summary: "Login experience",
+				},
+				logoutPath: {
+					Description: "Provides the logout experience",
+					Post: &openapi.Operation{
+						Description: "POST to logout action",
+						OperationID: "logout-post",
+						Responses: openapi.NewResponses(
+							openapi.WithName("302", &openapi.Response{
+								Description: openapi.Ptr("Found"),
 							}),
 							openapi.WithName("500", &openapi.Response{
 								Description: openapi.Ptr("Internal server error"),
 							}),
 						),
+						Summary: "Logout action",
+						Tags:    []string{"system", "logout", "auth"},
 					},
-					Summary: "HTML login page",
+					Summary: "Logout experience",
 				},
 			},
 		},
@@ -401,7 +383,7 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 }
 
 func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	const path = "/~/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}"
+	const path = "/-/navigation/{navKey}/{l10n}/{basePathMinusLeadingSlash...}"
 	mux.HandleFunc(
 		"GET "+path,
 		func(w http.ResponseWriter, r *http.Request) {
@@ -500,9 +482,11 @@ func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
 				path: {
-					Description: "Provides dynamic HTML fragments for page navigation components, supporting localization and breadcrumb contexts.",
+					Description: "Dynamic HTML navigation components, supporting localization and breadcrumb contexts.",
 					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(path, "", http.Header{}),
+						Description: "GET Dynamic HTML navigation",
+						OperationID: "navigation-get",
+						Parameters:  ko.ExtractParameters(path, "", http.Header{}),
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -524,8 +508,10 @@ func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 								Description: openapi.Ptr("Internal server error"),
 							}),
 						),
+						Summary: "Dynamic HTML navigation",
+						Tags:    []string{"system", "navigation"},
 					},
-					Summary: "Dynamic Navigation Fragment Provider",
+					Summary: "Dynamic HTML navigation components",
 				},
 			},
 		},
@@ -538,7 +524,7 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 		return
 	}
 
-	const path = "/~/oauth/callback"
+	const path = "/-/oauth/callback"
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		state := r.URL.Query().Get("state")
@@ -604,9 +590,11 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
 				path: {
-					Description: "OAuth2 Callback Endpoint",
+					Description: "The OAuth2 support endpoint",
 					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(path, "code=foo&state=bar", http.Header{}),
+						Description: "GET OAuth2 Callback",
+						OperationID: "oauth-get",
+						Parameters:  ko.ExtractParameters(path, "code=foo&state=bar", http.Header{}),
 						Responses: openapi.NewResponses(
 							openapi.WithName("303", &openapi.Response{
 								Description: openapi.Ptr("Redirect to original URL after successful login"),
@@ -615,8 +603,10 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 								Description: openapi.Ptr("Unauthorized"),
 							}),
 						),
+						Summary: "OAuth2 Callback",
+						Tags:    []string{"system", "oauth2", "auth"},
 					},
-					Summary: "OAuth2 Callback",
+					Summary: "OAuth2 support",
 				},
 			},
 		},
@@ -625,7 +615,7 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 }
 
 func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	const path = "/~/openapi"
+	const path = "/-/openapi"
 
 	// Register the path itself so it appears in the spec
 	hh.registerPath(path, ko.PathInfo{
@@ -635,6 +625,8 @@ func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 				path: {
 					Description: "Serves the generated OpenAPI 3.0 specification for this host.",
 					Get: &openapi.Operation{
+						Description: "GET OpenAPI 3.0 Spec",
+						OperationID: "openapi-get",
 						Parameters: ko.ExtractParameters(
 							path, "path=one&path=two&tag=one&tag=two&type=one&type=two",
 							http.Header{},
@@ -656,8 +648,10 @@ func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 								Description: openapi.Ptr("Failed to marshal OpenAPI spec"),
 							}),
 						),
+						Summary: "OpenAPI 3.0 Spec",
+						Tags:    []string{"system", "openapi"},
 					},
-					Summary: "OpenAPI Specification",
+					Summary: "Generated OpenAPI 3.0 specification",
 				},
 			},
 		},
@@ -668,9 +662,15 @@ func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 		hh.mu.RLock()
 		defer hh.mu.RUnlock()
 
-		spec := hh.openapiBuilder.BuildOpenAPI(ko.Host(r), hh.Name, hh.registeredPaths, filterFromQuery(r.URL.Query()))
-
-		jsonBytes, err := json.Marshal(spec)
+		query := r.URL.Query()
+		spec := hh.openapiBuilder.BuildOpenAPI(ko.Host(r), hh.Name, hh.registeredPaths, filterFromQuery(query))
+		var jsonBytes []byte
+		var err error
+		if _, ok := query["pretty"]; ok {
+			jsonBytes, err = json.MarshalIndent(spec, "", "  ")
+		} else {
+			jsonBytes, err = json.Marshal(spec)
+		}
 		if err != nil {
 			http.Error(w, "Failed to marshal OpenAPI spec", http.StatusInternalServerError)
 			return
@@ -720,7 +720,7 @@ func (hh *HostHandler) pageHandlerFunc(
 				if r.URL.RawQuery != "" {
 					returnURL += "?" + r.URL.RawQuery
 				}
-				redirectURL := "/~/login?return=" + url.QueryEscape(returnURL)
+				redirectURL := "/-/login?return=" + url.QueryEscape(returnURL)
 				http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 				return
 			}
@@ -752,7 +752,7 @@ func (hh *HostHandler) pageHandlerFunc(
 }
 
 func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	const path = "/~/schema/{path...}"
+	const path = "/-/schema/{path...}"
 
 	type schemaEntry struct {
 		name   string
@@ -766,9 +766,11 @@ func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
 				path: {
-					Description: "Serves individual JSONschema fragments from the registered OpenAPI specifications. The path should be in the format /~/schema/{basePath}/{schemaName} (e.g., /~/schema/v1/users/User) or simply /~/schema/{schemaName} for a global lookup.",
+					Description: "Serves individual JSONschema from the registered OpenAPI specifications. The path should be in the format /-/schema/{basePath}/{schemaName} (e.g., /-/schema/v1/users/User) or simply /-/schema/{schemaName} for a global lookup.",
 					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(path, "", http.Header{}),
+						Description: "GET JSONschema",
+						OperationID: "schema-get",
+						Parameters:  ko.ExtractParameters(path, "", http.Header{}),
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -786,8 +788,10 @@ func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 								Description: openapi.Ptr("Internal server error"),
 							}),
 						),
+						Summary: "JSONschema",
+						Tags:    []string{"system", "jsonschema", "schema", "openapi"},
 					},
-					Summary: "JSONschema Fragment Provider",
+					Summary: "JSONschema Provider",
 				},
 			},
 		},
@@ -829,7 +833,7 @@ func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 			}
 		}
 
-		// 2. Namespaced lookup if global failed: /~/schema/{basePath}/{schemaName}
+		// 2. Namespaced lookup if global failed: /-/schema/{basePath}/{schemaName}
 		if foundSchema == nil {
 			fullPath := "/" + requested
 			var bestMatchPath string
@@ -869,18 +873,55 @@ func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	if hh.sniffer != nil {
 		// Register Inspect Handler
-		mux.HandleFunc("/~/sniffer/inspect/{uuid}", hh.InspectHandler)
+		const inspectPath = "/-/sniffer/inspect/{uuid}"
+		mux.HandleFunc("GET "+inspectPath, hh.InspectHandler)
 
-		const path = "/~/sniffer/docs"
-		mux.HandleFunc("GET "+path, hh.sniffer.DocsHandler)
-		registeredPaths[path] = ko.PathInfo{
+		const docsPath = "/-/sniffer/docs"
+		mux.HandleFunc("GET "+docsPath, hh.sniffer.DocsHandler)
+
+		registeredPaths[docsPath] = ko.PathInfo{
 			API: ko.OpenAPI{
-				BasePath: path,
+				BasePath: docsPath,
 				Paths: map[string]ko.PathItem{
-					path: {
+					inspectPath: {
+						Description: "Provides inspection dashboard for the Request Sniffer's computed results.",
+						Get: &openapi.Operation{
+							Description: "GET Sniffer dashboard",
+							OperationID: "sniffer-dashboard-get",
+							Parameters:  ko.ExtractParameters(inspectPath, "format=text", http.Header{}),
+							Responses: openapi.NewResponses(
+								openapi.WithName("200", &openapi.Response{
+									Description: openapi.Ptr("Dashboard"),
+									Content: openapi.NewContentWithSchema(
+										&openapi.Schema{
+											Format: "text",
+											Type:   &openapi.Types{openapi.TypeString},
+										},
+										[]string{"text/plain"},
+									),
+								}),
+								openapi.WithName("200", &openapi.Response{
+									Description: openapi.Ptr("Dashboard"),
+									Content: openapi.NewContentWithSchema(
+										&openapi.Schema{
+											Format: "html",
+											Type:   &openapi.Types{openapi.TypeString},
+										},
+										[]string{"text/html"},
+									),
+								}),
+							),
+							Summary: "Sniffer Dashboard",
+							Tags:    []string{"system", "sniffer", "dashboard"},
+						},
+						Summary: "Provides inspection dashboard",
+					},
+					docsPath: {
 						Description: "Provides Markdown documentation for the Request Sniffer's supported headers and behaviors.",
 						Get: &openapi.Operation{
-							Parameters: ko.ExtractParameters(path, "", http.Header{}),
+							Description: "GET Sniffer Docs",
+							OperationID: "sniffer-docs-get",
+							Parameters:  ko.ExtractParameters(docsPath, "", http.Header{}),
 							Responses: openapi.NewResponses(
 								openapi.WithName("200", &openapi.Response{
 									Description: openapi.Ptr("Markdown"),
@@ -893,6 +934,8 @@ func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 									),
 								}),
 							),
+							Summary: "Sniffer Docs",
+							Tags:    []string{"system", "sniffer", "docs"},
 						},
 						Summary: "Request Sniffer Documentation",
 					},
@@ -904,7 +947,7 @@ func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 }
 
 func (hh *HostHandler) stateHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	const path = "/~/state/"
+	const path = "/-/state/"
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := auth.GetClaims(r.Context())
 		if !ok {
@@ -926,6 +969,8 @@ func (hh *HostHandler) stateHandler(mux *http.ServeMux, registeredPaths map[stri
 				path: {
 					Description: "Returns the current authenticated session state (claims) without requiring the client to parse the JWT.",
 					Get: &openapi.Operation{
+						Description: "GET authenticated session state",
+						OperationID: "state-get",
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -941,8 +986,10 @@ func (hh *HostHandler) stateHandler(mux *http.ServeMux, registeredPaths map[stri
 								Description: openapi.Ptr("User is not authenticated"),
 							}),
 						),
+						Summary: "Authenticated session state",
+						Tags:    []string{"system", "state", "auth"},
 					},
-					Summary: "Session State",
+					Summary: "The current authenticated session state (claims)",
 				},
 			},
 		},
@@ -951,7 +998,7 @@ func (hh *HostHandler) stateHandler(mux *http.ServeMux, registeredPaths map[stri
 }
 
 func (hh *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	const path = "/~/translation/{l10n}"
+	const path = "/-/translation/{l10n}"
 	mux.HandleFunc(
 		"GET "+path,
 		func(w http.ResponseWriter, r *http.Request) {
@@ -1006,78 +1053,40 @@ func (hh *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 		},
 	)
 
-	op := &openapi.Operation{
-		Parameters: ko.ExtractParameters(path, "key=one&key=two", http.Header{}),
-		Responses: openapi.NewResponses(
-			openapi.WithName("200", &openapi.Response{
-				Description: openapi.Ptr("JSON translation map"),
-				Content: openapi.NewContentWithSchema(
-					&openapi.Schema{
-						AdditionalProperties: openapi.AdditionalProperties{
-							Has: openapi.Ptr(true),
-						},
-						Type: &openapi.Types{openapi.TypeObject},
-					},
-					[]string{"application/json"},
-				),
-			}),
-			openapi.WithName("500", &openapi.Response{
-				Description: openapi.Ptr("Internal server error"),
-			}),
-		),
-	}
-
 	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
 			Paths: map[string]ko.PathItem{
 				path: {
-					Description: "Provides a JSON map of localization keys and their translated values for a given language tag.",
-					Get:         op,
-					Summary:     "Localization Key Provider",
+					Description: "Provides localization keys and their translated values for a given language tag as JSON.",
+					Get: &openapi.Operation{
+						Description: "GET localization keys and their translated values",
+						OperationID: "translation-get",
+						Parameters:  ko.ExtractParameters(path, "key=one&key=two", http.Header{}),
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Description: openapi.Ptr("JSON translation map"),
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										AdditionalProperties: openapi.AdditionalProperties{
+											Has: openapi.Ptr(true),
+										},
+										Type: &openapi.Types{openapi.TypeObject},
+									},
+									[]string{"application/json"},
+								),
+							}),
+							openapi.WithName("500", &openapi.Response{
+								Description: openapi.Ptr("Internal server error"),
+							}),
+						),
+						Summary: "Localization keys and their translated values",
+						Tags:    []string{"system", "translation", "localization"},
+					},
+					Summary: "Localization keys and their translated values",
 				},
 			},
 		},
 		Type: ko.SystemPathType,
 	}, registeredPaths)
-}
-
-func (hh *HostHandler) unimplementedHandler(pattern string, mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	mux.HandleFunc(
-		pattern,
-		func(w http.ResponseWriter, r *http.Request) {
-			hh.log.V(1).Info("unimplemented handler", "path", r.URL.Path)
-			err := fmt.Errorf(`{"path": "%s", "message": "Nothing here yet..."}`, r.URL.Path)
-			http.Error(w, err.Error(), http.StatusNotImplemented)
-		},
-	)
-
-	parts := strings.Split(pattern, " ")
-	path := pattern
-	if len(parts) > 1 {
-		path = parts[1]
-	}
-
-	info := ko.PathInfo{
-		API: ko.OpenAPI{
-			BasePath: path,
-			Paths: map[string]ko.PathItem{
-				path: {
-					Description: fmt.Sprintf("Internal system endpoint providing %s functionality. NOT YET IMPLEMENTED!", path),
-					Get: &openapi.Operation{
-						Parameters: ko.ExtractParameters(path, "", http.Header{}),
-						Responses: openapi.NewResponses(
-							openapi.WithName("501", &openapi.Response{
-								Description: openapi.Ptr("Not Implemented - This system endpoint is defined but not yet functional."),
-							}),
-						),
-					},
-					Summary: fmt.Sprintf("System Endpoint: %s", path),
-				},
-			},
-		},
-		Type: ko.SystemPathType,
-	}
-
-	hh.registerPath(path, info, registeredPaths)
 }

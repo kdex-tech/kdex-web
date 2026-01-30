@@ -660,48 +660,48 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 		}
 		wildcardPath := basePath + "{path...}"
 
-		// Create generic GET operation for static content
-		op := &openapi.Operation{
-			Description: description,
-			Parameters:  ko.ExtractParameters(wildcardPath, "", http.Header{}),
-			Responses: openapi.NewResponses(
-				openapi.WithName("200", &openapi.Response{
-					Content: openapi.NewContentWithSchema(
-						&openapi.Schema{
-							Format: "binary",
-							Type:   &openapi.Types{openapi.TypeString},
-						},
-						[]string{"*/*"},
-					),
-					Description: openapi.Ptr("Static content"),
-					Headers: openapi.Headers{
-						"Content-Type": &openapi.HeaderRef{
-							Value: &openapi.Header{
-								Parameter: openapi.Parameter{
-									Description: "The MIME type of the file (image/png, text/css, text/html, etc.)",
-									Schema: openapi.NewSchemaRef("", &openapi.Schema{
-										Type: &openapi.Types{openapi.TypeString},
-									}),
-								},
-							},
-						},
-					},
-				}),
-				openapi.WithName("404", &openapi.Response{
-					Description: openapi.Ptr("Resource not found"),
-				}),
-			),
-			Summary: summary,
-		}
-
 		pathInfo := ko.PathInfo{
 			API: ko.OpenAPI{
 				BasePath: basePath,
 				Paths: map[string]ko.PathItem{
 					wildcardPath: {
 						Description: description,
-						Get:         op,
-						Summary:     summary,
+						// Create generic GET operation for static content
+						Get: &openapi.Operation{
+							Description: "GET " + description,
+							OperationID: backend.Name + "-get",
+							Parameters:  ko.ExtractParameters(wildcardPath, "", http.Header{}),
+							Responses: openapi.NewResponses(
+								openapi.WithName("200", &openapi.Response{
+									Content: openapi.NewContentWithSchema(
+										&openapi.Schema{
+											Format: "binary",
+											Type:   &openapi.Types{openapi.TypeString},
+										},
+										[]string{"*/*"},
+									),
+									Description: openapi.Ptr("Static content"),
+									Headers: openapi.Headers{
+										"Content-Type": &openapi.HeaderRef{
+											Value: &openapi.Header{
+												Parameter: openapi.Parameter{
+													Description: "The MIME type of the file (image/png, text/css, text/html, etc.)",
+													Schema: openapi.NewSchemaRef("", &openapi.Schema{
+														Type: &openapi.Types{openapi.TypeString},
+													}),
+												},
+											},
+										},
+									},
+								}),
+								openapi.WithName("404", &openapi.Response{
+									Description: openapi.Ptr("Resource not found"),
+								}),
+							),
+							Summary: "GET " + summary,
+							Tags:    []string{"backend"},
+						},
+						Summary: summary,
 					},
 				},
 			},

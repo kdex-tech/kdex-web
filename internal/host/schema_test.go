@@ -80,36 +80,36 @@ func TestHostHandler_SchemaHandler(t *testing.T) {
 	}{
 		{
 			name:       "global lookup - unique",
-			path:       "/~/schema/Address",
+			path:       "/-/schema/Address",
 			wantCode:   http.StatusOK,
 			wantSchema: addrSchema,
 		},
 		{
 			name:       "global lookup - first win",
-			path:       "/~/schema/User",
+			path:       "/-/schema/User",
 			wantCode:   http.StatusOK,
 			wantSchema: addrSchema, // sorting order guarantees common schema will return first
 		},
 		{
 			name:       "namespaced lookup - User in v1/users",
-			path:       "/~/schema/v1/users/User",
+			path:       "/-/schema/v1/users/User",
 			wantCode:   http.StatusOK,
 			wantSchema: userSchema,
 		},
 		{
 			name:       "namespaced lookup - User in v1/common",
-			path:       "/~/schema/v1/common/User",
+			path:       "/-/schema/v1/common/User",
 			wantCode:   http.StatusOK,
 			wantSchema: addrSchema,
 		},
 		{
 			name:     "not found",
-			path:     "/~/schema/NonExistent",
+			path:     "/-/schema/NonExistent",
 			wantCode: http.StatusNotFound,
 		},
 		{
 			name:     "namespaced not found",
-			path:     "/~/schema/v1/users/Address",
+			path:     "/-/schema/v1/users/Address",
 			wantCode: http.StatusNotFound,
 		},
 	}

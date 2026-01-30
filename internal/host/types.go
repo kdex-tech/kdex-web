@@ -20,10 +20,11 @@ import (
 const (
 	kdexUIMetaTemplate = `<meta
 	name="kdex-ui"
+	data-navigation-endpoint="/-/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
+	data-openapi-endpoint="/-/openapi"
 	data-page-basepath="%s"
-	data-navigation-endpoint="/~/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
-	data-openapi-endpoint="/~/openapi"
 	data-page-patternpath="%s"
+	data-path-separator="/-/"
 	/>
 	`
 )

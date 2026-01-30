@@ -667,5 +667,9 @@ func matchFilter(routePath string, info PathInfo, filter Filter) bool {
 }
 
 func toOpenAPIPath(routePath string) string {
-	return strings.ReplaceAll(wildcardRegex.ReplaceAllString(routePath, "}"), "{$}", "")
+	routePath = strings.ReplaceAll(wildcardRegex.ReplaceAllString(routePath, "}"), "{$}", "")
+	if routePath == "/" {
+		return routePath
+	}
+	return strings.TrimSuffix(routePath, "/")
 }

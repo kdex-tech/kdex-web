@@ -220,10 +220,9 @@ func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 		patternPath,
 	)
 
-	// data-check-batch-endpoint="/~/check/batch"
-	// data-check-single-endpoint="/~/check/single"
-	// data-path-separator="/_/"
-	// data-state-endpoint="/~/state"
+	// data-check-batch-endpoint="/-/check/batch"
+	// data-check-single-endpoint="/-/check/single"
+	// data-state-endpoint="/-/state"
 
 	return buffer.String()
 }
@@ -497,8 +496,6 @@ func (hh *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathI
 	hh.schemaHandler(mux, registeredPaths)
 
 	// TODO: implement a check handler
-
-	// hh.unimplementedHandler("GET /~/check/", mux, registeredPaths)
 
 	return mux
 }

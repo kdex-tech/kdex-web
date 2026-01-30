@@ -1699,7 +1699,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 func TestRequestSniffer_DocsHandler(t *testing.T) {
 	s := &RequestSniffer{}
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/~/sniffer/docs", nil)
+	r := httptest.NewRequest("GET", "/-/sniffer/docs", nil)
 
 	s.DocsHandler(w, r)
 
@@ -1719,8 +1719,8 @@ func TestRequestSniffer_sniff_A(t *testing.T) {
 		wantErr   string
 	}{
 		{
-			name: "GET /~/internal",
-			r:    httptest.NewRequest("GET", "/~/internal", http.NoBody),
+			name: "GET /-/internal",
+			r:    httptest.NewRequest("GET", "/-/internal", http.NoBody),
 			want: nil,
 		},
 		{

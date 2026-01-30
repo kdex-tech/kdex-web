@@ -93,7 +93,7 @@ func NewConfig(ctx context.Context, c client.Client, auth *kdexv1alpha1.Auth, na
 			cfg.ClientID = auth.OIDCProvider.ClientID
 			cfg.ClientSecret = clientSecret
 			cfg.OIDCProviderURL = auth.OIDCProvider.OIDCProviderURL
-			cfg.RedirectURL = "/~/oauth/callback"
+			cfg.RedirectURL = "/-/oauth/callback"
 			cfg.Scopes = auth.OIDCProvider.Scopes
 		}
 	}
