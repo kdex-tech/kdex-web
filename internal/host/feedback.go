@@ -120,6 +120,61 @@ func (ac *AnalysisCache) reap() {
 	}
 }
 
+// isAgent detects AI agents and crawlers by checking for known bot identifiers in the user-agent string.
+// This uses specific bot names to avoid false positives from overly broad patterns.
+func isAgent(userAgent string) bool {
+	userAgent = strings.ToLower(userAgent)
+
+	// Common AI agent patterns
+	agentPatterns := []string{
+		// OpenAI
+		"gptbot",
+		"chatgpt-user",
+
+		// Anthropic
+		"claude-web",
+		"anthropic-ai",
+
+		// Google AI
+		"google-extended",
+		"googlebot",
+		"bard",
+		"gemini",
+
+		// Perplexity
+		"perplexitybot",
+		"perplexity",
+
+		// Other AI services
+		"cohere-ai",
+		"ai2bot",
+
+		// Common crawlers
+		"ccbot",      // Common Crawl
+		"bytespider", // ByteDance/TikTok
+		"applebot",
+		"facebookbot",
+		"twitterbot",
+		"linkedinbot",
+		"slackbot",
+		"discordbot",
+
+		// Generic bot indicators (more specific)
+		"bot/",
+		"crawler",
+		"spider",
+		"scraper",
+	}
+
+	for _, pattern := range agentPatterns {
+		if strings.Contains(userAgent, pattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // User-Agent detection for CLI tools
 func isCLI(userAgent string) bool {
 	userAgent = strings.ToLower(userAgent)
@@ -179,7 +234,9 @@ func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 
 			// Smart Redirection
 			format := "html"
-			if isCLI(r.UserAgent()) || strings.Contains(r.Header.Get("Accept"), "text/plain") {
+			if isAgent(r.UserAgent()) {
+				format = "json"
+			} else if isCLI(r.UserAgent()) || strings.Contains(r.Header.Get("Accept"), "text/plain") {
 				format = "text"
 			}
 
@@ -264,10 +321,7 @@ func (hh *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if len(result.Lints) > 0 {
-			lints := []string{}
-			for _, lint := range result.Lints {
-				lints = append(lints, lint)
-			}
+			lints := append([]string{}, result.Lints...)
 			feedback["lints"] = lints
 		}
 
