@@ -89,14 +89,14 @@ func TestNewExchanger(t *testing.T) {
 			}
 
 			return &Identity{
-				Email:   subject,
-				Extra:   extra,
-				Subject: subject,
-				Scopes:  []string{"foo", "bar"},
+				Email:        subject,
+				Extra:        extra,
+				Subject:      subject,
+				Entitlements: []string{"foo", "bar"},
 			}, nil
 		},
-		resolveScopes: func(subject string) ([]string, error) {
-			return []string{"page:read"}, nil
+		resolveRolesAndEntitlements: func(subject string) ([]string, []string, error) {
+			return nil, []string{"page:read"}, nil
 		},
 	}
 
@@ -338,14 +338,14 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			}
 
 			return &Identity{
-				Email:   subject,
-				Extra:   extra,
-				Subject: subject,
-				Scopes:  []string{"foo", "bar"},
+				Email:        subject,
+				Extra:        extra,
+				Subject:      subject,
+				Entitlements: []string{"foo", "bar"},
 			}, nil
 		},
-		resolveScopes: func(subject string) ([]string, error) {
-			return []string{"page:read"}, nil
+		resolveRolesAndEntitlements: func(subject string) ([]string, []string, error) {
+			return nil, []string{"page:read"}, nil
 		},
 	}
 
@@ -718,11 +718,11 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				iss, err := claims.GetIssuer()
 				assert.Nil(t, err)
 				assert.Equal(t, cfg.OIDCProviderURL, iss)
-				scopes := []string{}
-				for _, s := range claims["scopes"].([]any) {
-					scopes = append(scopes, s.(string))
+				entitlements := []string{}
+				for _, s := range claims["entitlements"].([]any) {
+					entitlements = append(entitlements, s.(string))
 				}
-				assert.Equal(t, []string{"page:read"}, scopes)
+				assert.Equal(t, []string{"page:read"}, entitlements)
 			},
 		},
 	}
@@ -788,7 +788,7 @@ func TokenHandler(cfg Config) http.HandlerFunc {
 
 		// 4. Generate the ID Token (using your SignToken function)
 		// We usually include 'aud' (client_id) and 'sub' (user id)
-		idToken, err := SignToken(code, "email@foo.bar", clientID, issuer, []string{"openid", "email"}, nil, cfg.ActivePair, 5*time.Minute)
+		idToken, err := SignToken(code, "email@foo.bar", clientID, issuer, nil, cfg.ActivePair, 5*time.Minute)
 		if err != nil {
 			http.Error(w, "failed to sign token", http.StatusInternalServerError)
 			return
@@ -812,17 +812,17 @@ func TokenHandler(cfg Config) http.HandlerFunc {
 }
 
 type mockScopeProvider struct {
-	resolveIdentity     func(subject string, password string, identity *Identity) error
-	resolveScopes       func(subject string) ([]string, error)
-	verifyLocalIdentity func(subject string, password string) (*Identity, error)
+	resolveIdentity             func(subject string, password string, identity *Identity) error
+	resolveRolesAndEntitlements func(subject string) ([]string, []string, error)
+	verifyLocalIdentity         func(subject string, password string) (*Identity, error)
 }
 
 func (m *mockScopeProvider) ResolveIdentity(subject string, password string, identity *Identity) error {
 	return m.resolveIdentity(subject, password, identity)
 }
 
-func (m *mockScopeProvider) ResolveScopes(subject string) ([]string, error) {
-	return m.resolveScopes(subject)
+func (m *mockScopeProvider) ResolveRolesAndEntitlements(subject string) ([]string, []string, error) {
+	return m.resolveRolesAndEntitlements(subject)
 }
 
 func (m *mockScopeProvider) VerifyLocalIdentity(subject string, password string) (*Identity, error) {

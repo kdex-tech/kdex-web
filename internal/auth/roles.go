@@ -11,22 +11,23 @@ import (
 )
 
 type Identity struct {
-	Email      string
-	Extra      map[string]any
-	FamilyName string
-	GivenName  string
-	MiddleName string
-	Name       string
-	Nickname   string
-	Picture    string
-	Scopes     []string
-	Subject    string
-	UpdatedAt  int64
+	Email        string
+	Extra        map[string]any
+	FamilyName   string
+	GivenName    string
+	MiddleName   string
+	Name         string
+	Nickname     string
+	Picture      string
+	Roles        []string
+	Entitlements []string
+	Subject      string
+	UpdatedAt    int64
 }
 
 type ScopeProvider interface {
 	ResolveIdentity(subject string, password string, identity *Identity) error
-	ResolveScopes(subject string) ([]string, error)
+	ResolveRolesAndEntitlements(subject string) ([]string, []string, error)
 	VerifyLocalIdentity(subject string, password string) (*Identity, error)
 }
 
@@ -95,13 +96,13 @@ func (rp *scopeProvider) ResolveIdentity(subject string, password string, identi
 	return nil
 }
 
-func (rp *scopeProvider) ResolveScopes(subject string) ([]string, error) {
+func (rp *scopeProvider) ResolveRolesAndEntitlements(subject string) ([]string, []string, error) {
 	roles, err := rp.resolveRoles(subject)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve roles: %w", err)
+		return nil, nil, fmt.Errorf("failed to resolve roles: %w", err)
 	}
 
-	return rp.collectScopes(roles), nil
+	return roles, rp.collectEntitlements(roles), nil
 }
 
 func (rp *scopeProvider) VerifyLocalIdentity(subject string, password string) (*Identity, error) {
@@ -115,12 +116,13 @@ func (rp *scopeProvider) VerifyLocalIdentity(subject string, password string) (*
 		return nil, fmt.Errorf("invalid identity %w", err)
 	}
 
-	scopes, err := rp.ResolveScopes(subject)
+	roles, entitlements, err := rp.ResolveRolesAndEntitlements(subject)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve scopes: %w", err)
 	}
 
-	localIdentity.Scopes = scopes
+	localIdentity.Roles = roles
+	localIdentity.Entitlements = entitlements
 
 	return localIdentity, nil
 }
@@ -135,7 +137,7 @@ func (rp *scopeProvider) collectRoles() (*kdexv1alpha1.KDexRoleList, error) {
 	return &roles, nil
 }
 
-func (rp *scopeProvider) collectScopes(roles []string) []string {
+func (rp *scopeProvider) collectEntitlements(roles []string) []string {
 	scopes := []string{}
 	for _, role := range roles {
 		scopes = append(scopes, rp.rolesMap[role]...)
@@ -146,10 +148,10 @@ func (rp *scopeProvider) collectScopes(roles []string) []string {
 func (rp *scopeProvider) buildMappingTable(roles *kdexv1alpha1.KDexRoleList) map[string][]string {
 	table := map[string][]string{}
 
-	for _, scope := range roles.Items {
-		table[scope.Name] = []string{}
+	for _, role := range roles.Items {
+		table[role.Name] = []string{}
 
-		for _, rule := range scope.Spec.Rules {
+		for _, rule := range role.Spec.Rules {
 			resourceNames := rule.ResourceNames
 
 			if len(resourceNames) == 0 {
@@ -159,7 +161,7 @@ func (rp *scopeProvider) buildMappingTable(roles *kdexv1alpha1.KDexRoleList) map
 			for _, resource := range rule.Resources {
 				for _, resourceName := range resourceNames {
 					for _, verb := range rule.Verbs {
-						table[scope.Name] = append(table[scope.Name], fmt.Sprintf("%s:%s:%s", resource, resourceName, verb))
+						table[role.Name] = append(table[role.Name], fmt.Sprintf("%s:%s:%s", resource, resourceName, verb))
 					}
 				}
 			}

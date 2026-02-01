@@ -601,7 +601,7 @@ func TestConfig_AddAuthentication(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/foo", http.NoBody)
 
-				token, err := SignToken("foo", "foo@foo.bar", got.ClientID, "issuer", []string{}, nil, got.ActivePair, got.TokenTTL)
+				token, err := SignToken("foo", "foo@foo.bar", got.ClientID, "issuer", nil, got.ActivePair, got.TokenTTL)
 				assert.Nil(t, err)
 
 				r.Header.Set("Authorization", "Bearer "+token)
@@ -626,7 +626,7 @@ func TestConfig_AddAuthentication(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/foo", http.NoBody)
 
-				token, err := SignToken("foo", "foo@foo.bar", got.ClientID, "issuer", []string{}, nil, got.ActivePair, got.TokenTTL)
+				token, err := SignToken("foo", "foo@foo.bar", got.ClientID, "issuer", nil, got.ActivePair, got.TokenTTL)
 				assert.Nil(t, err)
 
 				r.Header.Set("Cookie", "auth_token="+token)
@@ -651,7 +651,7 @@ func TestConfig_AddAuthentication(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/foo", http.NoBody)
 
-				token, err := SignToken("foo", "foo@foo.bar", got.ClientID, "issuer", []string{}, nil, got.ActivePair, 1*time.Microsecond)
+				token, err := SignToken("foo", "foo@foo.bar", got.ClientID, "issuer", nil, got.ActivePair, 1*time.Microsecond)
 				assert.Nil(t, err)
 
 				r.Header.Set("Cookie", "auth_token="+token)
@@ -686,14 +686,14 @@ func TestConfig_OIDC(t *testing.T) {
 			}
 
 			return &Identity{
-				Email:   subject,
-				Extra:   extra,
-				Subject: subject,
-				Scopes:  []string{"foo", "bar"},
+				Email:        subject,
+				Extra:        extra,
+				Subject:      subject,
+				Entitlements: []string{"foo", "bar"},
 			}, nil
 		},
-		resolveScopes: func(subject string) ([]string, error) {
-			return nil, nil
+		resolveRolesAndEntitlements: func(subject string) ([]string, []string, error) {
+			return nil, nil, nil
 		},
 	}
 

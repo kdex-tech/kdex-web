@@ -87,7 +87,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages"},
+				Entitlements: []string{"pages"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -102,7 +102,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages"},
+				Entitlements: []string{"pages"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -116,7 +116,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"users"},
+				Entitlements: []string{"users"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -130,7 +130,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"read"},
+				Entitlements: []string{"read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -144,7 +144,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"read"},
+				Entitlements: []string{"read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -159,7 +159,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages:1:read"},
+				Entitlements: []string{"pages:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -173,7 +173,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages::read"},
+				Entitlements: []string{"pages::read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -187,7 +187,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages:read"},
+				Entitlements: []string{"pages:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -201,7 +201,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages:1:read"},
+				Entitlements: []string{"pages:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -215,7 +215,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages:read"},
+				Entitlements: []string{"pages:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -229,7 +229,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages:1:read"},
+				Entitlements: []string{"pages:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -243,7 +243,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages:1:read"},
+				Entitlements: []string{"pages:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -257,7 +257,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages:all"},
+				Entitlements: []string{"pages:all"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -271,7 +271,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages:all"},
+				Entitlements: []string{"pages:all"},
 			},
 			req:      []v1alpha1.SecurityRequirement{},
 			succeeds: true,
@@ -281,7 +281,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "pages",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"pages:1:all"},
+				Entitlements: []string{"pages:1:all"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -295,7 +295,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"foo:1:all"},
+				Entitlements: []string{"foo:1:all"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -309,7 +309,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"foo:1:foo"},
+				Entitlements: []string{"foo:1:foo"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -323,7 +323,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"foo:1:read"},
+				Entitlements: []string{"foo:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -340,7 +340,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"admin"},
+				Entitlements: []string{"admin"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -358,7 +358,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"foo:1:read"},
+				Entitlements: []string{"foo:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -373,7 +373,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"admin"},
+				Entitlements: []string{"admin"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -388,7 +388,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
-				Scopes: []string{"foo:1:read", "admin"},
+				Entitlements: []string{"foo:1:read", "admin"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{

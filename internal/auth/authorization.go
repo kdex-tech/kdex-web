@@ -65,14 +65,14 @@ func (ac *AuthorizationChecker) CheckAccess(
 	}
 	// the scopes grated to ananonymous, merge with any existing
 	for _, anonGrant := range ac.anonymousGrants {
-		if !slices.Contains(claims.Scopes, anonGrant) {
-			claims.Scopes = append(claims.Scopes, anonGrant)
+		if !slices.Contains(claims.Entitlements, anonGrant) {
+			claims.Entitlements = append(claims.Entitlements, anonGrant)
 		}
 	}
 
 	ac.log.V(2).Info("CheckAccess", "claim", claims, "requirements", requirements)
 
-	return ac.validateSecurityRequirements(requirements, claims.Scopes), nil
+	return ac.validateSecurityRequirements(requirements, claims.Entitlements), nil
 }
 
 // validateSecurityRequirements checks if the user's scopes satisfy the security requirements.
@@ -80,7 +80,7 @@ func (ac *AuthorizationChecker) CheckAccess(
 // For our implementation, we expect a key like "oauth2" or "jwt" with scope values.
 func (ac *AuthorizationChecker) validateSecurityRequirements(
 	requirements []kdexv1alpha1.SecurityRequirement,
-	userScopes []string,
+	entitlements []string,
 ) bool {
 	// If no requirements, access is granted
 	if len(requirements) == 0 {
@@ -90,7 +90,7 @@ func (ac *AuthorizationChecker) validateSecurityRequirements(
 
 	// Requirements are OR'd - user needs to satisfy at least one
 	for _, requirement := range requirements {
-		if ac.satisfiesRequirement(requirement, userScopes) {
+		if ac.satisfiesRequirement(requirement, entitlements) {
 			return true
 		}
 	}

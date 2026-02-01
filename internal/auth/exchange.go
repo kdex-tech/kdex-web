@@ -82,7 +82,7 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken
 	email, _ := claims["email"].(string)
 	sub, _ := claims["sub"].(string)
 
-	scopes, err := e.sp.ResolveScopes(sub)
+	roles, entitlements, err := e.sp.ResolveRolesAndEntitlements(sub)
 	if err != nil {
 		return "", err
 	}
@@ -99,8 +99,11 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken
 		}
 	}
 
+	extra["roles"] = roles
+	extra["entitlements"] = entitlements
+
 	// 3. Mint Local Token
-	return SignToken(sub, email, e.config.ClientID, issuer, scopes, extra, e.config.ActivePair, e.config.TokenTTL)
+	return SignToken(sub, email, e.config.ClientID, issuer, extra, e.config.ActivePair, e.config.TokenTTL)
 }
 
 func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, password string) (string, error) {
@@ -141,7 +144,14 @@ func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, pas
 		extra["updated_at"] = identity.UpdatedAt
 	}
 
-	return SignToken(username, identity.Email, e.config.ClientID, issuer, identity.Scopes, extra, e.config.ActivePair, e.config.TokenTTL)
+	if len(identity.Entitlements) > 0 {
+		extra["entitlements"] = identity.Entitlements
+	}
+	if len(identity.Roles) > 0 {
+		extra["roles"] = identity.Roles
+	}
+
+	return SignToken(username, identity.Email, e.config.ClientID, issuer, extra, e.config.ActivePair, e.config.TokenTTL)
 }
 
 func (e *Exchanger) MapClaims(rules []CompiledMappingRule, rawClaims map[string]any) (map[string]any, error) {

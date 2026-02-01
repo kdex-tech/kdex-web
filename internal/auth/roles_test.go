@@ -276,9 +276,9 @@ func TestNewRoleProvider(t *testing.T) {
 			controllerNamespace: "foo",
 			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				scopes, err := got.ResolveScopes("")
+				_, entitlements, err := got.ResolveRolesAndEntitlements("")
 				assert.Nil(t, err)
-				assert.Equal(t, []string{}, scopes)
+				assert.Equal(t, []string{}, entitlements)
 			},
 		},
 		{
@@ -320,9 +320,9 @@ func TestNewRoleProvider(t *testing.T) {
 			controllerNamespace: "foo",
 			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				scopes, err := got.ResolveScopes("username")
+				_, entitlements, err := got.ResolveRolesAndEntitlements("username")
 				assert.Nil(t, err)
-				assert.Equal(t, []string{"page::read", "page::write"}, scopes)
+				assert.Equal(t, []string{"page::read", "page::write"}, entitlements)
 			},
 		},
 		{
@@ -436,7 +436,7 @@ func TestNewRoleProvider(t *testing.T) {
 				assert.NotNil(t, ident)
 				assert.Equal(t, "username", ident.Subject)
 				assert.Equal(t, "username@email.foo", ident.Email)
-				assert.Equal(t, []string{"page::read", "page::write"}, ident.Scopes)
+				assert.Equal(t, []string{"page::read", "page::write"}, ident.Entitlements)
 			},
 		},
 	}
