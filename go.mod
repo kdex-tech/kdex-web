@@ -2,12 +2,12 @@ module kdex.dev/web
 
 go 1.25.0
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.85
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.86
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/coreos/go-oidc/v3 v3.17.0
-	github.com/daveshanley/vacuum v0.23.1
+	github.com/daveshanley/vacuum v0.23.5 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-logr/logr v1.4.3
@@ -17,7 +17,7 @@ require (
 	github.com/onsi/gomega v1.38.2
 	// Pin to compatible versions to avoid breaking changes
 	github.com/pb33f/libopenapi v0.31.2 // indirect
-	github.com/pb33f/libopenapi-validator v0.10.1 // indirect
+	github.com/pb33f/libopenapi-validator v0.10.2 // indirect
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/text v0.33.0
 	k8s.io/api v0.35.0
