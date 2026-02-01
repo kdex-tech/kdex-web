@@ -255,6 +255,30 @@ func (hh *HostHandler) InspectHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 		return
+	} else if format == "json" {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		responseBody := map[string]any{}
+		feedback := map[string]any{
+			"method": result.OriginalRequest.Method,
+			"path":   result.OriginalRequest.URL.Path,
+		}
+
+		if len(result.Lints) > 0 {
+			lints := []string{}
+			for _, lint := range result.Lints {
+				lints = append(lints, lint)
+			}
+			feedback["lints"] = lints
+		}
+
+		responseBody["feedback"] = feedback
+		responseBody["spec"] = spec
+
+		err := json.NewEncoder(w).Encode(responseBody)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
 	}
 
 	// HTML Dashboard
