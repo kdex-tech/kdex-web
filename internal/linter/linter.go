@@ -2,6 +2,7 @@ package linter
 
 import (
 	"os"
+	"slices"
 
 	"github.com/daveshanley/vacuum/model"
 	"github.com/daveshanley/vacuum/motor"
@@ -38,6 +39,12 @@ func LintSpec(spec []byte) ([]model.RuleFunctionResult, error) {
 		selectedRuleSet = defaultRuleSets.GenerateOpenAPIRecommendedRuleSet()
 	} else {
 		selectedRuleSet = defaultRuleSets.GenerateOpenAPIRecommendedRuleSet()
+
+		for id, rule := range selectedRuleSet.Rules {
+			if rule.Severity == "info" {
+				delete(selectedRuleSet.Rules, id)
+			}
+		}
 	}
 
 	// Explicitly limit to OAS 3.0.x rules only
@@ -47,13 +54,7 @@ func LintSpec(spec []byte) ([]model.RuleFunctionResult, error) {
 			delete(selectedRuleSet.Rules, id)
 		}
 
-		isOAS3 := false
-		for _, f := range rule.Formats {
-			if f == "oas3" {
-				isOAS3 = true
-				break
-			}
-		}
+		isOAS3 := slices.Contains(rule.Formats, "oas3")
 		if !isOAS3 {
 			delete(selectedRuleSet.Rules, id)
 		}
