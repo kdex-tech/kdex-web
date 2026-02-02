@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -967,8 +966,16 @@ func (s *RequestSniffer) sniff(r *http.Request) (*kdexv1alpha1.KDexFunction, err
 		}
 	}
 
-	if !slices.Contains(fn.Spec.Metadata.Tags, fn.Name) {
-		fn.Spec.Metadata.Tags = append(fn.Spec.Metadata.Tags, fn.Name)
+	found := false
+	for _, tag := range fn.Spec.Metadata.Tags {
+		if tag.Name == fn.Name {
+			found = true
+		}
+	}
+	if !found {
+		fn.Spec.Metadata.Tags = append(fn.Spec.Metadata.Tags, kdexv1alpha1.Tag{
+			Name: fn.Name,
+		})
 	}
 
 	s.mergeAPIIntoFunction(
