@@ -248,7 +248,7 @@ func (b *Builder) BuildOpenAPI(
 				if op.Description == "" {
 					op.Description = curItem.Description
 				}
-				for _, tag := range pathInfo.Metadata.Tags {
+				for _, tag := range metaTags {
 					if !slices.Contains(op.Tags, tag.Name) {
 						op.Tags = append(op.Tags, tag.Name)
 					}

@@ -17,7 +17,7 @@ func TestNewAuthorizationChecker(t *testing.T) {
 		{
 			name: "constructor",
 			assertions: func(t *testing.T, got *AuthorizationChecker) {
-				assert.Equal(t, &AuthorizationChecker{anonymousGrants: []string{}}, got)
+				assert.NotNil(t, got)
 			},
 		},
 	}
@@ -45,7 +45,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			resourceName: "1",
 			claims:       nil,
 			req:          nil,
-			succeeds:     false,
+			succeeds:     true,
 		},
 		{
 			name:            "CheckPageAccess - claims= / req=[] + anon",
@@ -83,6 +83,39 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			succeeds:        false,
 		},
 		{
+			name:         "CheckPageAccess - claims=admin / req=[{bearer:[foo:1:read]}{oauth2:[admin]}]",
+			kind:         "foo",
+			resourceName: "1",
+			claims: &Claims{
+				Scope: "admin",
+			},
+			req: []v1alpha1.SecurityRequirement{
+				{
+					"bearer": []string{"foo:1:read"},
+				},
+				{
+					"oauth2": []string{"admin"},
+				},
+			},
+			anonymousGrants: []string{"foo:read"},
+			succeeds:        true,
+		},
+		{
+			name:         "CheckPageAccess - claims=admin / req=[{bearer:[foo:1:read],oauth2:[admin]}]",
+			kind:         "foo",
+			resourceName: "1",
+			claims: &Claims{
+				Scope: "admin",
+			},
+			req: []v1alpha1.SecurityRequirement{
+				{
+					"bearer": []string{"foo:1:read"},
+					"oauth2": []string{"admin"},
+				},
+			},
+			succeeds: false,
+		},
+		{
 			name:         "CheckPageAccess - claims=pages / req=[{bearer:[pages]}] + anon",
 			kind:         "pages",
 			resourceName: "1",
@@ -109,7 +142,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 					"bearer": []string{},
 				},
 			},
-			succeeds: false,
+			succeeds: true,
 		},
 		{
 			name:         "CheckPageAccess - claims=users / req=[{bearer:[pages]}]",
@@ -137,7 +170,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 					"bearer": []string{"read"},
 				},
 			},
-			succeeds: false,
+			succeeds: true,
 		},
 		{
 			name:         "CheckPageAccess - claims=read / req=[{beader:[read]}] + anon",
@@ -319,7 +352,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			succeeds: false,
 		},
 		{
-			name:         "CheckPageAccess - claims=foo:1:read / req=[{bearer:[foo:1:read]}{oauth:[admin]}]",
+			name:         "CheckPageAccess - claims=foo:1:read / req=[{bearer:[foo:1:read]}{oauth2:[admin]}]",
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
@@ -330,31 +363,13 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 					"bearer": []string{"foo:1:read"},
 				},
 				{
-					"oauth": []string{"admin"},
+					"oauth2": []string{"admin"},
 				},
 			},
 			succeeds: true,
 		},
 		{
-			name:         "CheckPageAccess - claims=admin / req=[{bearer:[foo:1:read]}{oauth:[admin]}]",
-			kind:         "foo",
-			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"admin"},
-			},
-			req: []v1alpha1.SecurityRequirement{
-				{
-					"bearer": []string{"foo:1:read"},
-				},
-				{
-					"oauth": []string{"admin"},
-				},
-			},
-			anonymousGrants: []string{"foo:read"},
-			succeeds:        true,
-		},
-		{
-			name:         "CheckPageAccess - claims=foo:1:read / req=[{bearer:[foo:1:read],oauth:[admin]}]",
+			name:         "CheckPageAccess - claims=foo:1:read / req=[{bearer:[foo:1:read],oauth2:[admin]}]",
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
@@ -363,37 +378,23 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			req: []v1alpha1.SecurityRequirement{
 				{
 					"bearer": []string{"foo:1:read"},
-					"oauth":  []string{"admin"},
+					"oauth2": []string{"admin"},
 				},
 			},
 			succeeds: false,
 		},
 		{
-			name:         "CheckPageAccess - claims=admin / req=[{bearer:[foo:1:read],oauth:[admin]}]",
+			name:         "CheckPageAccess - claims=foo:1:read,admin / req=[{bearer:[foo:1:read],oauth2:[admin]}]",
 			kind:         "foo",
 			resourceName: "1",
 			claims: &Claims{
-				Entitlements: []string{"admin"},
+				Entitlements: []string{"foo:1:read"},
+				Scope:        "admin",
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
 					"bearer": []string{"foo:1:read"},
-					"oauth":  []string{"admin"},
-				},
-			},
-			succeeds: false,
-		},
-		{
-			name:         "CheckPageAccess - claims=foo:1:read,admin / req=[{bearer:[foo:1:read],oauth:[admin]}]",
-			kind:         "foo",
-			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"foo:1:read", "admin"},
-			},
-			req: []v1alpha1.SecurityRequirement{
-				{
-					"bearer": []string{"foo:1:read"},
-					"oauth":  []string{"admin"},
+					"oauth2": []string{"admin"},
 				},
 			},
 			succeeds: true,

@@ -72,7 +72,7 @@ func (hh *HostHandler) LoginPost(w http.ResponseWriter, r *http.Request) {
 
 	issuer := hh.serverAddress(r)
 
-	token, err := hh.authExchanger.LoginLocal(r.Context(), issuer, username, password)
+	token, _, err := hh.authExchanger.LoginLocal(r.Context(), issuer, username, password, "")
 	if err != nil {
 		// FAILED: 401 Unauthorized / render login page again with error message?
 		// For now simple redirect back to login

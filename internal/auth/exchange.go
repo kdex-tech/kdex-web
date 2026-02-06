@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/cel-go/cel"
@@ -106,52 +107,106 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken
 	return SignToken(sub, email, e.config.ClientID, issuer, extra, e.config.ActivePair, e.config.TokenTTL)
 }
 
-func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, password string) (string, error) {
+func (e *Exchanger) GetClientID() string {
+	return e.config.ClientID
+}
+
+func (e *Exchanger) GetTokenTTL() time.Duration {
+	return e.config.TokenTTL
+}
+
+func (e *Exchanger) GetScopesSupported() ([]string, error) {
+	if e == nil || e.oidcProvider == nil {
+		return nil, nil
+	}
+	var claims OIDCProviderClaims
+	if err := e.oidcProvider.Claims(&claims); err != nil {
+		return nil, err
+	}
+	return claims.ScopesSupported, nil
+}
+
+func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, password string, scope string) (string, string, error) {
 	if e == nil || e.config.ActivePair == nil {
-		return "", fmt.Errorf("local auth not configured")
+		return "", "", fmt.Errorf("local auth not configured")
 	}
 
 	identity, err := e.sp.VerifyLocalIdentity(username, password)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	extra, err := e.MapClaims(e.config.MappingRules, identity.Extra)
 	if err != nil {
-		return "", fmt.Errorf("failed to map claims: %w", err)
+		return "", "", fmt.Errorf("failed to map claims: %w", err)
 	}
 
-	// 2. Add profile fields if they exist
-	if identity.FamilyName != "" {
-		extra["family_name"] = identity.FamilyName
-	}
-	if identity.GivenName != "" {
-		extra["given_name"] = identity.GivenName
-	}
-	if identity.MiddleName != "" {
-		extra["middle_name"] = identity.MiddleName
-	}
-	if identity.Name != "" {
-		extra["name"] = identity.Name
-	}
-	if identity.Nickname != "" {
-		extra["nickname"] = identity.Nickname
-	}
-	if identity.Picture != "" {
-		extra["picture"] = identity.Picture
-	}
-	if identity.UpdatedAt != 0 {
-		extra["updated_at"] = identity.UpdatedAt
+	// Determine granted scopes and filter claims
+	requestedScopes := strings.Split(scope, " ")
+	if scope == "" {
+		// Default scopes for local login if none requested
+		requestedScopes = []string{"email", "roles", "entitlements"}
 	}
 
-	if len(identity.Entitlements) > 0 {
+	grantedScopes := []string{}
+	hasScope := func(s string) bool {
+		return slices.Contains(requestedScopes, s)
+	}
+
+	// email scope
+	if hasScope("email") {
+		extra["email"] = identity.Email
+		grantedScopes = append(grantedScopes, "email")
+	}
+
+	// profile scope
+	if hasScope("profile") {
+		grantedScopes = append(grantedScopes, "profile")
+		if identity.FamilyName != "" {
+			extra["family_name"] = identity.FamilyName
+		}
+		if identity.GivenName != "" {
+			extra["given_name"] = identity.GivenName
+		}
+		if identity.MiddleName != "" {
+			extra["middle_name"] = identity.MiddleName
+		}
+		if identity.Name != "" {
+			extra["name"] = identity.Name
+		}
+		if identity.Nickname != "" {
+			extra["nickname"] = identity.Nickname
+		}
+		if identity.Picture != "" {
+			extra["picture"] = identity.Picture
+		}
+		if identity.UpdatedAt != 0 {
+			extra["updated_at"] = identity.UpdatedAt
+		}
+	}
+
+	// entitlements and roles
+	if hasScope("entitlements") && len(identity.Entitlements) > 0 {
 		extra["entitlements"] = identity.Entitlements
+		grantedScopes = append(grantedScopes, "entitlements")
 	}
-	if len(identity.Roles) > 0 {
+	if hasScope("roles") && len(identity.Roles) > 0 {
 		extra["roles"] = identity.Roles
+		grantedScopes = append(grantedScopes, "roles")
 	}
 
-	return SignToken(username, identity.Email, e.config.ClientID, issuer, extra, e.config.ActivePair, e.config.TokenTTL)
+	// Map any remaining identity scopes
+	if identity.Scope != "" {
+		extra["scope"] = identity.Scope
+	}
+
+	grantedScopeStr := strings.Join(grantedScopes, " ")
+	if grantedScopeStr != "" {
+		extra["scope"] = grantedScopeStr
+	}
+
+	token, err := SignToken(username, identity.Email, e.config.ClientID, issuer, extra, e.config.ActivePair, e.config.TokenTTL)
+	return token, grantedScopeStr, err
 }
 
 func (e *Exchanger) MapClaims(rules []CompiledMappingRule, rawClaims map[string]any) (map[string]any, error) {
@@ -261,7 +316,8 @@ func NewExchanger(
 }
 
 type OIDCProviderClaims struct {
-	EndSessionURL string `json:"end_session_endpoint"`
+	EndSessionURL   string   `json:"end_session_endpoint"`
+	ScopesSupported []string `json:"scopes_supported"`
 }
 
 func compileMappers(rules []kdexv1alpha1.MappingRule) ([]CompiledMappingRule, error) {

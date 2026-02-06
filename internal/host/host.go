@@ -350,17 +350,46 @@ func (hh *HostHandler) RemoveUtilityPage(name string) {
 
 func (hh *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 	req := &openapi.SecuritySchemes{}
-	bearerScheme := openapi.NewJWTSecurityScheme()
-	bearerScheme.Description = "Bearer Token - This is the default scheme"
-	// For now we assume that if a login page is specified we want to default to bearer auth
-	// as the preferred mode of authentication for auto-generated functions.
+
+	if hh.authConfig == nil || hh.authConfig.KeyPairs == nil {
+		return req
+	}
+
 	if hh.host != nil && hh.host.UtilityPages != nil && hh.host.UtilityPages.LoginRef != nil {
+		bearerScheme := openapi.NewJWTSecurityScheme()
+		bearerScheme.Description = "Bearer Token - This is the default scheme"
 		(*req)["bearer"] = &openapi.SecuritySchemeRef{
 			Value: bearerScheme,
 		}
-	} else if hh.host != nil {
-		(*req)["bearer"] = &openapi.SecuritySchemeRef{
-			Value: bearerScheme,
+	}
+
+	if hh.authExchanger != nil {
+		// Add OAuth2 Password flow
+		(*req)["oauth2"] = &openapi.SecuritySchemeRef{
+			Value: &openapi.SecurityScheme{
+				Description: "OAuth2 authentication using Password Flow",
+				Flows: &openapi.OAuthFlows{
+					Password: &openapi.OAuthFlow{
+						Scopes: map[string]string{
+							"openid":  "standard oidc scope",
+							"profile": "user profile info",
+						},
+						TokenURL: "/-/token",
+					},
+				},
+				Type: "oauth2",
+			},
+		}
+
+		// Add OIDC discovery
+		if hh.authExchanger.AuthCodeURL("") != "" {
+			(*req)["oidc"] = &openapi.SecuritySchemeRef{
+				Value: &openapi.SecurityScheme{
+					Description:      "OpenID Connect discovery",
+					OpenIdConnectUrl: "/.well-known/openid-configuration",
+					Type:             "openIdConnect",
+				},
+			}
 		}
 	}
 
@@ -484,16 +513,18 @@ func (hh *HostHandler) messagePrinter(translations *Translations, tag language.T
 func (hh *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathInfo) *http.ServeMux {
 	mux := http.NewServeMux()
 
+	hh.discoveryHandler(mux, registeredPaths)
 	hh.faviconHandler(mux, registeredPaths)
-	hh.navigationHandler(mux, registeredPaths)
-	hh.translationHandler(mux, registeredPaths)
-	hh.loginHandler(mux, registeredPaths)
 	hh.jwksHandler(mux, registeredPaths)
+	hh.loginHandler(mux, registeredPaths)
+	hh.navigationHandler(mux, registeredPaths)
 	hh.oauthHandler(mux, registeredPaths)
-	hh.stateHandler(mux, registeredPaths)
-	hh.snifferHandler(mux, registeredPaths)
 	hh.openapiHandler(mux, registeredPaths)
 	hh.schemaHandler(mux, registeredPaths)
+	hh.snifferHandler(mux, registeredPaths)
+	hh.stateHandler(mux, registeredPaths)
+	hh.tokenHandler(mux, registeredPaths)
+	hh.translationHandler(mux, registeredPaths)
 
 	// TODO: implement a check handler
 

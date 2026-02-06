@@ -52,6 +52,7 @@ type Claims struct {
 	// Custom claims
 	Entitlements []string `json:"entitlements,omitempty"` // custom
 	Roles        []string `json:"roles,omitempty"`        // custom
+	Scope        string   `json:"scope,omitempty"`        // oauth2
 }
 
 // WithAuthentication creates a middleware that validates JWT tokens from the Authorization header.

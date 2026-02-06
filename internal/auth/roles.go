@@ -22,6 +22,7 @@ type Identity struct {
 	Roles        []string
 	Entitlements []string
 	Subject      string
+	Scope        string
 	UpdatedAt    int64
 }
 

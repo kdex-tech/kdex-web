@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/text/language"
@@ -63,7 +64,9 @@ type HostHandler struct {
 		EndSessionURL() (string, error)
 		ExchangeCode(ctx context.Context, code string) (string, error)
 		ExchangeToken(ctx context.Context, issuer string, rawIDToken string) (string, error)
-		LoginLocal(ctx context.Context, issuer string, username, password string) (string, error)
+		GetClientID() string
+		GetTokenTTL() time.Duration
+		LoginLocal(ctx context.Context, issuer string, username, password string, scope string) (string, string, error)
 	}
 
 	sniffer interface {

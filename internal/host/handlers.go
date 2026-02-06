@@ -93,6 +93,51 @@ func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 	}
 }
 
+func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if hh.authConfig == nil || hh.authConfig.KeyPairs == nil {
+		return
+	}
+
+	const path = "/.well-known/openid-configuration"
+	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
+		issuer := hh.serverAddress(r)
+		auth.DiscoveryHandler(issuer)(w, r)
+	})
+	registeredPaths[path] = ko.PathInfo{
+		API: ko.OpenAPI{
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "Serve the OpenID configuration",
+					Get: &openapi.Operation{
+						Description: "GET the OpenID configuration",
+						OperationID: "discovery-get",
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										Format: "json",
+										Type:   &openapi.Types{openapi.TypeObject},
+									},
+									[]string{"application/json"},
+								),
+								Description: openapi.Ptr("OpenID Configuration"),
+							}),
+							openapi.WithStatus(500, &openapi.ResponseRef{
+								Ref: "#/components/responses/InternalServerError",
+							}),
+						),
+						Summary: "OpenID Discovery",
+						Tags:    []string{"system", "oidc", "auth"},
+					},
+					Summary: "The OpenID configuration",
+				},
+			},
+		},
+		Type: ko.SystemPathType,
+	}
+}
+
 func (hh *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/favicon.ico"
 	mux.HandleFunc("GET "+path, hh.favicon.FaviconHandler)
@@ -591,6 +636,99 @@ func (hh *HostHandler) stateHandler(mux *http.ServeMux, registeredPaths map[stri
 						Tags:    []string{"system", "state", "auth"},
 					},
 					Summary: "The current authenticated session state (claims)",
+				},
+			},
+		},
+		Type: ko.SystemPathType,
+	}, registeredPaths)
+}
+
+func (hh *HostHandler) tokenHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if hh.authConfig == nil || hh.authExchanger == nil {
+		return
+	}
+
+	const path = "/-/token"
+	mux.HandleFunc("POST "+path, func(w http.ResponseWriter, r *http.Request) {
+		issuer := hh.serverAddress(r)
+		auth.OAuth2TokenHandler(hh.authExchanger, issuer)(w, r)
+	})
+	hh.registerPath(path, ko.PathInfo{
+		API: ko.OpenAPI{
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "The OAuth2 token endpoint",
+					Post: &openapi.Operation{
+						Description: "POST to exchange credentials for a token",
+						OperationID: "token-post",
+						RequestBody: &openapi.RequestBodyRef{
+							Value: &openapi.RequestBody{
+								Content: openapi.Content{
+									"application/x-www-form-urlencoded": &openapi.MediaType{
+										Schema: &openapi.SchemaRef{
+											Value: &openapi.Schema{
+												Properties: openapi.Schemas{
+													"client_id": &openapi.SchemaRef{
+														Value: &openapi.Schema{
+															Type: &openapi.Types{openapi.TypeString},
+														},
+													},
+													"grant_type": &openapi.SchemaRef{
+														Value: &openapi.Schema{
+															Type: &openapi.Types{openapi.TypeString},
+														},
+													},
+													"password": &openapi.SchemaRef{
+														Value: &openapi.Schema{
+															Type: &openapi.Types{openapi.TypeString},
+														},
+													},
+													"scope": &openapi.SchemaRef{
+														Value: &openapi.Schema{
+															Type: &openapi.Types{openapi.TypeString},
+														},
+													},
+													"username": &openapi.SchemaRef{
+														Value: &openapi.Schema{
+															Type: &openapi.Types{openapi.TypeString},
+														},
+													},
+												},
+												Required: []string{"grant_type", "client_id"},
+												Type:     &openapi.Types{openapi.TypeObject},
+											},
+										},
+									},
+								},
+								Description: "Token request body",
+							},
+						},
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										Format: "json",
+										Type:   &openapi.Types{openapi.TypeObject},
+									},
+									[]string{"application/json"},
+								),
+								Description: openapi.Ptr("Token Response"),
+							}),
+							openapi.WithStatus(400, &openapi.ResponseRef{
+								Ref: "#/components/responses/BadRequest",
+							}),
+							openapi.WithStatus(401, &openapi.ResponseRef{
+								Ref: "#/components/responses/Unauthorized",
+							}),
+							openapi.WithStatus(500, &openapi.ResponseRef{
+								Ref: "#/components/responses/InternalServerError",
+							}),
+						),
+						Summary: "OAuth2 Token",
+						Tags:    []string{"system", "oauth2", "auth"},
+					},
+					Summary: "The OAuth2 token endpoint",
 				},
 			},
 		},
