@@ -20,7 +20,7 @@ func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 	handler := hh.pageHandlerFunc(finalPath, pr.ph.Name, pr.l10nRenders, pr.ph)
 
 	regFunc := func(p string, n string, l string, pattern bool, localized bool) {
-		reqs, exts := convertRequirements(pr.ph.Page.Security)
+		reqs, exts := hh.convertRequirements(pr.ph.Page.Security)
 
 		op := &openapi.Operation{
 			Description: fmt.Sprintf("Get HTML for %s%s%s", l, utils.IfElse(pattern, " (pattern)", ""), utils.IfElse(localized, " (localized)", "")),

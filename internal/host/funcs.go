@@ -9,7 +9,7 @@ import (
 	ko "kdex.dev/web/internal/openapi"
 )
 
-func convertRequirements(in *[]kdexv1alpha1.SecurityRequirement) (*openapi.SecurityRequirements, map[string]interface{}) {
+func (hh *HostHandler) convertRequirements(in *[]kdexv1alpha1.SecurityRequirement) (*openapi.SecurityRequirements, map[string]interface{}) {
 	var out *openapi.SecurityRequirements
 	var extensions map[string]any
 	requiredClaims := make(map[string][]string)

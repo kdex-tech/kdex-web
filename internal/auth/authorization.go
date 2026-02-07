@@ -26,12 +26,12 @@ func NewAuthorizationChecker(anonymousEntitlements []string, log logr.Logger) *A
 
 func (ac *AuthorizationChecker) CheckAccess(
 	ctx context.Context,
-	kind string,
+	resource string,
 	resourceName string,
 	kdexreqs []kdexv1alpha1.SecurityRequirement,
 ) (bool, error) {
-	if kind == "" || resourceName == "" {
-		return false, fmt.Errorf("kind, resourceName must not be empty")
+	if resource == "" || resourceName == "" {
+		return false, fmt.Errorf("resource and resourceName must not be empty")
 	}
 
 	// Get claims from context
@@ -58,37 +58,32 @@ func (ac *AuthorizationChecker) CheckAccess(
 
 	ac.log.V(2).Info("CheckAccess", "claim", claims, "entitlements", userEntitlements, "requirements", requirements)
 
-	return ac.ec.VerifyResourceEntitlements(kind, resourceName, userEntitlements, requirements), nil
+	return ac.ec.VerifyResourceEntitlements(resource, resourceName, userEntitlements, requirements)
 }
 
-func DeepCloneSecurityRequirements(input []kdexv1alpha1.SecurityRequirement) []kdexv1alpha1.SecurityRequirement {
-	if input == nil {
-		return nil
+func (ac *AuthorizationChecker) CalculateRequirements(
+	resource string,
+	resourceName string,
+	kdexreqs []kdexv1alpha1.SecurityRequirement,
+) ([]kdexv1alpha1.SecurityRequirement, error) {
+	if resource == "" || resourceName == "" {
+		return nil, fmt.Errorf("resource and resourceName must not be empty")
 	}
 
-	// 1. Clone the outer slice
-	clone := make([]kdexv1alpha1.SecurityRequirement, len(input))
-
-	for i, reqMap := range input {
-		if reqMap == nil {
-			continue
-		}
-
-		// 2. Clone the Map
-		newMap := make(kdexv1alpha1.SecurityRequirement, len(reqMap))
-		for key, scopes := range reqMap {
-			if scopes == nil {
-				newMap[key] = nil
-				continue
-			}
-
-			// 3. Clone the inner Slice
-			newScopes := make([]string, len(scopes))
-			copy(newScopes, scopes)
-			newMap[key] = newScopes
-		}
-		clone[i] = newMap
+	requirements := entitlements.Requirements{}
+	for _, v := range kdexreqs {
+		requirements = append(requirements, v)
 	}
 
-	return clone
+	requirements, err := ac.ec.CalculateResourceRequirements(resource, resourceName, requirements)
+	if err != nil {
+		return nil, err
+	}
+
+	kreq := make([]kdexv1alpha1.SecurityRequirement, len(requirements))
+	for _, v := range requirements {
+		kreq = append(kreq, v)
+	}
+
+	return kreq, nil
 }

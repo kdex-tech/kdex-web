@@ -430,21 +430,6 @@ func (hh *HostHandler) SetHost(
 		DefaultLanguage: host.DefaultLang,
 		Organization:    host.Organization,
 	})
-	hh.openapiBuilder = ko.Builder{
-		SecuritySchemes: hh.SecuritySchemes(),
-		TypesToInclude: utils.MapSlice(host.OpenAPI.TypesToInclude, func(i kdexv1alpha1.TypeToInclude) ko.PathType {
-			switch i {
-			case kdexv1alpha1.TypeBACKEND:
-				return ko.BackendPathType
-			case kdexv1alpha1.TypeFUNCTION:
-				return ko.FunctionPathType
-			case kdexv1alpha1.TypePAGE:
-				return ko.PagePathType
-			default:
-				return ko.SystemPathType
-			}
-		}),
-	}
 	hh.packageReferences = packageReferences
 	hh.pathsCollectedInReconcile = paths
 	hh.themeAssets = themeAssets
@@ -471,6 +456,22 @@ func (hh *HostHandler) SetHost(
 		hh.authConfig = authConfig
 		hh.authChecker = auth.NewAuthorizationChecker(authConfig.AnonymousEntitlements, hh.log.WithName("authChecker"))
 		hh.authExchanger = authExchanger
+	}
+
+	hh.openapiBuilder = ko.Builder{
+		SecuritySchemes: hh.SecuritySchemes(),
+		TypesToInclude: utils.MapSlice(host.OpenAPI.TypesToInclude, func(i kdexv1alpha1.TypeToInclude) ko.PathType {
+			switch i {
+			case kdexv1alpha1.TypeBACKEND:
+				return ko.BackendPathType
+			case kdexv1alpha1.TypeFUNCTION:
+				return ko.FunctionPathType
+			case kdexv1alpha1.TypePAGE:
+				return ko.PagePathType
+			default:
+				return ko.SystemPathType
+			}
+		}),
 	}
 
 	hh.mu.Unlock()
