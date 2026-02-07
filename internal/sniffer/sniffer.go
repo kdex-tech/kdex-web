@@ -104,9 +104,6 @@ func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
 			Name:      fnMutated.Name,
 			Namespace: fnMutated.Namespace,
 		},
-		Status: kdexv1alpha1.KDexFunctionStatus{
-			OpenAPISchemaURL: ko.Host(r) + "/-/openapi?tag=" + fnMutated.Name,
-		},
 	}
 
 	op, err := ctrl.CreateOrUpdate(
@@ -140,13 +137,6 @@ func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
 		"op", op,
 		"err", err,
 	)
-
-	if err == nil {
-		fn.Status.OpenAPISchemaURL = ko.Host(r) + "/-/openapi?tag=" + fn.Name
-		if statusErr := s.Client.Status().Update(context.Background(), fn); statusErr != nil {
-			log.Error(statusErr, "failed to update function status", "name", fn.Name)
-		}
-	}
 
 	return res, err
 }
