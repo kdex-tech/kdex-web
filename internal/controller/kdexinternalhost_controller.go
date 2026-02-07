@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"sync"
@@ -942,13 +943,9 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 		func() error {
 			if internalPackageReferences.CreationTimestamp.IsZero() {
 				internalPackageReferences.Annotations = make(map[string]string)
-				for key, value := range internalHost.Annotations {
-					internalPackageReferences.Annotations[key] = value
-				}
+				maps.Copy(internalPackageReferences.Annotations, internalHost.Annotations)
 				internalPackageReferences.Labels = make(map[string]string)
-				for key, value := range internalHost.Labels {
-					internalPackageReferences.Labels[key] = value
-				}
+				maps.Copy(internalPackageReferences.Labels, internalHost.Labels)
 
 				internalPackageReferences.Labels["kdex.dev/packages"] = internalPackageReferences.Name
 			}
