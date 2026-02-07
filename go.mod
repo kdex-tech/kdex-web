@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.25.6
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.95
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.96
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -12,13 +12,16 @@ require (
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-logr/logr v1.4.3
 	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/google/cel-go v0.26.1
 	github.com/google/uuid v1.6.0
+	github.com/kdex-tech/entitlements v0.1.5
 	github.com/onsi/ginkgo/v2 v2.27.5
 	github.com/onsi/gomega v1.38.2
 	// Pin to compatible versions to avoid breaking changes
 	github.com/pb33f/libopenapi v0.31.2 // indirect
 	github.com/pb33f/libopenapi-validator v0.10.2 // indirect
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/oauth2 v0.34.0
 	golang.org/x/text v0.33.0
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0
@@ -26,11 +29,6 @@ require (
 	kdex.dev/crds v0.0.0-00010101000000-000000000000
 	sigs.k8s.io/controller-runtime v0.23.0
 	sigs.k8s.io/gateway-api v1.4.1
-)
-
-require (
-	github.com/google/cel-go v0.26.1
-	golang.org/x/oauth2 v0.34.0
 )
 
 require (
@@ -83,7 +81,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/kdex-tech/entitlements v0.1.4
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
