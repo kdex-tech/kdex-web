@@ -351,45 +351,44 @@ func (hh *HostHandler) RemoveUtilityPage(name string) {
 func (hh *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 	req := &openapi.SecuritySchemes{}
 
-	if hh.authConfig == nil || hh.authConfig.KeyPairs == nil {
+	if !hh.authConfig.IsAuthEnabled() {
 		return req
 	}
 
-	if hh.host != nil && hh.host.UtilityPages != nil && hh.host.UtilityPages.LoginRef != nil {
-		bearerScheme := openapi.NewJWTSecurityScheme()
-		bearerScheme.Description = "Bearer Token - This is the default scheme"
-		(*req)["bearer"] = &openapi.SecuritySchemeRef{
-			Value: bearerScheme,
-		}
+	(*req)["bearer"] = &openapi.SecuritySchemeRef{
+		Value: &openapi.SecurityScheme{
+			Description:  "Bearer Token - This is the default scheme",
+			Type:         "http",
+			Scheme:       "bearer",
+			BearerFormat: "JWT",
+		},
 	}
 
-	if hh.authExchanger != nil {
-		// Add OAuth2 Password flow
-		(*req)["oauth2"] = &openapi.SecuritySchemeRef{
-			Value: &openapi.SecurityScheme{
-				Description: "OAuth2 authentication using Password Flow",
-				Flows: &openapi.OAuthFlows{
-					Password: &openapi.OAuthFlow{
-						Scopes: map[string]string{
-							"openid":  "standard oidc scope",
-							"profile": "user profile info",
-						},
-						TokenURL: "/-/token",
+	// Add OAuth2 Password flow
+	(*req)["oauth2"] = &openapi.SecuritySchemeRef{
+		Value: &openapi.SecurityScheme{
+			Description: "OAuth2 authentication using Password Flow",
+			Flows: &openapi.OAuthFlows{
+				Password: &openapi.OAuthFlow{
+					Scopes: map[string]string{
+						"openid":  "standard oidc scope",
+						"profile": "user profile info",
 					},
+					TokenURL: "/-/token",
 				},
-				Type: "oauth2",
 			},
-		}
+			Type: "oauth2",
+		},
+	}
 
-		// Add OIDC discovery
-		if hh.authExchanger.AuthCodeURL("") != "" {
-			(*req)["oidc"] = &openapi.SecuritySchemeRef{
-				Value: &openapi.SecurityScheme{
-					Description:      "OpenID Connect discovery",
-					OpenIdConnectUrl: "/.well-known/openid-configuration",
-					Type:             "openIdConnect",
-				},
-			}
+	// Add OIDC discovery
+	if hh.authConfig.IsOIDCEnabled() {
+		(*req)["oidc"] = &openapi.SecuritySchemeRef{
+			Value: &openapi.SecurityScheme{
+				Description:      "OpenID Connect discovery",
+				OpenIdConnectUrl: "/.well-known/openid-configuration",
+				Type:             "openIdConnect",
+			},
 		}
 	}
 
@@ -470,7 +469,7 @@ func (hh *HostHandler) SetHost(
 
 	if authConfig != nil {
 		hh.authConfig = authConfig
-		hh.authChecker = auth.NewAuthorizationChecker(authConfig.AnonymousGrants, hh.log.WithName("authChecker"))
+		hh.authChecker = auth.NewAuthorizationChecker(authConfig.AnonymousEntitlements, hh.log.WithName("authChecker"))
 		hh.authExchanger = authExchanger
 	}
 

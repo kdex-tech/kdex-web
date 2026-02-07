@@ -16,7 +16,7 @@ func (hh *HostHandler) pageHandlerFunc(
 	pageHandler page.PageHandler,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if hh.authConfig != nil {
+		if hh.authConfig.IsAuthEnabled() {
 			// Check authorization before processing the request
 
 			// Perform authorization check

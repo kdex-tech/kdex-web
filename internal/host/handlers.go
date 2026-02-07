@@ -94,7 +94,7 @@ func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 }
 
 func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if hh.authConfig == nil || hh.authConfig.KeyPairs == nil {
+	if !hh.authConfig.IsAuthEnabled() {
 		return
 	}
 
@@ -177,7 +177,7 @@ func (hh *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 }
 
 func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if hh.authConfig == nil || hh.authConfig.KeyPairs == nil {
+	if !hh.authConfig.IsAuthEnabled() {
 		return
 	}
 
@@ -219,7 +219,7 @@ func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 }
 
 func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if hh.authConfig == nil || hh.authExchanger == nil {
+	if !hh.authConfig.IsAuthEnabled() {
 		return
 	}
 
@@ -363,7 +363,7 @@ func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 }
 
 func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if hh.authConfig == nil || hh.authConfig.OIDCProviderURL == "" || hh.authExchanger == nil {
+	if !hh.authConfig.IsOIDCEnabled() {
 		return
 	}
 
@@ -644,7 +644,7 @@ func (hh *HostHandler) stateHandler(mux *http.ServeMux, registeredPaths map[stri
 }
 
 func (hh *HostHandler) tokenHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if hh.authConfig == nil || hh.authExchanger == nil {
+	if !hh.authConfig.IsAuthEnabled() {
 		return
 	}
 

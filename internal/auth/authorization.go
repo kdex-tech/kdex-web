@@ -19,7 +19,7 @@ type AuthorizationChecker struct {
 // NewAuthorizationChecker creates a new authorization checker.
 func NewAuthorizationChecker(anonymousEntitlements []string, log logr.Logger) *AuthorizationChecker {
 	return &AuthorizationChecker{
-		ec:  entitlements.NewEntitlementsChecker(anonymousEntitlements),
+		ec:  entitlements.NewEntitlementsChecker(anonymousEntitlements, "", false),
 		log: log,
 	}
 }

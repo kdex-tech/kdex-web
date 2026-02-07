@@ -45,7 +45,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			resourceName: "1",
 			claims:       nil,
 			req:          nil,
-			succeeds:     true,
+			succeeds:     false,
 		},
 		{
 			name:            "CheckPageAccess - claims= / req=[] + anon",
@@ -142,7 +142,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 					"bearer": []string{},
 				},
 			},
-			succeeds: true,
+			succeeds: false,
 		},
 		{
 			name:         "CheckPageAccess - claims=users / req=[{bearer:[pages]}]",
@@ -170,7 +170,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 					"bearer": []string{"read"},
 				},
 			},
-			succeeds: true,
+			succeeds: false,
 		},
 		{
 			name:         "CheckPageAccess - claims=read / req=[{beader:[read]}] + anon",

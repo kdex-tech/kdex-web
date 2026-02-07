@@ -28,15 +28,52 @@ type Exchanger struct {
 	sp           ScopeProvider
 }
 
+func NewExchanger(
+	ctx context.Context,
+	cfg Config,
+	sp ScopeProvider,
+) (*Exchanger, error) {
+	ex := &Exchanger{
+		config: cfg,
+		sp:     sp,
+	}
+
+	if cfg.IsOIDCEnabled() {
+		provider, err := oidc.NewProvider(ctx, cfg.OIDCProviderURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize OIDC provider: %w", err)
+		}
+		ex.oidcProvider = provider
+		ex.oidcVerifier = provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
+
+		scopes := []string{oidc.ScopeOpenID, "profile", "email"}
+		for _, newScope := range cfg.Scopes {
+			if !slices.Contains(scopes, newScope) {
+				scopes = append(scopes, newScope)
+			}
+		}
+
+		ex.oauth2Config = &oauth2.Config{
+			ClientID:     cfg.ClientID,
+			ClientSecret: cfg.ClientSecret,
+			Endpoint:     provider.Endpoint(),
+			RedirectURL:  cfg.RedirectURL,
+			Scopes:       scopes,
+		}
+	}
+
+	return ex, nil
+}
+
 func (e *Exchanger) AuthCodeURL(state string) string {
-	if e == nil || e.oauth2Config == nil {
+	if e == nil || !e.config.IsOIDCEnabled() {
 		return ""
 	}
 	return e.oauth2Config.AuthCodeURL(state)
 }
 
 func (e *Exchanger) EndSessionURL() (string, error) {
-	if e == nil || e.oidcProvider == nil {
+	if e == nil || !e.config.IsOIDCEnabled() {
 		return "", nil
 	}
 	var claims OIDCProviderClaims
@@ -47,7 +84,7 @@ func (e *Exchanger) EndSessionURL() (string, error) {
 }
 
 func (e *Exchanger) ExchangeCode(ctx context.Context, code string) (string, error) {
-	if e == nil || e.oauth2Config == nil {
+	if e == nil || !e.config.IsOIDCEnabled() {
 		return "", fmt.Errorf("OIDC is not configured")
 	}
 
@@ -66,7 +103,7 @@ func (e *Exchanger) ExchangeCode(ctx context.Context, code string) (string, erro
 }
 
 func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken string) (string, error) {
-	if e == nil || e.oidcVerifier == nil {
+	if e == nil || !e.config.IsOIDCEnabled() {
 		return "", fmt.Errorf("OIDC is not configured")
 	}
 	// 1. Verify OIDC Token
@@ -116,7 +153,7 @@ func (e *Exchanger) GetTokenTTL() time.Duration {
 }
 
 func (e *Exchanger) GetScopesSupported() ([]string, error) {
-	if e == nil || e.oidcProvider == nil {
+	if e == nil || !e.config.IsOIDCEnabled() {
 		return nil, nil
 	}
 	var claims OIDCProviderClaims
@@ -127,7 +164,7 @@ func (e *Exchanger) GetScopesSupported() ([]string, error) {
 }
 
 func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, password string, scope string) (string, string, error) {
-	if e == nil || e.config.ActivePair == nil {
+	if e == nil || !e.config.IsAuthEnabled() {
 		return "", "", fmt.Errorf("local auth not configured")
 	}
 
@@ -272,47 +309,10 @@ func (e *Exchanger) setNestedPath(m map[string]any, path string, value any) erro
 }
 
 func (e *Exchanger) verifyIDToken(ctx context.Context, rawIDToken string) (*oidc.IDToken, error) {
-	if e == nil || e.oidcVerifier == nil {
+	if e == nil || !e.config.IsOIDCEnabled() {
 		return nil, fmt.Errorf("OIDC is not configured")
 	}
 	return e.oidcVerifier.Verify(ctx, rawIDToken)
-}
-
-func NewExchanger(
-	ctx context.Context,
-	cfg Config,
-	sp ScopeProvider,
-) (*Exchanger, error) {
-	ex := &Exchanger{
-		config: cfg,
-		sp:     sp,
-	}
-
-	if cfg.OIDCProviderURL != "" {
-		provider, err := oidc.NewProvider(ctx, cfg.OIDCProviderURL)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize OIDC provider: %w", err)
-		}
-		ex.oidcProvider = provider
-		ex.oidcVerifier = provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
-
-		scopes := []string{oidc.ScopeOpenID, "profile", "email"}
-		for _, newScope := range cfg.Scopes {
-			if !slices.Contains(scopes, newScope) {
-				scopes = append(scopes, newScope)
-			}
-		}
-
-		ex.oauth2Config = &oauth2.Config{
-			ClientID:     cfg.ClientID,
-			ClientSecret: cfg.ClientSecret,
-			Endpoint:     provider.Endpoint(),
-			RedirectURL:  cfg.RedirectURL,
-			Scopes:       scopes,
-		}
-	}
-
-	return ex, nil
 }
 
 type OIDCProviderClaims struct {

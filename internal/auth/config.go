@@ -12,31 +12,24 @@ import (
 )
 
 type Config struct {
-	ActivePair      *KeyPair
-	AnonymousGrants []string
-	BlockKey        string
-	ClientID        string
-	ClientSecret    string
-	CookieName      string
-	KeyPairs        *KeyPairs
-	MappingRules    []CompiledMappingRule
-	OIDCProviderURL string
-	RedirectURL     string
-	Scopes          []string
-	TokenTTL        time.Duration
+	ActivePair            *KeyPair
+	AnonymousEntitlements []string
+	BlockKey              string
+	ClientID              string
+	ClientSecret          string
+	CookieName            string
+	KeyPairs              *KeyPairs
+	MappingRules          []CompiledMappingRule
+	OIDCProviderURL       string
+	RedirectURL           string
+	Scopes                []string
+	TokenTTL              time.Duration
 }
 
 func NewConfig(ctx context.Context, c client.Client, auth *kdexv1alpha1.Auth, namespace string, devMode bool) (*Config, error) {
 	cfg := &Config{}
 
 	if auth != nil {
-		cfg.AnonymousGrants = auth.AnonymousGrants
-		cfg.CookieName = auth.JWT.CookieName
-
-		if cfg.CookieName == "" {
-			cfg.CookieName = "auth_token"
-		}
-
 		keyPairs, err := LoadOrGenerateKeyPair(
 			ctx,
 			c,
@@ -46,6 +39,13 @@ func NewConfig(ctx context.Context, c client.Client, auth *kdexv1alpha1.Auth, na
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		cfg.AnonymousEntitlements = auth.AnonymousEntitlements
+		cfg.CookieName = auth.JWT.CookieName
+
+		if cfg.CookieName == "" {
+			cfg.CookieName = "auth_token"
 		}
 
 		cfg.KeyPairs = keyPairs
@@ -102,10 +102,24 @@ func NewConfig(ctx context.Context, c client.Client, auth *kdexv1alpha1.Auth, na
 }
 
 func (c *Config) AddAuthentication(mux http.Handler) http.Handler {
-	if c == nil || c.ActivePair == nil {
+	if !c.IsAuthEnabled() {
 		return mux
 	}
 	return WithAuthentication(c.ActivePair.Private.Public(), c.CookieName)(mux)
+}
+
+func (c *Config) IsAuthEnabled() bool {
+	if c == nil || c.ActivePair == nil {
+		return false
+	}
+	return true
+}
+
+func (c *Config) IsOIDCEnabled() bool {
+	if c == nil || c.ActivePair == nil || c.OIDCProviderURL == "" {
+		return false
+	}
+	return true
 }
 
 func getOrGenerate(blockKey string) string {
