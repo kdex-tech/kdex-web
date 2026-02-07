@@ -248,7 +248,11 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 				err.Error(),
 			)
 
-			return ctrl.Result{}, err
+			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{Requeue: true}, nil
 		}
 
 		var imageDigest string
