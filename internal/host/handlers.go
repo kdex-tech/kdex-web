@@ -11,8 +11,6 @@ import (
 	"kdex.dev/web/internal/utils"
 )
 
-// TODO: run the openapi through the vacuum linter and fix
-
 func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, registeredPaths map[string]ko.PathInfo) {
 	finalPath := toFinalPath(pr.ph.BasePath())
 	label := pr.ph.Label()

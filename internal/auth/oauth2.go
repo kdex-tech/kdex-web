@@ -58,6 +58,15 @@ func OAuth2TokenHandler(exchanger LoginExchanger, issuer string) http.HandlerFun
 			// TODO: Implement authorization_code exchange once code storage is added
 			http.Error(w, "grant_type authorization_code not yet supported for local exchange", http.StatusNotImplemented)
 			return
+		case "client_credentials":
+			// TODO: What is preventing us from implementing this now? We have the client_id and client_secret in the secret.
+			// We just need to validate that the client_secret is correct and then return a token.
+			http.Error(w, "grant_type client_credentials not yet supported for local exchange", http.StatusNotImplemented)
+			return
+		case "refresh_token":
+			// TODO: Implement refresh_token exchange once refresh token storage is added
+			http.Error(w, "grant_type refresh_token not yet supported for local exchange", http.StatusNotImplemented)
+			return
 		default:
 			http.Error(w, "Unsupported grant_type", http.StatusBadRequest)
 			return
