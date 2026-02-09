@@ -38,3 +38,7 @@ func MapSlice[T any, U any](slice []T, mapper func(T) U) []U {
 	}
 	return result
 }
+
+func Ptr[T any](value T) *T {
+	return &value
+}

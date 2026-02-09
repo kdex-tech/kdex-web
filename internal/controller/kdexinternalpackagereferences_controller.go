@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
+	"kdex.dev/web/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -405,12 +406,9 @@ func (r *KDexInternalPackageReferencesReconciler) setupJob(
 			})
 		}
 
-		backoffLimit := int32(3)
-		completions := int32(1)
-
 		job.Spec = batchv1.JobSpec{
-			BackoffLimit: &backoffLimit,
-			Completions:  &completions,
+			BackoffLimit: utils.Ptr[int32](3),
+			Completions:  utils.Ptr[int32](1),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
