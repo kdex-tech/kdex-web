@@ -93,16 +93,55 @@ func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[
 		return
 	}
 
-	const path = "/.well-known/openid-configuration"
-	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
+	const oauth2path = "/.well-known/oauth-authorization-server"
+	mux.HandleFunc("GET "+oauth2path, func(w http.ResponseWriter, r *http.Request) {
 		issuer := hh.serverAddress(r)
 		auth.DiscoveryHandler(issuer)(w, r)
 	})
-	registeredPaths[path] = ko.PathInfo{
+	registeredPaths[oauth2path] = ko.PathInfo{
 		API: ko.OpenAPI{
-			BasePath: path,
+			BasePath: oauth2path,
 			Paths: map[string]ko.PathItem{
-				path: {
+				oauth2path: {
+					Description: "Serve the OAuth 2.0 Authorization Server configuration",
+					Get: &openapi.Operation{
+						Description: "GET the OAuth 2.0 Authorization Server configuration",
+						OperationID: "oauth2-authorization-server-get",
+						Responses: openapi.NewResponses(
+							openapi.WithName("200", &openapi.Response{
+								Content: openapi.NewContentWithSchema(
+									&openapi.Schema{
+										Format: "json",
+										Type:   &openapi.Types{openapi.TypeObject},
+									},
+									[]string{"application/json"},
+								),
+								Description: openapi.Ptr("OpenID Configuration"),
+							}),
+							openapi.WithStatus(500, &openapi.ResponseRef{
+								Ref: "#/components/responses/InternalServerError",
+							}),
+						),
+						Summary: "OAuth 2.0 Authorization Server configuration",
+						Tags:    []string{"system", "oidc", "auth"},
+					},
+					Summary: "The OAuth 2.0 Authorization Server configuration",
+				},
+			},
+		},
+		Type: ko.SystemPathType,
+	}
+
+	const oidcPath = "/.well-known/openid-configuration"
+	mux.HandleFunc("GET "+oidcPath, func(w http.ResponseWriter, r *http.Request) {
+		issuer := hh.serverAddress(r)
+		auth.DiscoveryHandler(issuer)(w, r)
+	})
+	registeredPaths[oidcPath] = ko.PathInfo{
+		API: ko.OpenAPI{
+			BasePath: oidcPath,
+			Paths: map[string]ko.PathItem{
+				oidcPath: {
 					Description: "Serve the OpenID configuration",
 					Get: &openapi.Operation{
 						Description: "GET the OpenID configuration",

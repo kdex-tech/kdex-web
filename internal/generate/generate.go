@@ -22,9 +22,9 @@ import (
 
 type Generator struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	GeneratorConfig kdexv1alpha1.GeneratorConfig
-	ServiceAccount  string
+	Config         kdexv1alpha1.Generator
+	Scheme         *runtime.Scheme
+	ServiceAccount string
 }
 
 func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1alpha1.KDexFunction) (*batchv1.Job, error) {
@@ -68,7 +68,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 		},
 		{
 			Name:  "FUNCTION_ENTRYPOINT",
-			Value: function.Spec.Function.Entrypoint,
+			Value: g.Config.Entrypoint,
 		},
 		{
 			Name:  "FUNCTION_NAMESPACE",
@@ -88,22 +88,22 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 		},
 		{
 			Name:  "COMMITTER_EMAIL",
-			Value: g.GeneratorConfig.Git.CommitterEmail,
+			Value: g.Config.Git.CommitterEmail,
 		},
 		{
 			Name:  "COMMITTER_NAME",
-			Value: g.GeneratorConfig.Git.CommitterName,
+			Value: g.Config.Git.CommitterName,
 		},
 		{
 			Name:  "COMMIT_SUB_DIRECTORY",
-			Value: g.GeneratorConfig.Git.FunctionSubDirectory,
+			Value: g.Config.Git.FunctionSubDirectory,
 		},
 		{
 			Name: "GIT_HOST",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "host",
-					LocalObjectReference: g.GeneratorConfig.Git.RepoSecretRef,
+					LocalObjectReference: g.Config.Git.RepoSecretRef,
 				},
 			},
 		},
@@ -112,7 +112,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "org",
-					LocalObjectReference: g.GeneratorConfig.Git.RepoSecretRef,
+					LocalObjectReference: g.Config.Git.RepoSecretRef,
 				},
 			},
 		},
@@ -121,7 +121,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "repo",
-					LocalObjectReference: g.GeneratorConfig.Git.RepoSecretRef,
+					LocalObjectReference: g.Config.Git.RepoSecretRef,
 				},
 			},
 		},
@@ -130,7 +130,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "token",
-					LocalObjectReference: g.GeneratorConfig.Git.RepoSecretRef,
+					LocalObjectReference: g.Config.Git.RepoSecretRef,
 				},
 			},
 		},
@@ -139,7 +139,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "user",
-					LocalObjectReference: g.GeneratorConfig.Git.RepoSecretRef,
+					LocalObjectReference: g.Config.Git.RepoSecretRef,
 				},
 			},
 		},
@@ -160,9 +160,9 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			Name:      jobName,
 			Namespace: function.Namespace,
 			Labels: map[string]string{
-				"app":        "codegen",
-				"function":   function.Name,
-				"generation": fmt.Sprintf("%d", function.Generation),
+				"app":                 "codegen",
+				"function":            function.Name,
+				"kdex.dev/generation": fmt.Sprintf("%d", function.Generation),
 			},
 		},
 		Spec: batchv1.JobSpec{
@@ -175,22 +175,22 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 					InitContainers: []corev1.Container{
 						{
 							Name:         "git-checkout",
-							Image:        g.GeneratorConfig.Git.Image,
+							Image:        g.Config.Git.Image,
 							Command:      []string{"git_checkout"},
 							Env:          env,
 							VolumeMounts: volumeMounts,
 						},
 						{
 							Name:         "generate-code",
-							Image:        g.GeneratorConfig.Image,
-							Command:      g.GeneratorConfig.Command,
-							Args:         g.GeneratorConfig.Args,
+							Image:        g.Config.Image,
+							Command:      g.Config.Command,
+							Args:         g.Config.Args,
 							Env:          env,
 							VolumeMounts: volumeMounts,
 						},
 						{
 							Name:         "git-push",
-							Image:        g.GeneratorConfig.Git.Image,
+							Image:        g.Config.Git.Image,
 							Command:      []string{"git_push"},
 							Env:          env,
 							VolumeMounts: volumeMounts,
@@ -198,8 +198,8 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 					},
 					Containers: []corev1.Container{
 						{
-							Name:         "patch-source-status",
-							Image:        g.GeneratorConfig.Git.Image,
+							Name:         "results",
+							Image:        g.Config.Git.Image,
 							Command:      []string{"patch_source_status"},
 							Env:          env,
 							VolumeMounts: volumeMounts,
@@ -217,7 +217,6 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 					},
 				},
 			},
-			TTLSecondsAfterFinished: utils.Ptr(int32(0)),
 		},
 	}
 
@@ -239,14 +238,14 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 func marshall(function *kdexv1alpha1.KDexFunction) string {
 	copy := function.DeepCopy()
 
-	if copy.Status.GeneratorConfig != nil && copy.Spec.Function.GeneratorConfig == nil {
-		copy.Spec.Function.GeneratorConfig = copy.Status.GeneratorConfig
+	if copy.Status.Generator != nil && copy.Spec.Origin.Generator == nil {
+		copy.Spec.Origin.Generator = copy.Status.Generator
 	}
-	if copy.Status.Source != nil && copy.Spec.Function.Source == nil {
-		copy.Spec.Function.Source = copy.Status.Source
+	if copy.Status.Source != nil && copy.Spec.Origin.Source == nil {
+		copy.Spec.Origin.Source = copy.Status.Source
 	}
-	if copy.Status.Executable != "" && copy.Spec.Function.Executable == "" {
-		copy.Spec.Function.Executable = copy.Status.Executable
+	if copy.Status.Executable != nil && copy.Spec.Origin.Executable == nil {
+		copy.Spec.Origin.Executable = copy.Status.Executable
 	}
 
 	copy.Status = kdexv1alpha1.KDexFunctionStatus{}

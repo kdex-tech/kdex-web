@@ -36,16 +36,11 @@ func (b *Builder) GetOrCreateKPackImage(
 	op, err := ctrl.CreateOrPatch(ctx, b.Client, kImage, func() error {
 		spec := map[string]any{
 			"build": map[string]any{
-				"env": []any{
-					map[string]any{
-						"name":  "BP_LOG_LEVEL",
-						"value": "DEBUG",
-					},
-				},
+				"env": b.Source.Builder.Env,
 			},
 			"builder": map[string]any{
-				"name": "tiny-microservice-builder",
-				"kind": "ClusterBuilder",
+				"name": b.Source.Builder.BuilderRef.Name,
+				"kind": b.Source.Builder.BuilderRef.Kind,
 			},
 			"imageTaggingStrategy": "BuildNumber",
 			"source": map[string]any{

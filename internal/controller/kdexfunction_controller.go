@@ -18,7 +18,9 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,13 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
+	"kdex.dev/web/internal"
 	"kdex.dev/web/internal/build"
 	"kdex.dev/web/internal/deploy"
 	"kdex.dev/web/internal/generate"
+	kjob "kdex.dev/web/internal/job"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -46,6 +49,14 @@ type KDexFunctionReconciler struct {
 	Configuration configuration.NexusConfiguration
 	RequeueDelay  time.Duration
 	Scheme        *runtime.Scheme
+}
+
+type handlerContext struct {
+	ctx             context.Context
+	faasAdaptorSpec kdexv1alpha1.KDexFaaSAdaptorSpec
+	function        *kdexv1alpha1.KDexFunction
+	host            kdexv1alpha1.KDexInternalHost
+	req             ctrl.Request
 }
 
 func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
@@ -122,365 +133,37 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		function.Status.Attributes["faasAdaptor.generation"] = fmt.Sprintf("%d", faasAdaptorObj.GetGeneration())
 	}
 
-	// Add generational awareness
-	if function.Status.ObservedGeneration != function.Generation {
-		function.Status.ObservedGeneration = function.Generation
-		function.Status.GeneratorConfig = nil
-		function.Status.Source = nil
-		function.Status.Executable = ""
-		function.Status.URL = ""
-		function.Status.State = kdexv1alpha1.KDexFunctionStatePending
-		function.Status.Detail = ""
-		function.Status.Conditions = nil
-	}
-
-	// OpenAPIValid should result purely through validation webhook
-	if !hasOpenAPISchemaURL(&function) {
-		scheme := "http"
-		if host.Spec.Routing.TLS != nil {
-			scheme = "https"
-		}
-		function.Status.OpenAPISchemaURL = fmt.Sprintf("%s://%s/-/openapi?type=function&tag=%s", scheme, host.Spec.Routing.Domains[0], function.Name)
-		if function.Status.Attributes == nil {
-			function.Status.Attributes = make(map[string]string)
-		}
-
-		port := ""
-		for _, p := range r.Configuration.HostDefault.Service.Ports {
-			if p.Name == "server" {
-				port = fmt.Sprintf(":%d", p.Port)
-				break
-			}
-		}
-		function.Status.Attributes["openapi.schema.url.internal"] = fmt.Sprintf("%s://%s/-/openapi?type=function&tag=%s", "http", host.Name+"."+host.Namespace+".svc.cluster.local"+port, function.Name)
-		function.Status.State = kdexv1alpha1.KDexFunctionStateOpenAPIValid
-		function.Status.Detail = "OpenAPISchemaURL:" + function.Status.OpenAPISchemaURL
-
-		kdexv1alpha1.SetConditions(
-			&function.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionFalse,
-				Progressing: metav1.ConditionTrue,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconciling,
-			string(kdexv1alpha1.KDexFunctionStateOpenAPIValid),
-		)
-
-		log.V(2).Info(string(kdexv1alpha1.KDexFunctionStateOpenAPIValid))
-
-		return ctrl.Result{}, nil
-	}
-
-	// TODO: the Function.Language, Function.Environment and Function.Entrypoint should not need to be set by the developer.
-	// If they are not set, they should be inferred from the FaaSAdaptorSpec.DefaultLanguage, FaaSAdaptorSpec.DefaultEnvironment and FaaSAdaptorSpec.DefaultEntrypoint.
-	// If they are set, they should be validated here because we need the FaaSAdaptor to do that.
-
-	// BuildValid can happen either manually by setting spec.function.generatorConfig
-	if hasGeneratorConfig(&function) {
-		function.Status.State = kdexv1alpha1.KDexFunctionStateBuildValid
-		generatorConfig := function.Spec.Function.GeneratorConfig
-		if generatorConfig == nil {
-			generatorConfig = function.Status.GeneratorConfig
-		}
-		function.Status.Detail = "GeneratorImage:" + generatorConfig.Image
-	} else if !hasSource(&function) && !hasExecutable(&function) && !hasURL(&function) {
-		function.Status.GeneratorConfig = r.calculateGeneratorConfig(&function, faasAdaptorSpec)
-
-		if function.Status.GeneratorConfig == nil {
-			err := fmt.Errorf("GeneratorConfig %s/%s not found for function %s/%s", function.Spec.Function.Language, function.Spec.Function.Environment, function.Namespace, function.Name)
-			kdexv1alpha1.SetConditions(
-				&function.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
-			return ctrl.Result{}, err
-		}
-
-		function.Status.State = kdexv1alpha1.KDexFunctionStateBuildValid
-		function.Status.Detail = "GeneratorImage:" + function.Status.GeneratorConfig.Image
-
-		kdexv1alpha1.SetConditions(
-			&function.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionFalse,
-				Progressing: metav1.ConditionTrue,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconciling,
-			string(kdexv1alpha1.KDexFunctionStateBuildValid),
-		)
-
-		log.V(2).Info(string(kdexv1alpha1.KDexFunctionStateBuildValid))
-
-		return ctrl.Result{}, nil
-	}
-
-	if hasSource(&function) {
-		function.Status.State = kdexv1alpha1.KDexFunctionStateSourceAvailable
-		source := function.Spec.Function.Source
-		if source == nil {
-			source = function.Status.Source
-		}
-		function.Status.Detail = "Source: " + source.Repository + "/src/branch/" + source.Revision
-	} else if hasGeneratorConfig(&function) && !hasExecutable(&function) && !hasURL(&function) {
-
-		// The Builder will compute the Source which must be set in function.Status.Source and
-		// function.Status.State = kdexv1alpha1.KDexFunctionStateSourceGenerated
-
-		generatorConfig := function.Spec.Function.GeneratorConfig
-		if generatorConfig == nil {
-			generatorConfig = function.Status.GeneratorConfig
-		}
-
-		generator := generate.Generator{
-			Client:          r.Client,
-			Scheme:          r.Scheme,
-			GeneratorConfig: *generatorConfig,
-			ServiceAccount:  host.Name,
-		}
-
-		job, err := generator.GetOrCreateGenerateJob(ctx, &function)
-		if err != nil {
-			kdexv1alpha1.SetConditions(
-				&function.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
-			return ctrl.Result{}, err
-		}
-
-		if job != nil {
-			for _, cond := range job.Status.Conditions {
-				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-					err := fmt.Errorf("Code generation job %s/%s failed: %s", job.Namespace, job.Name, cond.Message)
-					kdexv1alpha1.SetConditions(
-						&function.Status.Conditions,
-						kdexv1alpha1.ConditionStatuses{
-							Degraded:    metav1.ConditionTrue,
-							Progressing: metav1.ConditionFalse,
-							Ready:       metav1.ConditionFalse,
-						},
-						kdexv1alpha1.ConditionReasonReconcileError,
-						err.Error(),
-					)
-					return ctrl.Result{}, err
-				}
-			}
-
-			kdexv1alpha1.SetConditions(
-				&function.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionFalse,
-					Progressing: metav1.ConditionTrue,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconciling,
-				fmt.Sprintf("Waiting on code generation job %s/%s to complete", job.Namespace, job.Name),
-			)
-
-			log.V(2).Info(fmt.Sprintf("Waiting on code generation job %s/%s to complete", job.Namespace, job.Name))
-		}
-
-		return ctrl.Result{}, nil
-	}
-
-	if hasExecutable(&function) {
+	if function.Spec.Origin.Executable != nil {
 		function.Status.State = kdexv1alpha1.KDexFunctionStateExecutableAvailable
-		executable := function.Spec.Function.Executable
-		if executable == "" {
-			executable = function.Status.Executable
-		}
-		function.Status.Detail = "Executable: " + executable
-	} else if hasSource(&function) && !hasURL(&function) {
-
-		// TODO: In this scenario we need to trigger creation of the function image.
-		// The Builder will compute the image name and tag which must be set in function.Status.Executable and
-		// function.Status.State = kdexv1alpha1.KDexFunctionStateExecutableAvailable
-
-		source := function.Spec.Function.Source
-		if source == nil {
-			source = function.Status.Source
-		}
-
-		builder := build.Builder{
-			Client:        r.Client,
-			Scheme:        r.Scheme,
-			Configuration: r.Configuration,
-			Source:        *source,
-		}
-
-		op, imgUnstruct, err := builder.GetOrCreateKPackImage(ctx, &function)
-		if err != nil {
-			if strings.Contains(err.Error(), "Immutable field changed") {
-				// we need to delete the image builder and try again because there was a change in our image repository
-				// and the image builder is immutable.
-				log.V(2).Info("Immutable field changed, deleting image builder", "image builder", imgUnstruct)
-				err := r.Client.Delete(ctx, imgUnstruct)
-				if err != nil {
-					return ctrl.Result{}, err
-				}
-				return ctrl.Result{RequeueAfter: time.Second}, nil
-			}
-
-			kdexv1alpha1.SetConditions(
-				&function.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
-			return ctrl.Result{}, err
-		}
-
-		log.V(2).Info(
-			"GetOrCreateKPackImage",
-			"op", op,
-			"generation", function.GetGeneration(),
-			"source", source,
-			"KPackImage", imgUnstruct,
-		)
-
-		if imgUnstruct != nil && imgUnstruct.Object != nil {
-			status, ok := imgUnstruct.Object["status"].(map[string]any)
-			if !ok {
-				return ctrl.Result{}, fmt.Errorf("image builder job %s/%s has no status", imgUnstruct.GetNamespace(), imgUnstruct.GetName())
-			}
-			conditions, ok := status["conditions"].([]any)
-			if !ok {
-				return ctrl.Result{}, fmt.Errorf("image builder job %s/%s has no conditions", imgUnstruct.GetNamespace(), imgUnstruct.GetName())
-			}
-			for _, cond := range conditions {
-				if cond.(map[string]any)["type"] == "Failed" && cond.(map[string]any)["status"] == "True" {
-					err := fmt.Errorf("image builder job %s/%s failed: %s", imgUnstruct.GetNamespace(), imgUnstruct.GetName(), cond.(map[string]any)["message"])
-					kdexv1alpha1.SetConditions(
-						&function.Status.Conditions,
-						kdexv1alpha1.ConditionStatuses{
-							Degraded:    metav1.ConditionTrue,
-							Progressing: metav1.ConditionFalse,
-							Ready:       metav1.ConditionFalse,
-						},
-						kdexv1alpha1.ConditionReasonReconcileError,
-						err.Error(),
-					)
-					return ctrl.Result{}, err
-				} else if cond.(map[string]any)["type"] == "Ready" && cond.(map[string]any)["status"] == "True" {
-					function.Status.State = kdexv1alpha1.KDexFunctionStateExecutableAvailable
-					function.Status.Executable = status["latestImage"].(string)
-					function.Status.Detail = "Image:" + function.Status.Executable
-					tags := []string{}
-					tag, ok, _ := unstructured.NestedString(imgUnstruct.Object, "spec", "tag")
-					if ok {
-						tags = append(tags, tag)
-					}
-					additionalTags, ok, _ := unstructured.NestedSlice(imgUnstruct.Object, "spec", "additionalTags")
-					if ok {
-						for _, t := range additionalTags {
-							tags = append(tags, t.(string))
-						}
-					}
-					function.Status.Attributes["image.tags"] = strings.Join(tags, ",")
-				}
-			}
-		}
-
-		if function.Status.State != kdexv1alpha1.KDexFunctionStateExecutableAvailable {
-			return ctrl.Result{}, nil
-		}
-
-		kdexv1alpha1.SetConditions(
-			&function.Status.Conditions,
-			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionFalse,
-				Progressing: metav1.ConditionTrue,
-				Ready:       metav1.ConditionFalse,
-			},
-			kdexv1alpha1.ConditionReasonReconciling,
-			string(kdexv1alpha1.KDexFunctionStateExecutableAvailable),
-		)
-
-		log.V(2).Info(string(kdexv1alpha1.KDexFunctionStateExecutableAvailable))
-
-		return ctrl.Result{}, nil
+	} else if function.Spec.Origin.Source != nil {
+		function.Status.State = kdexv1alpha1.KDexFunctionStateSourceAvailable
+	} else if function.Spec.Origin.Generator != nil {
+		function.Status.State = kdexv1alpha1.KDexFunctionStateBuildValid
 	}
 
-	if hasURL(&function) {
-		function.Status.State = kdexv1alpha1.KDexFunctionStateReady
-		function.Status.Detail = "FunctionURL: " + function.Status.URL
-	} else if hasExecutable(&function) {
+	hc := handlerContext{
+		ctx:             ctx,
+		req:             req,
+		function:        &function,
+		host:            *host,
+		faasAdaptorSpec: *faasAdaptorSpec,
+	}
 
-		// TODO: In this scenario we need to trigger the function deployment and
-		// wait for it to reconcile, then set the URL on function.Status.URL and
-		// function.Status.State = kdexv1alpha1.KDexFunctionStateFunctionDeployed
-
-		deployer := deploy.Deployer{
-			Client:         r.Client,
-			Scheme:         r.Scheme,
-			Configuration:  r.Configuration,
-			ServiceAccount: host.Name,
-		}
-
-		job, err := deployer.GetOrCreateDeployJob(ctx, &function, faasAdaptorSpec)
-		if err != nil {
-			kdexv1alpha1.SetConditions(
-				&function.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
-			return ctrl.Result{}, err
-		}
-
-		if job != nil {
-			for _, cond := range job.Status.Conditions {
-				if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-					err := fmt.Errorf("Function deployer job %s/%s failed: %s", job.Namespace, job.Name, cond.Message)
-					kdexv1alpha1.SetConditions(
-						&function.Status.Conditions,
-						kdexv1alpha1.ConditionStatuses{
-							Degraded:    metav1.ConditionTrue,
-							Progressing: metav1.ConditionFalse,
-							Ready:       metav1.ConditionFalse,
-						},
-						kdexv1alpha1.ConditionReasonReconcileError,
-						err.Error(),
-					)
-					return ctrl.Result{}, err
-				}
-			}
-
-			kdexv1alpha1.SetConditions(
-				&function.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionFalse,
-					Progressing: metav1.ConditionTrue,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconciling,
-				fmt.Sprintf("Waiting on function deployer job %s/%s to complete", job.Namespace, job.Name),
-			)
-
-			log.V(2).Info(fmt.Sprintf("Waiting on function deployer job %s/%s to complete", job.Namespace, job.Name))
-		}
-
-		return ctrl.Result{}, nil
+	switch function.Status.State {
+	case kdexv1alpha1.KDexFunctionStatePending:
+		return r.handlePending(hc)
+	case kdexv1alpha1.KDexFunctionStateOpenAPIValid:
+		return r.handleOpenAPIValid(hc)
+	case kdexv1alpha1.KDexFunctionStateBuildValid:
+		return r.handleBuildValid(hc)
+	case kdexv1alpha1.KDexFunctionStateSourceAvailable:
+		return r.handleSourceAvailable(hc)
+	case kdexv1alpha1.KDexFunctionStateExecutableAvailable:
+		return r.handleExecutableAvailable(hc)
+	case kdexv1alpha1.KDexFunctionStateFunctionDeployed:
+		return r.handleFunctionDeployed(hc)
+	case kdexv1alpha1.KDexFunctionStateReady:
+		return r.handleReady(hc)
 	}
 
 	kdexv1alpha1.SetConditions(
@@ -501,32 +184,15 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *KDexFunctionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	unstructured := &unstructured.Unstructured{}
+	unstructured.SetGroupVersionKind(internal.KPackImageGVK)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexFunction{}).
+		Owns(&batchv1.Job{}).
+		Owns(unstructured).
 		Watches(
 			&kdexv1alpha1.KDexInternalHost{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexFunction{}, &kdexv1alpha1.KDexFunctionList{}, "{.Spec.HostRef}")).
-		Watches(
-			&unstructured.Unstructured{
-				Object: map[string]any{
-					"apiVersion": "kpack.io/v1alpha2",
-					"kind":       "Image",
-				},
-			},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []reconcile.Request {
-				functionName := o.GetLabels()["kdex.dev/function"]
-				if functionName == "" {
-					return nil
-				}
-				return []reconcile.Request{
-					{
-						NamespacedName: client.ObjectKey{
-							Namespace: o.GetNamespace(),
-							Name:      functionName,
-						},
-					},
-				}
-			})).
 		WithOptions(controller.TypedOptions[reconcile.Request]{
 			LogConstructor: LogConstructor("kdexfunction", mgr),
 		}).
@@ -534,39 +200,608 @@ func (r *KDexFunctionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *KDexFunctionReconciler) calculateGeneratorConfig(function *kdexv1alpha1.KDexFunction, faasAdaptorSpec *kdexv1alpha1.KDexFaaSAdaptorSpec) *kdexv1alpha1.GeneratorConfig {
-	if faasAdaptorSpec == nil {
-		return nil
+func (r *KDexFunctionReconciler) handlePending(hc handlerContext) (ctrl.Result, error) {
+	log := logf.FromContext(hc.ctx)
+
+	if hc.function.Status.OpenAPISchemaURL == "" {
+		scheme := "http"
+		if hc.host.Spec.Routing.TLS != nil {
+			scheme = "https"
+		}
+		hc.function.Status.OpenAPISchemaURL = fmt.Sprintf("%s://%s/-/openapi?type=function&tag=%s", scheme, hc.host.Spec.Routing.Domains[0], hc.function.Name)
+		port := ""
+		for _, p := range r.Configuration.HostDefault.Service.Ports {
+			if p.Name == "server" {
+				port = fmt.Sprintf(":%d", p.Port)
+				break
+			}
+		}
+		hc.function.Status.Attributes["openapi.schema.url.internal"] = fmt.Sprintf("%s://%s/-/openapi?type=function&tag=%s", "http", hc.host.Name+"."+hc.host.Namespace+".svc.cluster.local"+port, hc.function.Name)
 	}
 
-	language := function.Spec.Function.Language
-	environment := function.Spec.Function.Environment
+	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateOpenAPIValid
+	hc.function.Status.Detail = fmt.Sprintf("%v: %s", kdexv1alpha1.KDexFunctionStateOpenAPIValid, hc.function.Status.OpenAPISchemaURL)
 
-	generatorConfig, ok := faasAdaptorSpec.Generators[language+"/"+environment]
+	kdexv1alpha1.SetConditions(
+		&hc.function.Status.Conditions,
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionTrue,
+			Ready:       metav1.ConditionFalse,
+		},
+		kdexv1alpha1.ConditionReasonReconciling,
+		hc.function.Status.Detail,
+	)
 
-	if !ok {
-		return nil
+	log.V(2).Info(hc.function.Status.Detail)
+
+	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+}
+
+func (r *KDexFunctionReconciler) handleOpenAPIValid(hc handlerContext) (ctrl.Result, error) {
+	log := logf.FromContext(hc.ctx)
+
+	if hc.function.Spec.Origin.Generator != nil {
+		hc.function.Status.Generator = hc.function.Spec.Origin.Generator
+	} else {
+		g := &kdexv1alpha1.Generator{}
+
+		parts := strings.SplitN(hc.faasAdaptorSpec.DefaultBuilderGenerator, "/", 2)
+		for _, generator := range hc.faasAdaptorSpec.Generators {
+			if generator.Language == parts[1] {
+				g = &generator
+				break
+			}
+		}
+
+		if g == nil {
+			err := fmt.Errorf(
+				"Generator %s not found for function %s/%s",
+				parts[1],
+				hc.function.Namespace,
+				hc.function.Name,
+			)
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				err.Error(),
+			)
+			return ctrl.Result{}, err
+		}
+
+		hc.function.Status.Generator = g
 	}
 
-	return &generatorConfig
+	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateBuildValid
+	hc.function.Status.Detail = fmt.Sprintf("%v: %s/%s", kdexv1alpha1.KDexFunctionStateBuildValid, hc.function.Status.Generator.Language, hc.function.Status.Generator.Image)
+
+	kdexv1alpha1.SetConditions(
+		&hc.function.Status.Conditions,
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionTrue,
+			Ready:       metav1.ConditionFalse,
+		},
+		kdexv1alpha1.ConditionReasonReconciling,
+		hc.function.Status.Detail,
+	)
+
+	log.V(2).Info(hc.function.Status.Detail)
+
+	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 }
 
-func hasGeneratorConfig(function *kdexv1alpha1.KDexFunction) bool {
-	return function.Spec.Function.GeneratorConfig != nil || function.Status.GeneratorConfig != nil
+func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Result, error) {
+	log := logf.FromContext(hc.ctx)
+
+	if hc.function.Spec.Origin.Source != nil {
+		hc.function.Status.Source = hc.function.Spec.Origin.Source
+	} else {
+		gImpl := generate.Generator{
+			Client:         r.Client,
+			Scheme:         r.Scheme,
+			Config:         *hc.function.Status.Generator,
+			ServiceAccount: hc.host.Name,
+		}
+
+		job, err := gImpl.GetOrCreateGenerateJob(hc.ctx, hc.function)
+		if err != nil {
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				err.Error(),
+			)
+			return ctrl.Result{}, err
+		}
+
+		success := false
+		for _, cond := range job.Status.Conditions {
+			if cond.Type == batchv1.JobSuccessCriteriaMet && cond.Status == corev1.ConditionTrue {
+				success = true
+				break
+			} else if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+				err := fmt.Errorf("Code generation job %s/%s failed: %s", job.Namespace, job.Name, cond.Message)
+				kdexv1alpha1.SetConditions(
+					&hc.function.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileError,
+					err.Error(),
+				)
+				return ctrl.Result{}, err
+			}
+		}
+
+		if !success {
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionFalse,
+					Progressing: metav1.ConditionTrue,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconciling,
+				fmt.Sprintf("Waiting on code generation job %s/%s to complete", job.Namespace, job.Name),
+			)
+
+			log.V(2).Info(fmt.Sprintf("Waiting on code generation job %s/%s to complete", job.Namespace, job.Name))
+
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		} else {
+			pod, err := kjob.GetPodForJob(hc.ctx, r.Client, job)
+			if err != nil {
+				kdexv1alpha1.SetConditions(
+					&hc.function.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileError,
+					err.Error(),
+				)
+
+				if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+					return ctrl.Result{}, err
+				}
+
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			}
+
+			var terminationMessage string
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if containerStatus.Name == "results" && containerStatus.State.Terminated != nil {
+					terminationMessage = containerStatus.State.Terminated.Message
+					break
+				}
+			}
+
+			if terminationMessage == "" {
+				err := fmt.Errorf("code generation job %s/%s failed: %s", job.Namespace, job.Name, "")
+				kdexv1alpha1.SetConditions(
+					&hc.function.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileError,
+					err.Error(),
+				)
+
+				if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+					return ctrl.Result{}, err
+				}
+
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			} else {
+				type results struct {
+					Repository string `json:"repository"`
+					Revision   string `json:"revision"`
+					Path       string `json:"path"`
+				}
+				var res results
+				if err := json.Unmarshal([]byte(terminationMessage), &res); err != nil {
+					kdexv1alpha1.SetConditions(
+						&hc.function.Status.Conditions,
+						kdexv1alpha1.ConditionStatuses{
+							Degraded:    metav1.ConditionTrue,
+							Progressing: metav1.ConditionFalse,
+							Ready:       metav1.ConditionFalse,
+						},
+						kdexv1alpha1.ConditionReasonReconcileError,
+						err.Error(),
+					)
+
+					if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+						return ctrl.Result{}, err
+					}
+
+					return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+				}
+
+				hc.function.Status.Source = &kdexv1alpha1.Source{
+					Repository: res.Repository,
+					Revision:   res.Revision,
+					Path:       res.Path,
+				}
+
+				defaultParts := strings.SplitN(hc.faasAdaptorSpec.DefaultBuilderGenerator, "/", 2)
+				defaultLanguage := defaultParts[1]
+				defaultBuilderName := defaultParts[0]
+				sourceLanguage := gImpl.Config.Language
+				builderName := ""
+				if sourceLanguage == defaultLanguage {
+					builderName = defaultBuilderName
+				} else {
+					for _, b := range hc.faasAdaptorSpec.Builders {
+						if slices.Contains(b.Languages, sourceLanguage) {
+							builderName = b.Name
+						}
+					}
+				}
+
+				for _, builder := range hc.faasAdaptorSpec.Builders {
+					if builder.Name == builderName {
+						hc.function.Status.Source.Builder = &builder
+					}
+				}
+			}
+		}
+	}
+
+	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateSourceAvailable
+	hc.function.Status.Detail = fmt.Sprintf("%v: %s@%s", kdexv1alpha1.KDexFunctionStateSourceAvailable, hc.function.Status.Source.Repository, hc.function.Status.Source.Revision)
+
+	kdexv1alpha1.SetConditions(
+		&hc.function.Status.Conditions,
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionTrue,
+			Ready:       metav1.ConditionFalse,
+		},
+		kdexv1alpha1.ConditionReasonReconciling,
+		hc.function.Status.Detail,
+	)
+
+	log.V(2).Info(hc.function.Status.Detail)
+
+	return ctrl.Result{}, nil
 }
 
-func hasSource(function *kdexv1alpha1.KDexFunction) bool {
-	return function.Spec.Function.Source != nil || function.Status.Source != nil
+func (r *KDexFunctionReconciler) handleSourceAvailable(hc handlerContext) (ctrl.Result, error) {
+	log := logf.FromContext(hc.ctx)
+
+	if hc.function.Spec.Origin.Executable != nil {
+		hc.function.Status.Executable = hc.function.Spec.Origin.Executable
+	} else {
+		builder := build.Builder{
+			Client:        r.Client,
+			Scheme:        r.Scheme,
+			Configuration: r.Configuration,
+			Source:        *hc.function.Status.Source,
+		}
+
+		op, imgUnstruct, err := builder.GetOrCreateKPackImage(hc.ctx, hc.function)
+		if err != nil {
+			if strings.Contains(err.Error(), "Immutable field changed") {
+				log.V(2).Info("Immutable field changed, deleting image builder", "image builder", imgUnstruct)
+
+				if err := r.Client.Delete(hc.ctx, imgUnstruct); err != nil {
+					return ctrl.Result{}, err
+				}
+
+				return ctrl.Result{RequeueAfter: time.Second}, nil
+			}
+
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				err.Error(),
+			)
+
+			return ctrl.Result{}, err
+		}
+
+		log.V(2).Info(
+			"GetOrCreateKPackImage",
+			"op", op,
+			"generation", hc.function.GetGeneration(),
+			"source", hc.function.Status.Source,
+			"KPackImage", imgUnstruct,
+		)
+
+		success := false
+		if imgUnstruct != nil && imgUnstruct.Object != nil {
+			status, ok := imgUnstruct.Object["status"].(map[string]any)
+			if !ok {
+				err := fmt.Errorf("image builder job %s/%s has no status", imgUnstruct.GetNamespace(), imgUnstruct.GetName())
+				kdexv1alpha1.SetConditions(
+					&hc.function.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileError,
+					err.Error(),
+				)
+				return ctrl.Result{}, err
+			}
+
+			conditions, ok := status["conditions"].([]any)
+			if !ok {
+				err := fmt.Errorf("image builder job %s/%s has no conditions", imgUnstruct.GetNamespace(), imgUnstruct.GetName())
+				kdexv1alpha1.SetConditions(
+					&hc.function.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileError,
+					err.Error(),
+				)
+				return ctrl.Result{}, err
+			}
+
+			for _, cond := range conditions {
+				if cond.(map[string]any)["type"] == "Ready" && cond.(map[string]any)["status"] == "True" {
+					success = true
+				} else if cond.(map[string]any)["type"] == "Failed" && cond.(map[string]any)["status"] == "True" {
+					err := fmt.Errorf("image builder job %s/%s failed: %s", imgUnstruct.GetNamespace(), imgUnstruct.GetName(), cond.(map[string]any)["message"])
+					kdexv1alpha1.SetConditions(
+						&hc.function.Status.Conditions,
+						kdexv1alpha1.ConditionStatuses{
+							Degraded:    metav1.ConditionTrue,
+							Progressing: metav1.ConditionFalse,
+							Ready:       metav1.ConditionFalse,
+						},
+						kdexv1alpha1.ConditionReasonReconcileError,
+						err.Error(),
+					)
+					return ctrl.Result{}, err
+				}
+			}
+		}
+
+		if !success {
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionFalse,
+					Progressing: metav1.ConditionTrue,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconciling,
+				fmt.Sprintf("Waiting on image builder job %s/%s to complete", imgUnstruct.GetNamespace(), imgUnstruct.GetName()),
+			)
+
+			log.V(2).Info(fmt.Sprintf("Waiting on image builder job %s/%s to complete", imgUnstruct.GetNamespace(), imgUnstruct.GetName()))
+
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		} else {
+			status, _ := imgUnstruct.Object["status"].(map[string]any)
+
+			hc.function.Status.Executable = &kdexv1alpha1.Executable{
+				Image: status["latestImage"].(string),
+			}
+			tags := []string{}
+			tag, ok, _ := unstructured.NestedString(imgUnstruct.Object, "spec", "tag")
+			if ok {
+				tags = append(tags, tag)
+			}
+			additionalTags, ok, _ := unstructured.NestedSlice(imgUnstruct.Object, "spec", "additionalTags")
+			if ok {
+				for _, t := range additionalTags {
+					tags = append(tags, t.(string))
+				}
+			}
+			hc.function.Status.Attributes["image.tags"] = strings.Join(tags, ",")
+		}
+	}
+
+	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateExecutableAvailable
+	hc.function.Status.Detail = fmt.Sprintf("%v: %s", kdexv1alpha1.KDexFunctionStateExecutableAvailable, hc.function.Status.Executable.Image)
+
+	kdexv1alpha1.SetConditions(
+		&hc.function.Status.Conditions,
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionTrue,
+			Ready:       metav1.ConditionFalse,
+		},
+		kdexv1alpha1.ConditionReasonReconciling,
+		hc.function.Status.Detail,
+	)
+
+	log.V(2).Info(hc.function.Status.Detail)
+
+	return ctrl.Result{}, nil
 }
 
-func hasExecutable(function *kdexv1alpha1.KDexFunction) bool {
-	return function.Spec.Function.Executable != "" || function.Status.Executable != ""
+func (r *KDexFunctionReconciler) handleExecutableAvailable(hc handlerContext) (ctrl.Result, error) {
+	log := logf.FromContext(hc.ctx)
+
+	// TODO: In this scenario we need to trigger the function deployment and
+	// wait for it to reconcile, then set the URL on function.Status.URL and
+	// function.Status.State = kdexv1alpha1.KDexFunctionStateFunctionDeployed
+
+	deployer := deploy.Deployer{
+		Client:         r.Client,
+		FaaSAdaptor:    hc.faasAdaptorSpec,
+		Host:           hc.host,
+		ServiceAccount: hc.host.Name,
+		Scheme:         r.Scheme,
+	}
+
+	job, err := deployer.GetOrCreateDeployJob(hc.ctx, hc.function)
+	if err != nil {
+		kdexv1alpha1.SetConditions(
+			&hc.function.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			err.Error(),
+		)
+		return ctrl.Result{}, err
+	}
+
+	success := false
+	for _, cond := range job.Status.Conditions {
+		if cond.Type == batchv1.JobSuccessCriteriaMet && cond.Status == corev1.ConditionTrue {
+			success = true
+			break
+		} else if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
+			err := fmt.Errorf("Function deployer job %s/%s failed: %s", job.Namespace, job.Name, cond.Message)
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				err.Error(),
+			)
+			return ctrl.Result{}, err
+		}
+	}
+
+	if !success {
+		kdexv1alpha1.SetConditions(
+			&hc.function.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionFalse,
+				Progressing: metav1.ConditionTrue,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconciling,
+			fmt.Sprintf("Waiting on function deployer job %s/%s to complete", job.Namespace, job.Name),
+		)
+
+		log.V(2).Info(fmt.Sprintf("Waiting on function deployer job %s/%s to complete", job.Namespace, job.Name))
+
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+	} else {
+		pod, err := kjob.GetPodForJob(hc.ctx, r.Client, job)
+		if err != nil {
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				err.Error(),
+			)
+
+			if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		}
+
+		var terminationMessage string
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			if containerStatus.Name == "results" && containerStatus.State.Terminated != nil {
+				terminationMessage = containerStatus.State.Terminated.Message
+				break
+			}
+		}
+
+		if terminationMessage == "" {
+			err := fmt.Errorf("function deployment job %s/%s failed: %s", job.Namespace, job.Name, "")
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				err.Error(),
+			)
+
+			if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		} else {
+			type results struct {
+				URL string `json:"url"`
+			}
+			var res results
+			if err := json.Unmarshal([]byte(terminationMessage), &res); err != nil {
+				kdexv1alpha1.SetConditions(
+					&hc.function.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileError,
+					err.Error(),
+				)
+
+				if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+					return ctrl.Result{}, err
+				}
+
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			}
+
+			hc.function.Status.URL = res.URL
+		}
+	}
+
+	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateFunctionDeployed
+	hc.function.Status.Detail = fmt.Sprintf("%v: %s", kdexv1alpha1.KDexFunctionStateFunctionDeployed, hc.function.Status.URL)
+
+	kdexv1alpha1.SetConditions(
+		&hc.function.Status.Conditions,
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionTrue,
+			Ready:       metav1.ConditionFalse,
+		},
+		kdexv1alpha1.ConditionReasonReconciling,
+		hc.function.Status.Detail,
+	)
+
+	log.V(2).Info(hc.function.Status.Detail)
+
+	return ctrl.Result{}, nil
 }
 
-func hasOpenAPISchemaURL(function *kdexv1alpha1.KDexFunction) bool {
-	return function.Status.OpenAPISchemaURL != ""
+func (r *KDexFunctionReconciler) handleFunctionDeployed(hc handlerContext) (ctrl.Result, error) {
+	panic("unimplemented")
 }
 
-func hasURL(function *kdexv1alpha1.KDexFunction) bool {
-	return function.Status.URL != ""
+func (r *KDexFunctionReconciler) handleReady(hc handlerContext) (ctrl.Result, error) {
+	panic("unimplemented")
 }

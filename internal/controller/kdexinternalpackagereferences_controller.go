@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
+	kjob "kdex.dev/web/internal/job"
 	"kdex.dev/web/internal/utils"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -236,7 +237,7 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 	)
 
 	if job.Status.Succeeded > 0 {
-		pod, err := r.getPodForJob(ctx, job)
+		pod, err := kjob.GetPodForJob(ctx, r.Client, job)
 		if err != nil {
 			kdexv1alpha1.SetConditions(
 				&internalPackageReferences.Status.Conditions,
@@ -323,25 +324,6 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 	log.V(1).Info("reconciled", "as", jobOp)
 
 	return ctrl.Result{}, nil
-}
-
-func (r *KDexInternalPackageReferencesReconciler) getPodForJob(
-	ctx context.Context,
-	job *batchv1.Job,
-) (*corev1.Pod, error) {
-	podList := &corev1.PodList{}
-	if err := r.List(ctx, podList, client.InNamespace(job.Namespace), client.MatchingLabels{"job-name": job.Name}); err != nil {
-		return nil, err
-	}
-
-	// find pod with matching generation
-	for _, pod := range podList.Items {
-		if pod.Annotations["kdex.dev/generation"] == job.Annotations["kdex.dev/generation"] {
-			return &pod, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no pods found for job %s", job.Name)
 }
 
 func (r *KDexInternalPackageReferencesReconciler) setupJob(

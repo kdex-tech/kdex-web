@@ -5,17 +5,21 @@ import (
 	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/crds/configuration"
+	"kdex.dev/web/internal/utils"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Deployer struct {
 	Client         client.Client
+	FaaSAdaptor    kdexv1alpha1.KDexFaaSAdaptorSpec
+	Host           kdexv1alpha1.KDexInternalHost
 	Scheme         *runtime.Scheme
-	Configuration  configuration.NexusConfiguration
 	ServiceAccount string
 }
 
@@ -29,7 +33,7 @@ type Deployer struct {
 // of the deployment back to the Nexus controller. The job must return success or
 // failure along with reasons, and upon success, at least the URL of the function so that the
 // Focal Controller can mount it into the host's service mesh and dispatch requests to it.
-func (d *Deployer) GetOrCreateDeployJob(ctx context.Context, function *kdexv1alpha1.KDexFunction, faasAdaptorSpec *kdexv1alpha1.KDexFaaSAdaptorSpec) (*batchv1.Job, error) {
+func (d *Deployer) GetOrCreateDeployJob(ctx context.Context, function *kdexv1alpha1.KDexFunction) (*batchv1.Job, error) {
 	// Create Job name
 	jobName := fmt.Sprintf("%s-deployer-%d", function.Name, function.Generation)
 
@@ -42,5 +46,109 @@ func (d *Deployer) GetOrCreateDeployJob(ctx context.Context, function *kdexv1alp
 		return nil, err
 	}
 
-	return nil, nil
+	env := []corev1.EnvVar{
+		{
+			Name:  "FUNCTION_HOST",
+			Value: function.Spec.HostRef.Name,
+		},
+		{
+			Name:  "FUNCTION_GENERATION",
+			Value: fmt.Sprintf("%d", function.Generation),
+		},
+		{
+			Name:  "FUNCTION_NAME",
+			Value: function.Name,
+		},
+		{
+			Name:  "FUNCTION_NAMESPACE",
+			Value: function.Namespace,
+		},
+		{
+			Name:  "FUNCTION_BASEPATH",
+			Value: function.Spec.API.BasePath,
+		},
+		{
+			Name:  "JWKS_URL",
+			Value: d.Host.Spec.Routing.Domains[0] + "/.well-known/jwks.json",
+		},
+		{
+			Name:  "ISSUER",
+			Value: d.Host.Spec.Routing.Domains[0],
+		},
+		{
+			Name:  "CLIENT_ID",
+			Value: d.Host.Spec.Auth.OIDCProvider.ClientID,
+		},
+		{
+			Name:  "AUDIENCE",
+			Value: d.Host.Spec.Routing.Domains[0],
+		},
+	}
+
+	env = append(env, d.FaaSAdaptor.Deployer.Env...)
+
+	forwardedEnvVars := ""
+	sep := ""
+	for _, e := range env {
+		forwardedEnvVars += fmt.Sprintf("%s%s", sep, e.Name)
+		sep = ","
+	}
+
+	env = append(env, corev1.EnvVar{
+		Name:  "FORWARDED_ENV_VARS",
+		Value: forwardedEnvVars,
+	})
+
+	job = &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: function.Namespace,
+			Labels: map[string]string{
+				"app":                 "deployer",
+				"function":            function.Name,
+				"kdex.dev/generation": fmt.Sprintf("%d", function.Generation),
+			},
+		},
+		Spec: batchv1.JobSpec{
+			BackoffLimit: utils.Ptr(int32(3)),
+			Completions:  utils.Ptr(int32(1)),
+			Parallelism:  utils.Ptr(int32(1)),
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					AutomountServiceAccountToken: utils.Ptr(true),
+					Containers: []corev1.Container{
+						{
+							Args:    d.FaaSAdaptor.Deployer.Args,
+							Command: d.FaaSAdaptor.Deployer.Command,
+							Env:     env,
+							Image:   d.FaaSAdaptor.Deployer.Image,
+
+							// TODO: implement the KNative deployer image
+							// TODO: implement the AWS Lambda deployer image
+							// TODO: implement the Google Cloud Functions deployer image
+							// TODO: implement the Azure Functions deployer image
+
+							Name: "deployer",
+						},
+					},
+					RestartPolicy:      corev1.RestartPolicyNever,
+					ServiceAccountName: d.ServiceAccount,
+				},
+			},
+		},
+	}
+
+	// Add owner reference
+	err = ctrl.SetControllerReference(function, job, d.Scheme)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create deployment job: %w", err)
+	}
+
+	// Create the job
+	err = d.Client.Create(ctx, job)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create deployment job: %w", err)
+	}
+
+	return job, nil
 }
