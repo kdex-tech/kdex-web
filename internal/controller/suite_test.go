@@ -94,7 +94,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	logger, err := kdexlog.New(&opts, map[string]string{
-		"kdexpagebinding": "2",
+		"kdexfunction": "2",
 	})
 	if err != nil {
 		panic(err)
@@ -121,6 +121,7 @@ var _ = BeforeSuite(func() {
 	testEnv.CRDDirectoryPaths = append(testEnv.CRDDirectoryPaths, filepath.Join(crdPath, "config", "crd", "bases"))
 
 	addRemoteCRD(&testEnv.CRDDirectoryPaths, tempDir, "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml")
+	addRemoteCRD(&testEnv.CRDDirectoryPaths, tempDir, "https://github.com/buildpacks-community/kpack/releases/download/v0.17.1/release-0.17.1.yaml")
 
 	// Retrieve the first found binary directory to allow running tests from IDEs
 	if getFirstFoundEnvTestBinaryDir() != "" {
@@ -255,6 +256,15 @@ var _ = BeforeSuite(func() {
 		Scheme:              k8sManager.GetScheme(),
 	}
 	err = internalUtilityPageReconciler.SetupWithManager(k8sManager)
+	Expect(err).NotTo(HaveOccurred())
+
+	functionReconciler := &KDexFunctionReconciler{
+		Client:        k8sManager.GetClient(),
+		Configuration: configuration,
+		RequeueDelay:  requeueDelay,
+		Scheme:        k8sManager.GetScheme(),
+	}
+	err = functionReconciler.SetupWithManager(k8sManager)
 	Expect(err).NotTo(HaveOccurred())
 
 	go func() {

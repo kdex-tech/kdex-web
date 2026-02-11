@@ -88,29 +88,6 @@ func addOrUpdatePageArchetype(
 	}).Should(Succeed())
 }
 
-func addOrUpdatePageBinding(
-	ctx context.Context,
-	k8sClient client.Client,
-	pageBinding kdexv1alpha1.KDexPageBinding,
-) {
-	Eventually(func(g Gomega) error {
-		list := &kdexv1alpha1.KDexPageBindingList{}
-		err := k8sClient.List(ctx, list, &client.ListOptions{
-			Namespace:     pageBinding.Namespace,
-			FieldSelector: fields.OneTermEqualSelector("metadata.name", pageBinding.Name),
-		})
-		g.Expect(err).NotTo(HaveOccurred())
-		if len(list.Items) > 0 {
-			existing := list.Items[0]
-			existing.Spec = pageBinding.Spec
-			g.Expect(k8sClient.Update(ctx, &existing)).To(Succeed())
-		} else {
-			g.Expect(k8sClient.Create(ctx, &pageBinding)).To(Succeed())
-		}
-		return nil
-	}).Should(Succeed())
-}
-
 func addOrUpdatePageHeader(
 	ctx context.Context,
 	k8sClient client.Client,
@@ -180,52 +157,6 @@ func addOrUpdatePageNavigation(
 	}).Should(Succeed())
 }
 
-func addOrUpdateScriptLibrary(
-	ctx context.Context,
-	k8sClient client.Client,
-	scriptLibrary kdexv1alpha1.KDexScriptLibrary,
-) {
-	Eventually(func(g Gomega) error {
-		list := &kdexv1alpha1.KDexScriptLibraryList{}
-		err := k8sClient.List(ctx, list, &client.ListOptions{
-			Namespace:     scriptLibrary.Namespace,
-			FieldSelector: fields.OneTermEqualSelector("metadata.name", scriptLibrary.Name),
-		})
-		g.Expect(err).NotTo(HaveOccurred())
-		if len(list.Items) > 0 {
-			existing := list.Items[0]
-			existing.Spec = scriptLibrary.Spec
-			g.Expect(k8sClient.Update(ctx, &existing)).To(Succeed())
-		} else {
-			g.Expect(k8sClient.Create(ctx, &scriptLibrary)).To(Succeed())
-		}
-		return nil
-	}).Should(Succeed())
-}
-
-func addOrUpdateTheme(
-	ctx context.Context,
-	k8sClient client.Client,
-	theme kdexv1alpha1.KDexTheme,
-) {
-	Eventually(func(g Gomega) error {
-		list := &kdexv1alpha1.KDexThemeList{}
-		err := k8sClient.List(ctx, list, &client.ListOptions{
-			Namespace:     theme.Namespace,
-			FieldSelector: fields.OneTermEqualSelector("metadata.name", theme.Name),
-		})
-		g.Expect(err).NotTo(HaveOccurred())
-		if len(list.Items) > 0 {
-			existing := list.Items[0]
-			existing.Spec = theme.Spec
-			g.Expect(k8sClient.Update(ctx, &existing)).To(Succeed())
-		} else {
-			g.Expect(k8sClient.Create(ctx, &theme)).To(Succeed())
-		}
-		return nil
-	}).Should(Succeed())
-}
-
 func assertResourceReady(ctx context.Context, k8sClient client.Client, name string, namespace string, checkResource client.Object, ready bool) {
 	typeNamespacedName := types.NamespacedName{
 		Name: name,
@@ -266,6 +197,7 @@ func cleanupResources(namespace string) {
 	for _, pair := range []Pairs{
 		{&kdexv1alpha1.KDexApp{}, &kdexv1alpha1.KDexAppList{}},
 		{&kdexv1alpha1.KDexClusterApp{}, &kdexv1alpha1.KDexClusterAppList{}},
+		{&kdexv1alpha1.KDexClusterFaaSAdaptor{}, &kdexv1alpha1.KDexClusterFaaSAdaptorList{}},
 		{&kdexv1alpha1.KDexClusterPageArchetype{}, &kdexv1alpha1.KDexClusterPageArchetypeList{}},
 		{&kdexv1alpha1.KDexClusterPageFooter{}, &kdexv1alpha1.KDexClusterPageFooterList{}},
 		{&kdexv1alpha1.KDexClusterPageHeader{}, &kdexv1alpha1.KDexClusterPageHeaderList{}},
@@ -273,6 +205,8 @@ func cleanupResources(namespace string) {
 		{&kdexv1alpha1.KDexClusterScriptLibrary{}, &kdexv1alpha1.KDexClusterScriptLibraryList{}},
 		{&kdexv1alpha1.KDexClusterTheme{}, &kdexv1alpha1.KDexClusterThemeList{}},
 		{&kdexv1alpha1.KDexClusterUtilityPage{}, &kdexv1alpha1.KDexClusterUtilityPageList{}},
+		{&kdexv1alpha1.KDexFaaSAdaptor{}, &kdexv1alpha1.KDexFaaSAdaptorList{}},
+		{&kdexv1alpha1.KDexFunction{}, &kdexv1alpha1.KDexFunctionList{}},
 		{&kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}},
 		{&kdexv1alpha1.KDexInternalPackageReferences{}, &kdexv1alpha1.KDexInternalPackageReferencesList{}},
 		{&kdexv1alpha1.KDexInternalTranslation{}, &kdexv1alpha1.KDexInternalTranslationList{}},

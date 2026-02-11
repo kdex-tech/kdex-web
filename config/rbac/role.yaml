@@ -67,12 +67,14 @@ rules:
   resources:
   - kdexapps
   - kdexclusterapps
+  - kdexclusterfaasadaptors
   - kdexclusterpagearchetypes
   - kdexclusterpagefooters
   - kdexclusterpageheaders
   - kdexclusterpagenavigations
   - kdexclusterscriptlibraries
   - kdexclusterthemes
+  - kdexfaasadaptors
   - kdexpagearchetypes
   - kdexpagefooters
   - kdexpageheaders
@@ -122,6 +124,32 @@ rules:
   - kdexinternaltranslations/status
   - kdexinternalutilitypages/status
   - kdexpagebindings/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - kpack.io
+  resources:
+  - images
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kpack.io
+  resources:
+  - images/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kpack.io
+  resources:
+  - images/status
   verbs:
   - get
   - patch

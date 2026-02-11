@@ -17,7 +17,6 @@ import (
 	"kdex.dev/web/internal/page"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 func ResolveContents(
@@ -208,7 +207,7 @@ func ResolveKDexObjectReference(
 	requeueDelay time.Duration,
 ) (client.Object, bool, ctrl.Result, error) {
 	if objectRef == nil {
-		return nil, false, reconcile.Result{}, nil
+		return nil, false, ctrl.Result{}, nil
 	}
 
 	t := reflect.TypeOf(referrer)
@@ -221,14 +220,14 @@ func ResolveKDexObjectReference(
 	isReferrerClustered := strings.Contains(referrerKind, "Cluster")
 
 	if isReferrerClustered && !strings.Contains(objectRef.Kind, "Cluster") {
-		return nil, true, reconcile.Result{}, fmt.Errorf(
+		return nil, true, ctrl.Result{}, fmt.Errorf(
 			"referrer %s is cluster scoped so %s must also be cluster scoped", referrerKind, objectRef.Kind)
 	}
 
 	gvk := schema.GroupVersionKind{Group: "kdex.dev", Version: "v1alpha1", Kind: objectRef.Kind}
 	obj, err := c.Scheme().New(gvk)
 	if err != nil {
-		return nil, true, reconcile.Result{}, fmt.Errorf("unknown kind %s", objectRef.Kind)
+		return nil, true, ctrl.Result{}, fmt.Errorf("unknown kind %s", objectRef.Kind)
 	}
 
 	key := client.ObjectKey{Name: objectRef.Name}
@@ -263,14 +262,14 @@ func ResolveKDexObjectReference(
 	conditions, ok := conditionsField.Interface().([]metav1.Condition)
 
 	if !ok {
-		return nil, true, reconcile.Result{}, fmt.Errorf("no condition field on status %v", obj)
+		return obj.(client.Object), true, ctrl.Result{}, fmt.Errorf("no condition field on status %v", obj)
 	}
 
 	if isReady, r1, err := isReady(obj.(client.Object), &conditions, requeueDelay); !isReady {
-		return nil, true, r1, err
+		return obj.(client.Object), true, r1, err
 	}
 
-	return obj.(client.Object), false, reconcile.Result{}, nil
+	return obj.(client.Object), false, ctrl.Result{}, nil
 }
 
 func ResolveSecret(

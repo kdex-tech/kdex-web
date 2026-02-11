@@ -9,12 +9,14 @@ package controller
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,             verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexapps,                                verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterapps,                         verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterfaasadaptors,                 verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpagearchetypes,               verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpagefooters,                  verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpageheaders,                  verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterpagenavigations,              verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterscriptlibraries,              verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexclusterthemes,                       verbs=get;list;watch
+// +kubebuilder:rbac:groups=kdex.dev,resources=kdexfaasadaptors,                        verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexfunctions,                           verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexfunctions/status,                    verbs=get;update;patch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexfunctions/finalizers,                verbs=update
@@ -41,4 +43,7 @@ package controller
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexrolebindings,                        verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexscriptlibraries,                     verbs=get;list;watch
 // +kubebuilder:rbac:groups=kdex.dev,resources=kdexthemes,                              verbs=get;list;watch
+// +kubebuilder:rbac:groups=kpack.io,resources=images,                                  verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kpack.io,resources=images/finalizers,                       verbs=update
+// +kubebuilder:rbac:groups=kpack.io,resources=images/status,                           verbs=get;update;patch
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,                      verbs=get;list;watch;create;update;patch;delete
