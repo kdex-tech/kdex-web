@@ -23,6 +23,19 @@ type Deployer struct {
 	ServiceAccount string
 }
 
+// Runtime defines the interface for interacting with a FaaS provider.
+type Runtime interface {
+	// Deploy returns a Job that, when executed, will deploy or update the function.
+	// The Job is expected to update the KDexFunction status upon completion.
+	Deploy(ctx context.Context, function *kdexv1alpha1.KDexFunction) (*batchv1.Job, error)
+
+	// Observe returns a workload that, when executed, calls the provider API to check status.
+	// For external providers, this is likely a CronJob.
+	// For K8s-native providers (like Knative), this might return nil (if handled by standard Watch),
+	// or a no-op Job for consistency.
+	Observe(ctx context.Context, function *kdexv1alpha1.KDexFunction) (client.Object, error)
+}
+
 // The FaaS adaptor is responsible for deploying the function.
 // Since there are virtually unlimited number of ways to deploy a function,
 // we use a job as a bridge between the Nexus controller and the FaaS adaptor.
@@ -33,7 +46,7 @@ type Deployer struct {
 // of the deployment back to the Nexus controller. The job must return success or
 // failure along with reasons, and upon success, at least the URL of the function so that the
 // Focal Controller can mount it into the host's service mesh and dispatch requests to it.
-func (d *Deployer) GetOrCreateDeployJob(ctx context.Context, function *kdexv1alpha1.KDexFunction) (*batchv1.Job, error) {
+func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFunction) (*batchv1.Job, error) {
 	// Create Job name
 	jobName := fmt.Sprintf("%s-deployer-%d", function.Name, function.Generation)
 
@@ -151,4 +164,95 @@ func (d *Deployer) GetOrCreateDeployJob(ctx context.Context, function *kdexv1alp
 	}
 
 	return job, nil
+}
+
+func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunction) (client.Object, error) {
+	if d.FaaSAdaptor.Observer == nil {
+		return nil, nil // No observer configured
+	}
+
+	// Create CronJob name
+	cronJobName := fmt.Sprintf("%s-observer", function.Name)
+
+	cronJob := &batchv1.CronJob{}
+	err := d.Client.Get(ctx, client.ObjectKey{Namespace: function.Namespace, Name: cronJobName}, cronJob)
+	if err == nil {
+		// Update schedule if changed? For now, just return existing.
+		return cronJob, nil
+	}
+	if !errors.IsNotFound(err) {
+		return nil, err
+	}
+
+	// Reuse deployment environment variables where appropriate
+	env := []corev1.EnvVar{
+		{
+			Name:  "FUNCTION_HOST",
+			Value: function.Spec.HostRef.Name,
+		},
+		{
+			Name:  "FUNCTION_NAME",
+			Value: function.Name,
+		},
+		{
+			Name:  "FUNCTION_NAMESPACE",
+			Value: function.Namespace,
+		},
+	}
+
+	env = append(env, d.FaaSAdaptor.Observer.Env...)
+
+	cronJob = &batchv1.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cronJobName,
+			Namespace: function.Namespace,
+			Labels: map[string]string{
+				"app":      "observer",
+				"function": function.Name,
+			},
+		},
+		Spec: batchv1.CronJobSpec{
+			Schedule:          d.FaaSAdaptor.Observer.Schedule,
+			ConcurrencyPolicy: batchv1.ForbidConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							AutomountServiceAccountToken: utils.Ptr(true),
+							Containers: []corev1.Container{
+								{
+									Args:    d.FaaSAdaptor.Observer.Args,
+									Command: d.FaaSAdaptor.Observer.Command,
+									Env:     env,
+									Image:   d.FaaSAdaptor.Observer.Image,
+									Name:    "observer",
+								},
+							},
+							RestartPolicy:      corev1.RestartPolicyOnFailure,
+							ServiceAccountName: d.FaaSAdaptor.Observer.ServiceAccountName,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// Default service account if not set in observer spec
+	if cronJob.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName == "" {
+		cronJob.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName = d.ServiceAccount
+	}
+
+	// Add owner reference
+	err = ctrl.SetControllerReference(function, cronJob, d.Scheme)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create observation cronjob: %w", err)
+	}
+
+	// Create the cronjob
+	err = d.Client.Create(ctx, cronJob)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create observation cronjob: %w", err)
+	}
+
+	return cronJob, nil
 }

@@ -649,7 +649,7 @@ func (r *KDexFunctionReconciler) handleExecutableAvailable(hc handlerContext) (c
 		Scheme:         r.Scheme,
 	}
 
-	job, err := deployer.GetOrCreateDeployJob(hc.ctx, hc.function)
+	job, err := deployer.Deploy(hc.ctx, hc.function)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&hc.function.Status.Conditions,
@@ -795,9 +795,92 @@ func (r *KDexFunctionReconciler) handleExecutableAvailable(hc handlerContext) (c
 }
 
 func (r *KDexFunctionReconciler) handleFunctionDeployed(hc handlerContext) (ctrl.Result, error) {
-	panic("unimplemented")
+	log := logf.FromContext(hc.ctx)
+
+	deployer := deploy.Deployer{
+		Client:         r.Client,
+		FaaSAdaptor:    hc.faasAdaptorSpec,
+		Host:           hc.host,
+		ServiceAccount: hc.host.Name,
+		Scheme:         r.Scheme,
+	}
+
+	_, err := deployer.Observe(hc.ctx, hc.function)
+	if err != nil {
+		kdexv1alpha1.SetConditions(
+			&hc.function.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			err.Error(),
+		)
+		return ctrl.Result{}, err
+	}
+
+	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateReady
+	hc.function.Status.Detail = fmt.Sprintf("%v: %s", kdexv1alpha1.KDexFunctionStateReady, hc.function.Status.URL)
+
+	kdexv1alpha1.SetConditions(
+		&hc.function.Status.Conditions,
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionFalse,
+			Ready:       metav1.ConditionTrue,
+		},
+		kdexv1alpha1.ConditionReasonReconcileSuccess,
+		hc.function.Status.Detail,
+	)
+
+	log.V(2).Info(hc.function.Status.Detail)
+
+	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 }
 
 func (r *KDexFunctionReconciler) handleReady(hc handlerContext) (ctrl.Result, error) {
-	panic("unimplemented")
+	log := logf.FromContext(hc.ctx)
+
+	deployer := deploy.Deployer{
+		Client:         r.Client,
+		FaaSAdaptor:    hc.faasAdaptorSpec,
+		Host:           hc.host,
+		ServiceAccount: hc.host.Name,
+		Scheme:         r.Scheme,
+	}
+
+	_, err := deployer.Observe(hc.ctx, hc.function)
+	if err != nil {
+		kdexv1alpha1.SetConditions(
+			&hc.function.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse, // Keep ready state ?
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			err.Error(),
+		)
+		return ctrl.Result{}, err
+	}
+
+	// Stay In Ready State
+	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateReady
+	hc.function.Status.Detail = fmt.Sprintf("%v: %s", kdexv1alpha1.KDexFunctionStateReady, hc.function.Status.URL)
+
+	kdexv1alpha1.SetConditions(
+		&hc.function.Status.Conditions,
+		kdexv1alpha1.ConditionStatuses{
+			Degraded:    metav1.ConditionFalse,
+			Progressing: metav1.ConditionFalse,
+			Ready:       metav1.ConditionTrue,
+		},
+		kdexv1alpha1.ConditionReasonReconcileSuccess,
+		"Function is ready",
+	)
+
+	log.V(2).Info("Function is ready")
+
+	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 }
