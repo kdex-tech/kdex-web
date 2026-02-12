@@ -176,6 +176,10 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 	log := logf.FromContext(ctx).WithName("createOrUpdateJob").WithValues(
 		"job", job.Name, "configmap", configMap.Name, "secret", secret.Name)
 
+	// TODO: improve this logic. It's very sloppy and inneficient. I believe
+	// it's unnecessarilly complex and recreates the job even when it's not
+	// needed.
+
 	// try getting the job to see if it's already created
 	checkedJob := &batchv1.Job{}
 	if err := r.Get(

@@ -41,6 +41,10 @@ func (hh *HostHandler) pageHandlerFunc(
 				}
 
 				// Redirect to login with return URL
+
+				// TODO: I'm not sure if this is the best way to do this. Redirecting to login on a page that requires authorization
+				// doesn't seem right. I think we should just return a 401 Unauthorized.
+
 				returnURL := r.URL.Path
 				if r.URL.RawQuery != "" {
 					returnURL += "?" + r.URL.RawQuery
