@@ -100,6 +100,13 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 
 	env = append(env, d.FaaSAdaptor.Deployer.Env...)
 
+	if function.Status.Executable != nil {
+		env = append(env, corev1.EnvVar{
+			Name:  "FUNCTION_IMAGE",
+			Value: function.Status.Executable.Image,
+		})
+	}
+
 	forwardedEnvVars := ""
 	sep := ""
 	for _, e := range env {
