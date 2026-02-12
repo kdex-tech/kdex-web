@@ -479,7 +479,7 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 
 	log.V(2).Info(hc.function.Status.Detail)
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 }
 
 func (r *KDexFunctionReconciler) handleSourceAvailable(hc handlerContext) (ctrl.Result, error) {
@@ -640,10 +640,6 @@ func (r *KDexFunctionReconciler) handleSourceAvailable(hc handlerContext) (ctrl.
 
 func (r *KDexFunctionReconciler) handleExecutableAvailable(hc handlerContext) (ctrl.Result, error) {
 	log := logf.FromContext(hc.ctx)
-
-	// TODO: In this scenario we need to trigger the function deployment and
-	// wait for it to reconcile, then set the URL on function.Status.URL and
-	// function.Status.State = kdexv1alpha1.KDexFunctionStateFunctionDeployed
 
 	deployer := deploy.Deployer{
 		Client:         r.Client,

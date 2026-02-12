@@ -75,10 +75,10 @@ func (d *Deployer) GetOrCreateDeployJob(ctx context.Context, function *kdexv1alp
 			Name:  "ISSUER",
 			Value: d.Host.Spec.Routing.Domains[0],
 		},
-		{
-			Name:  "CLIENT_ID",
-			Value: d.Host.Spec.Auth.OIDCProvider.ClientID,
-		},
+		// {
+		// 	Name:  "CLIENT_ID",
+		// 	Value: d.Host.Spec.Auth.OIDCProvider.ClientID,
+		// },
 		{
 			Name:  "AUDIENCE",
 			Value: d.Host.Spec.Routing.Domains[0],

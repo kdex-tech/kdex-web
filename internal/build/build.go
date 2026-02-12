@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
@@ -35,9 +36,6 @@ func (b *Builder) GetOrCreateKPackImage(
 
 	op, err := ctrl.CreateOrPatch(ctx, b.Client, kImage, func() error {
 		spec := map[string]any{
-			"build": map[string]any{
-				"env": b.Source.Builder.Env,
-			},
 			"builder": map[string]any{
 				"name": b.Source.Builder.BuilderRef.Name,
 				"kind": b.Source.Builder.BuilderRef.Kind,
@@ -57,6 +55,7 @@ func (b *Builder) GetOrCreateKPackImage(
 		}
 
 		unstructured.SetNestedMap(kImage.Object, spec, "spec")
+		unstructured.SetNestedSlice(kImage.Object, convert(b.Source.Builder.Env), "spec", "build", "env")
 
 		kImage.SetLabels(map[string]string{
 			"app":           "builder",
@@ -72,4 +71,15 @@ func (b *Builder) GetOrCreateKPackImage(
 	}
 
 	return op, kImage, nil
+}
+
+func convert(envVar []v1.EnvVar) []any {
+	var result []any
+	for _, env := range envVar {
+		result = append(result, map[string]any{
+			"name":  env.Name,
+			"value": env.Value,
+		})
+	}
+	return result
 }
