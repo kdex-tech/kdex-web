@@ -25,7 +25,6 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -324,28 +323,7 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 			return ctrl.Result{}, err
 		}
 
-		success := false
-		for _, cond := range job.Status.Conditions {
-			if cond.Type == batchv1.JobSuccessCriteriaMet && cond.Status == corev1.ConditionTrue {
-				success = true
-				break
-			} else if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-				err := fmt.Errorf("Code generation job %s/%s failed: %s", job.Namespace, job.Name, cond.Message)
-				kdexv1alpha1.SetConditions(
-					&hc.function.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionFalse,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconcileError,
-					err.Error(),
-				)
-				return ctrl.Result{}, err
-			}
-		}
-
-		if !success {
+		if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
 			kdexv1alpha1.SetConditions(
 				&hc.function.Status.Conditions,
 				kdexv1alpha1.ConditionStatuses{
@@ -389,8 +367,8 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 				}
 			}
 
-			if terminationMessage == "" {
-				err := fmt.Errorf("code generation job %s/%s failed: %s", job.Namespace, job.Name, "")
+			if job.Status.Failed == 1 {
+				err := fmt.Errorf("code generation job %s/%s failed: %s", job.Namespace, job.Name, terminationMessage)
 				kdexv1alpha1.SetConditions(
 					&hc.function.Status.Conditions,
 					kdexv1alpha1.ConditionStatuses{
@@ -407,57 +385,57 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 				}
 
 				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			}
+
+			type results struct {
+				Repository string `json:"repository"`
+				Revision   string `json:"revision"`
+				Path       string `json:"path"`
+			}
+			var res results
+			if err := json.Unmarshal([]byte(terminationMessage), &res); err != nil {
+				kdexv1alpha1.SetConditions(
+					&hc.function.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileError,
+					err.Error(),
+				)
+
+				if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+					return ctrl.Result{}, err
+				}
+
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			}
+
+			hc.function.Status.Source = &kdexv1alpha1.Source{
+				Repository: res.Repository,
+				Revision:   res.Revision,
+				Path:       res.Path,
+			}
+
+			defaultParts := strings.SplitN(hc.faasAdaptorSpec.DefaultBuilderGenerator, "/", 2)
+			defaultLanguage := defaultParts[1]
+			defaultBuilderName := defaultParts[0]
+			sourceLanguage := gImpl.Config.Language
+			builderName := ""
+			if sourceLanguage == defaultLanguage {
+				builderName = defaultBuilderName
 			} else {
-				type results struct {
-					Repository string `json:"repository"`
-					Revision   string `json:"revision"`
-					Path       string `json:"path"`
-				}
-				var res results
-				if err := json.Unmarshal([]byte(terminationMessage), &res); err != nil {
-					kdexv1alpha1.SetConditions(
-						&hc.function.Status.Conditions,
-						kdexv1alpha1.ConditionStatuses{
-							Degraded:    metav1.ConditionTrue,
-							Progressing: metav1.ConditionFalse,
-							Ready:       metav1.ConditionFalse,
-						},
-						kdexv1alpha1.ConditionReasonReconcileError,
-						err.Error(),
-					)
-
-					if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
-						return ctrl.Result{}, err
-					}
-
-					return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-				}
-
-				hc.function.Status.Source = &kdexv1alpha1.Source{
-					Repository: res.Repository,
-					Revision:   res.Revision,
-					Path:       res.Path,
-				}
-
-				defaultParts := strings.SplitN(hc.faasAdaptorSpec.DefaultBuilderGenerator, "/", 2)
-				defaultLanguage := defaultParts[1]
-				defaultBuilderName := defaultParts[0]
-				sourceLanguage := gImpl.Config.Language
-				builderName := ""
-				if sourceLanguage == defaultLanguage {
-					builderName = defaultBuilderName
-				} else {
-					for _, b := range hc.faasAdaptorSpec.Builders {
-						if slices.Contains(b.Languages, sourceLanguage) {
-							builderName = b.Name
-						}
+				for _, b := range hc.faasAdaptorSpec.Builders {
+					if slices.Contains(b.Languages, sourceLanguage) {
+						builderName = b.Name
 					}
 				}
+			}
 
-				for _, builder := range hc.faasAdaptorSpec.Builders {
-					if builder.Name == builderName {
-						hc.function.Status.Source.Builder = &builder
-					}
+			for _, builder := range hc.faasAdaptorSpec.Builders {
+				if builder.Name == builderName {
+					hc.function.Status.Source.Builder = &builder
 				}
 			}
 		}
@@ -664,28 +642,7 @@ func (r *KDexFunctionReconciler) handleExecutableAvailable(hc handlerContext) (c
 		return ctrl.Result{}, err
 	}
 
-	success := false
-	for _, cond := range job.Status.Conditions {
-		if cond.Type == batchv1.JobSuccessCriteriaMet && cond.Status == corev1.ConditionTrue {
-			success = true
-			break
-		} else if cond.Type == batchv1.JobFailed && cond.Status == corev1.ConditionTrue {
-			err := fmt.Errorf("Function deployer job %s/%s failed: %s", job.Namespace, job.Name, cond.Message)
-			kdexv1alpha1.SetConditions(
-				&hc.function.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
-			return ctrl.Result{}, err
-		}
-	}
-
-	if !success {
+	if job.Status.Succeeded == 0 && job.Status.Failed == 0 {
 		kdexv1alpha1.SetConditions(
 			&hc.function.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
@@ -723,14 +680,14 @@ func (r *KDexFunctionReconciler) handleExecutableAvailable(hc handlerContext) (c
 
 		var terminationMessage string
 		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.Name == "results" && containerStatus.State.Terminated != nil {
+			if containerStatus.Name == "deployer" && containerStatus.State.Terminated != nil {
 				terminationMessage = containerStatus.State.Terminated.Message
 				break
 			}
 		}
 
-		if terminationMessage == "" {
-			err := fmt.Errorf("function deployment job %s/%s failed: %s", job.Namespace, job.Name, "")
+		if job.Status.Failed == 1 {
+			err := fmt.Errorf("function deployment job %s/%s failed: %s", job.Namespace, job.Name, terminationMessage)
 			kdexv1alpha1.SetConditions(
 				&hc.function.Status.Conditions,
 				kdexv1alpha1.ConditionStatuses{
@@ -747,32 +704,32 @@ func (r *KDexFunctionReconciler) handleExecutableAvailable(hc handlerContext) (c
 			}
 
 			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-		} else {
-			type results struct {
-				URL string `json:"url"`
-			}
-			var res results
-			if err := json.Unmarshal([]byte(terminationMessage), &res); err != nil {
-				kdexv1alpha1.SetConditions(
-					&hc.function.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionFalse,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconcileError,
-					err.Error(),
-				)
-
-				if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
-					return ctrl.Result{}, err
-				}
-
-				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-			}
-
-			hc.function.Status.URL = res.URL
 		}
+
+		type results struct {
+			URL string `json:"url"`
+		}
+		var res results
+		if err := json.Unmarshal([]byte(terminationMessage), &res); err != nil {
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				err.Error(),
+			)
+
+			if err := r.Delete(hc.ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		}
+
+		hc.function.Status.URL = res.URL
 	}
 
 	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateFunctionDeployed

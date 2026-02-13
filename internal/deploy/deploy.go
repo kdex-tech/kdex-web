@@ -133,12 +133,20 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 				"function":            function.Name,
 				"kdex.dev/generation": fmt.Sprintf("%d", function.Generation),
 			},
+			Annotations: map[string]string{
+				"kdex.dev/generation": fmt.Sprintf("%d", function.Generation),
+			},
 		},
 		Spec: batchv1.JobSpec{
 			BackoffLimit: utils.Ptr(int32(3)),
 			Completions:  utils.Ptr(int32(1)),
 			Parallelism:  utils.Ptr(int32(1)),
 			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"kdex.dev/generation": fmt.Sprintf("%d", function.Generation),
+					},
+				},
 				Spec: corev1.PodSpec{
 					AutomountServiceAccountToken: utils.Ptr(true),
 					Containers: []corev1.Container{
