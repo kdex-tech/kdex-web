@@ -355,6 +355,8 @@ func (hh *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 		return req
 	}
 
+	// TODO: add API key security
+
 	(*req)["bearer"] = &openapi.SecuritySchemeRef{
 		Value: &openapi.SecurityScheme{
 			Description:  "Bearer Token - This is the default scheme",
@@ -364,11 +366,11 @@ func (hh *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 		},
 	}
 
-	// Add OAuth2 Password flow
 	(*req)["oauth2"] = &openapi.SecuritySchemeRef{
 		Value: &openapi.SecurityScheme{
 			Description: "OAuth2 authentication using Password Flow",
 			Flows: &openapi.OAuthFlows{
+				// TODO: Add other flows
 				Password: &openapi.OAuthFlow{
 					Scopes: map[string]string{
 						"openid":  "standard oidc scope",
@@ -381,7 +383,6 @@ func (hh *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 		},
 	}
 
-	// Add OIDC discovery
 	if hh.authConfig.IsOIDCEnabled() {
 		(*req)["oidc"] = &openapi.SecuritySchemeRef{
 			Value: &openapi.SecurityScheme{
