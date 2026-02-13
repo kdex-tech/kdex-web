@@ -20,8 +20,10 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
+	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -33,7 +35,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8s_runtime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
@@ -51,11 +53,13 @@ import (
 	"kdex.dev/web/internal/controller"
 	"kdex.dev/web/internal/host"
 	"kdex.dev/web/internal/web/server"
+
+	_ "net/http/pprof"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
-	scheme   = runtime.NewScheme()
+	scheme   = k8s_runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
 
@@ -74,6 +78,7 @@ func main() {
 	var configFile string
 	var focalHost string
 	namedLogLevels := make(kdexlog.NamedLogLevelPairs)
+	var pprofAddr string
 	var requeueDelaySeconds int
 	var serviceName string
 	var webserverAddr string
@@ -91,6 +96,7 @@ func main() {
 		"attention on.")
 	flag.Var(&namedLogLevels, "named-log-level", "Specify a named log level pair (format: NAME=LEVEL) (can be used "+
 		"multiple times)")
+	flag.StringVar(&pprofAddr, "pprof-bind-address", "", "The address the pprof endpoint binds to. If not set, the pprof endpoint is disabled.")
 	flag.IntVar(&requeueDelaySeconds, "requeue-delay-seconds", 15, "Set the delay for requeuing reconciliation loops")
 	flag.StringVar(&serviceName, "service-name", "", "The name of the controller service so it can self configure an "+
 		"ingress/httproute with itself as backend.")
@@ -293,6 +299,14 @@ func main() {
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
+	}
+
+	if pprofAddr != "" && strings.Contains(pprofAddr, ":") {
+		setupLog.Info("starting pprof server", "address", pprofAddr)
+		go func() {
+			runtime.SetBlockProfileRate(1)
+			log.Println(http.ListenAndServe(pprofAddr, nil))
+		}()
 	}
 
 	ctx := ctrl.SetupSignalHandler()
