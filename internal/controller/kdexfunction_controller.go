@@ -84,12 +84,6 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if function.Status.ObservedGeneration < function.Generation {
 		function.Status.State = kdexv1alpha1.KDexFunctionStatePending
-		function.Status.OpenAPISchemaURL = ""
-		function.Status.Generator = nil
-		function.Status.Source = nil
-		function.Status.Executable = nil
-		function.Status.URL = ""
-		function.Status.Detail = ""
 	}
 
 	kdexv1alpha1.SetConditions(
@@ -164,11 +158,9 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if err := r.Get(ctx, types.NamespacedName{Name: kImageName, Namespace: function.Namespace}, image); err == nil {
 			latestImage, found, _ := unstructured.NestedString(image.Object, "status", "latestImage")
 			if found && latestImage != "" {
-				if function.Status.Executable == nil || function.Status.Executable.Image != latestImage {
-					if function.Status.State != kdexv1alpha1.KDexFunctionStateSourceAvailable {
-						log.Info("New image detected from KPack, re-reconciling from source available", "latestImage", latestImage)
-						function.Status.State = kdexv1alpha1.KDexFunctionStateSourceAvailable
-					}
+				if function.Status.State == kdexv1alpha1.KDexFunctionStateReady && function.Status.Executable.Image != latestImage {
+					log.Info("New image detected from KPack, re-reconciling from source available", "latestImage", latestImage)
+					function.Status.State = kdexv1alpha1.KDexFunctionStateSourceAvailable
 				}
 			}
 		}
@@ -821,6 +813,12 @@ func (r *KDexFunctionReconciler) handleFunctionDeployed(hc handlerContext) (ctrl
 
 func (r *KDexFunctionReconciler) handleReady(hc handlerContext) (ctrl.Result, error) {
 	log := logf.FromContext(hc.ctx)
+
+	if hc.function.Status.Executable == nil {
+		log.V(2).Info("Executable is nil, re-reconciling")
+		hc.function.Status.State = kdexv1alpha1.KDexFunctionStateSourceAvailable
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+	}
 
 	deployer := deploy.Deployer{
 		Client:         r.Client,
