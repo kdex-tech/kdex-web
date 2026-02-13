@@ -168,7 +168,6 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 							Env:     env,
 							Image:   d.FaaSAdaptor.Deployer.Image,
 
-							// TODO: implement the KNative deployer image
 							// TODO: implement the AWS Lambda deployer image
 							// TODO: implement the Google Cloud Functions deployer image
 							// TODO: implement the Azure Functions deployer image
