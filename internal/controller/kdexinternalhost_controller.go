@@ -495,7 +495,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if err := r.cleanupObsoleteBackends(ctx, &internalHost, requiredBackends); err != nil {
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, err
+		return ctrl.Result{}, err
 	}
 
 	var ingressOrHTTPRouteOp controllerutil.OperationResult
@@ -549,20 +549,6 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			internalHost.Status.Attributes[dep.Name+".deployment"] = "ready"
 		}
 	}
-
-	// if val, ok := internalHost.Status.Attributes["ingress"]; !ok || val == "" {
-	// 	kdexv1alpha1.SetConditions(
-	// 		&internalHost.Status.Conditions,
-	// 		kdexv1alpha1.ConditionStatuses{
-	// 			Degraded:    metav1.ConditionFalse,
-	// 			Progressing: metav1.ConditionTrue,
-	// 			Ready:       metav1.ConditionFalse,
-	// 		},
-	// 		kdexv1alpha1.ConditionReasonReconciling,
-	// 		"Waiting for ingress to be ready.",
-	// 	)
-	// 	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-	// }
 
 	authConfig, err := auth.NewConfig(ctx, r.Client, internalHost.Spec.Auth, internalHost.Namespace, internalHost.Spec.DevMode)
 	if err != nil {

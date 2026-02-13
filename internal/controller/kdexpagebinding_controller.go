@@ -367,11 +367,6 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		scriptDefs = append(scriptDefs, scriptLibrary.Scripts...)
 	}
 
-	_, shouldReturn, r1, err = ResolveHost(ctx, r.Client, &pageBinding, &pageBinding.Status.Conditions, &pageBinding.Spec.HostRef, r.RequeueDelay)
-	if shouldReturn {
-		return r1, err
-	}
-
 	uniqueBackendRefs := UniqueBackendRefs(backendRefs)
 	uniquePackageRefs := UniquePackageRefs(packageRefs)
 	uniqueScriptDefs := UniqueScriptDefs(scriptDefs)
