@@ -59,6 +59,11 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 		return nil, err
 	}
 
+	issuer := "http://" + d.Host.Spec.Routing.Domains[0]
+	if d.Host.Spec.Routing.TLS != nil {
+		issuer = "https://" + d.Host.Spec.Routing.Domains[0]
+	}
+
 	env := []corev1.EnvVar{
 		{
 			Name:  "FUNCTION_HOST",
@@ -82,11 +87,11 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 		},
 		{
 			Name:  "JWKS_URL",
-			Value: d.Host.Spec.Routing.Domains[0] + "/.well-known/jwks.json",
+			Value: issuer + "/.well-known/jwks.json",
 		},
 		{
 			Name:  "ISSUER",
-			Value: d.Host.Spec.Routing.Domains[0],
+			Value: issuer,
 		},
 		// {
 		// 	Name:  "CLIENT_ID",
@@ -94,7 +99,7 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 		// },
 		{
 			Name:  "AUDIENCE",
-			Value: d.Host.Spec.Routing.Domains[0],
+			Value: issuer,
 		},
 	}
 

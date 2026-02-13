@@ -87,6 +87,8 @@ func MakeHandlerByReferencePath(
 		panic(err)
 	}
 
+	const level = 3
+
 	log := logf.Log.WithName(
 		strings.ToLower(watcherKind),
 	).WithName(
@@ -123,27 +125,27 @@ func MakeHandlerByReferencePath(
 		for _, i := range items {
 			item := i.(client.Object)
 
-			log.V(2).Info("processing item", "object", item.GetName(), "namespace", item.GetNamespace())
+			log.V(level).Info("processing item", "object", item.GetName(), "namespace", item.GetNamespace())
 
 			for j, jpRef := range jpRefs {
 				curPath := referencePath[j]
 				jsonPathReference, err := jpRef.FindResults(item)
 				if err != nil {
-					log.V(2).Info("skipping", "path", curPath, "err", err, "object", item.GetName(), "namespace", item.GetNamespace())
+					log.V(level).Info("skipping", "path", curPath, "err", err, "object", item.GetName(), "namespace", item.GetNamespace())
 					continue
 				}
 				if len(jsonPathReference) == 0 || len(jsonPathReference[0]) == 0 {
-					log.V(2).Info("skipping", "path", curPath, "object", item.GetName(), "namespace", item.GetNamespace())
+					log.V(level).Info("skipping", "path", curPath, "object", item.GetName(), "namespace", item.GetNamespace())
 					continue
 				}
 
-				log.V(2).Info("field found", "path", curPath, "object", item.GetName(), "namespace", item.GetNamespace())
+				log.V(level).Info("field found", "path", curPath, "object", item.GetName(), "namespace", item.GetNamespace())
 
 				for idx, node := range jsonPathReference {
 					for _, curRef := range node {
 						ref := reflect.ValueOf(curRef.Interface())
 
-						log.V(2).Info("reference", "reference", ref, "object", item.GetName(), "node", idx)
+						log.V(level).Info("reference", "reference", ref, "object", item.GetName(), "node", idx)
 
 						isNil := false
 						switch ref.Kind() {
@@ -156,7 +158,7 @@ func MakeHandlerByReferencePath(
 
 						theReferenceStruct := ref.Interface()
 
-						log.V(2).Info("struct", "interface", theReferenceStruct, "object", item.GetName(), "node", idx)
+						log.V(level).Info("struct", "interface", theReferenceStruct, "object", item.GetName(), "node", idx)
 
 						switch v := theReferenceStruct.(type) {
 						case corev1.LocalObjectReference:

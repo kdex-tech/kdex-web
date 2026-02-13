@@ -79,7 +79,7 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			res = ctrl.Result{}
 		}
 
-		log.V(2).Info("status", "status", function.Status, "err", err, "res", res)
+		log.V(3).Info("status", "status", function.Status, "err", err, "res", res)
 	}()
 
 	kdexv1alpha1.SetConditions(
