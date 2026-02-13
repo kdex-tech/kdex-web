@@ -188,6 +188,7 @@ func (r *KDexFunctionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexFunction{}).
 		Owns(&batchv1.Job{}).
+		Owns(&batchv1.CronJob{}).
 		Owns(unstructured).
 		Watches(
 			&kdexv1alpha1.KDexInternalHost{},
