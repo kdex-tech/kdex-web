@@ -801,7 +801,7 @@ func (r *KDexFunctionReconciler) handleFunctionDeployed(hc handlerContext) (ctrl
 	}
 
 	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateReady
-	hc.function.Status.Detail = fmt.Sprintf("%v: %s", kdexv1alpha1.KDexFunctionStateReady, hc.function.Status.URL)
+	hc.function.Status.Detail = fmt.Sprintf("%v: %s%s", kdexv1alpha1.KDexFunctionStateReady, hc.function.Status.URL, hc.function.Spec.API.BasePath)
 
 	kdexv1alpha1.SetConditions(
 		&hc.function.Status.Conditions,
@@ -847,7 +847,7 @@ func (r *KDexFunctionReconciler) handleReady(hc handlerContext) (ctrl.Result, er
 
 	// Stay In Ready State
 	hc.function.Status.State = kdexv1alpha1.KDexFunctionStateReady
-	hc.function.Status.Detail = fmt.Sprintf("%v: %s", kdexv1alpha1.KDexFunctionStateReady, hc.function.Status.URL)
+	hc.function.Status.Detail = fmt.Sprintf("%v: %s%s", kdexv1alpha1.KDexFunctionStateReady, hc.function.Status.URL, hc.function.Spec.API.BasePath)
 
 	kdexv1alpha1.SetConditions(
 		&hc.function.Status.Conditions,
