@@ -31,6 +31,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
@@ -156,144 +157,119 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 	modulePath string,
 	internalPackageReferences *kdexv1alpha1.KDexInternalPackageReferences,
 ) (ctrl.Result, error) {
-	configMapOp, configMap, err := r.createOrUpdateJobConfigMap(ctx, modulePath, internalPackageReferences)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	log := logf.FromContext(ctx)
 
-	secretOp, secret, err := r.createOrUpdateJobSecret(ctx, internalPackageReferences)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	// 1. Check if the work is already done for this spec (Idempotency check)
+	currentPackageRefs := fmt.Sprintf("%v", internalPackageReferences.Spec.PackageReferences)
+	if internalPackageReferences.Status.Attributes["packageReferences"] == currentPackageRefs &&
+		internalPackageReferences.Status.Attributes["image"] != "" &&
+		internalPackageReferences.Status.Attributes["importmap"] != "" {
 
-	job := &batchv1.Job{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-job", internalPackageReferences.Name),
-			Namespace: internalPackageReferences.Namespace,
-		},
-	}
-
-	log := logf.FromContext(ctx).WithName("createOrUpdateJob").WithValues(
-		"job", job.Name, "configmap", configMap.Name, "secret", secret.Name)
-
-	// TODO: improve this logic. It's very sloppy and inneficient. I believe
-	// it's unnecessarilly complex and recreates the job even when it's not
-	// needed.
-
-	// try getting the job to see if it's already created
-	checkedJob := &batchv1.Job{}
-	if err := r.Get(
-		ctx,
-		client.ObjectKey{Namespace: internalPackageReferences.Namespace, Name: job.Name},
-		checkedJob,
-	); err == nil {
-		// if the job already succeeded but doesn't match the generation, delete it
-		if checkedJob.Status.Succeeded > 0 &&
-			checkedJob.Annotations["kdex.dev/generation"] != fmt.Sprintf("%d", internalPackageReferences.Generation) {
-
-			log.V(2).Info("job already succeeded but doesn't match the generation")
-
-			if err := r.Delete(ctx, checkedJob, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			return ctrl.Result{Requeue: true}, nil
-		}
-	}
-
-	jobOp, err := ctrl.CreateOrUpdate(
-		ctx,
-		r.Client,
-		job,
-		func() error {
-			r.setupJob(internalPackageReferences, job, configMap, secret)
-
-			return ctrl.SetControllerReference(internalPackageReferences, job, r.Scheme)
-		},
-	)
-
-	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&internalPackageReferences.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
-				Degraded:    metav1.ConditionTrue,
+				Degraded:    metav1.ConditionFalse,
 				Progressing: metav1.ConditionFalse,
-				Ready:       metav1.ConditionFalse,
+				Ready:       metav1.ConditionTrue,
 			},
-			kdexv1alpha1.ConditionReasonReconcileError,
-			err.Error(),
+			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			"Reconciliation successful, package image ready",
 		)
+		return ctrl.Result{}, nil
+	}
 
+	// 2. Work not done, ensure support resources are up to date
+	_, configMap, err := r.createOrUpdateJobConfigMap(ctx, modulePath, internalPackageReferences)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	log.V(1).Info(
-		"result",
-		"job", job.Name,
-		"status", job.Status,
-		"jobOp", jobOp,
-		"configMapOp", configMapOp,
-		"secretOp", secretOp,
-		"generation", internalPackageReferences.Generation,
-		"labelGeneration", job.Annotations["kdex.dev/generation"],
-		"observedGeneration", internalPackageReferences.Status.ObservedGeneration,
-		"attributes", internalPackageReferences.Status.Attributes,
-	)
+	_, secret, err := r.createOrUpdateJobSecret(ctx, internalPackageReferences)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-	if job.Status.Succeeded > 0 {
-		pod, err := kjob.GetPodForJob(ctx, r.Client, job)
-		if err != nil {
-			kdexv1alpha1.SetConditions(
-				&internalPackageReferences.Status.Conditions,
-				kdexv1alpha1.ConditionStatuses{
-					Degraded:    metav1.ConditionTrue,
-					Progressing: metav1.ConditionFalse,
-					Ready:       metav1.ConditionFalse,
-				},
-				kdexv1alpha1.ConditionReasonReconcileError,
-				err.Error(),
-			)
+	// 3. Reconcile the Job
+	jobName := fmt.Sprintf("%s-job", internalPackageReferences.Name)
+	job := &batchv1.Job{}
+	err = r.Get(ctx, client.ObjectKey{Namespace: internalPackageReferences.Namespace, Name: jobName}, job)
 
+	if err == nil {
+		// Job exists. Check if it's for the current generation.
+		if job.Annotations["kdex.dev/generation"] != fmt.Sprintf("%d", internalPackageReferences.Generation) {
+			log.V(2).Info("deleting stale job", "job", job.Name, "currentGeneration", internalPackageReferences.Generation)
 			if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
 				return ctrl.Result{}, err
 			}
-
 			return ctrl.Result{Requeue: true}, nil
 		}
 
-		var imageDigest string
-		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.Name == "kaniko" && containerStatus.State.Terminated != nil {
-				imageDigest = containerStatus.State.Terminated.Message
-				break
+		// Correct generation. Check status.
+		if job.Status.Succeeded > 0 {
+			// Harvest results from the pods
+			pod, err := kjob.GetPodForJob(ctx, r.Client, job)
+			if err != nil {
+				kdexv1alpha1.SetConditions(
+					&internalPackageReferences.Status.Conditions,
+					kdexv1alpha1.ConditionStatuses{
+						Degraded:    metav1.ConditionTrue,
+						Progressing: metav1.ConditionFalse,
+						Ready:       metav1.ConditionFalse,
+					},
+					kdexv1alpha1.ConditionReasonReconcileError,
+					err.Error(),
+				)
+
+				if err := r.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground)); err != nil {
+					return ctrl.Result{}, err
+				}
+
+				return ctrl.Result{Requeue: true}, nil
 			}
-		}
 
-		if imageDigest == "" {
-			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-		}
-
-		var importmap string
-		for _, containerStatus := range pod.Status.InitContainerStatuses {
-			if containerStatus.Name == "importmap-generator" && containerStatus.State.Terminated != nil {
-				importmap = containerStatus.State.Terminated.Message
-				break
+			var imageDigest string
+			for _, containerStatus := range pod.Status.ContainerStatuses {
+				if containerStatus.Name == "kaniko" && containerStatus.State.Terminated != nil {
+					imageDigest = containerStatus.State.Terminated.Message
+					break
+				}
 			}
+
+			var importmap string
+			for _, containerStatus := range pod.Status.InitContainerStatuses {
+				if containerStatus.Name == "importmap-generator" && containerStatus.State.Terminated != nil {
+					importmap = containerStatus.State.Terminated.Message
+					break
+				}
+			}
+
+			if imageDigest == "" || importmap == "" {
+				// Job reported success but we can't find the outputs yet? Wait a bit.
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			}
+
+			internalPackageReferences.Status.Attributes["image"] = fmt.Sprintf(
+				"%s/%s@%s", r.Configuration.DefaultImageRegistry.Host, internalPackageReferences.Name, imageDigest,
+			)
+			internalPackageReferences.Status.Attributes["importmap"] = importmap
+			internalPackageReferences.Status.Attributes["packageReferences"] = currentPackageRefs
+
+			kdexv1alpha1.SetConditions(
+				&internalPackageReferences.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionFalse,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionTrue,
+				},
+				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				"Reconciliation successful, package image ready",
+			)
+
+			log.V(1).Info("results harvested successfully", "job", job.Name)
+			return ctrl.Result{}, nil
 		}
 
-		if importmap == "" {
-			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-		}
-
-		internalPackageReferences.Status.Attributes["image"] = fmt.Sprintf(
-			"%s/%s@%s", r.Configuration.DefaultImageRegistry.Host, internalPackageReferences.Name, imageDigest,
-		)
-		internalPackageReferences.Status.Attributes["importmap"] = importmap
-		internalPackageReferences.Status.Attributes["packageReferences"] = fmt.Sprintf(
-			"%v", internalPackageReferences.Spec.PackageReferences,
-		)
-
-	} else {
+		// Check for failure
 		for _, condition := range job.Status.Conditions {
 			if condition.Type == batchv1.JobFailed && condition.Status == corev1.ConditionTrue {
 				kdexv1alpha1.SetConditions(
@@ -311,23 +287,44 @@ func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJob(
 			}
 		}
 
+		// Job is still in progress
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
-	kdexv1alpha1.SetConditions(
-		&internalPackageReferences.Status.Conditions,
-		kdexv1alpha1.ConditionStatuses{
-			Degraded:    metav1.ConditionFalse,
-			Progressing: metav1.ConditionFalse,
-			Ready:       metav1.ConditionTrue,
+	if !errors.IsNotFound(err) {
+		return ctrl.Result{}, err
+	}
+
+	// 4. Job doesn't exist, create it for the current generation
+	newJob := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: internalPackageReferences.Namespace,
 		},
-		kdexv1alpha1.ConditionReasonReconcileSuccess,
-		"Reconciliation successful, package image ready",
-	)
+	}
+	r.setupJob(internalPackageReferences, newJob, configMap, secret)
 
-	log.V(1).Info("reconciled", "as", jobOp)
+	if err := ctrl.SetControllerReference(internalPackageReferences, newJob, r.Scheme); err != nil {
+		return ctrl.Result{}, err
+	}
 
-	return ctrl.Result{}, nil
+	if err := r.Create(ctx, newJob); err != nil {
+		kdexv1alpha1.SetConditions(
+			&internalPackageReferences.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			err.Error(),
+		)
+
+		return ctrl.Result{}, err
+	}
+
+	log.V(1).Info("job created", "job", newJob.Name, "generation", internalPackageReferences.Generation)
+	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 }
 
 func (r *KDexInternalPackageReferencesReconciler) setupJob(
