@@ -511,53 +511,30 @@ func (r *KDexFunctionReconciler) handleSourceAvailable(hc handlerContext) (ctrl.
 		success := false
 		if imgUnstruct != nil && imgUnstruct.Object != nil {
 			status, ok := imgUnstruct.Object["status"].(map[string]any)
-			if !ok {
-				err := fmt.Errorf("image builder job %s/%s has no status", imgUnstruct.GetNamespace(), imgUnstruct.GetName())
-				kdexv1alpha1.SetConditions(
-					&hc.function.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionFalse,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconcileError,
-					err.Error(),
-				)
-				return ctrl.Result{}, err
-			}
-
-			conditions, ok := status["conditions"].([]any)
-			if !ok {
-				err := fmt.Errorf("image builder job %s/%s has no conditions", imgUnstruct.GetNamespace(), imgUnstruct.GetName())
-				kdexv1alpha1.SetConditions(
-					&hc.function.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionTrue,
-						Progressing: metav1.ConditionFalse,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconcileError,
-					err.Error(),
-				)
-				return ctrl.Result{}, err
-			}
-
-			for _, cond := range conditions {
-				if cond.(map[string]any)["type"] == "Ready" && cond.(map[string]any)["status"] == "True" {
-					success = true
-				} else if cond.(map[string]any)["type"] == "Failed" && cond.(map[string]any)["status"] == "True" {
-					err := fmt.Errorf("image builder job %s/%s failed: %s", imgUnstruct.GetNamespace(), imgUnstruct.GetName(), cond.(map[string]any)["message"])
-					kdexv1alpha1.SetConditions(
-						&hc.function.Status.Conditions,
-						kdexv1alpha1.ConditionStatuses{
-							Degraded:    metav1.ConditionTrue,
-							Progressing: metav1.ConditionFalse,
-							Ready:       metav1.ConditionFalse,
-						},
-						kdexv1alpha1.ConditionReasonReconcileError,
-						err.Error(),
-					)
-					return ctrl.Result{}, err
+			if ok {
+				observedGeneration, found, _ := unstructured.NestedInt64(imgUnstruct.Object, "status", "observedGeneration")
+				if found && observedGeneration >= imgUnstruct.GetGeneration() {
+					conditions, ok := status["conditions"].([]any)
+					if ok {
+						for _, cond := range conditions {
+							if cond.(map[string]any)["type"] == "Ready" && cond.(map[string]any)["status"] == "True" {
+								success = true
+							} else if cond.(map[string]any)["type"] == "Failed" && cond.(map[string]any)["status"] == "True" {
+								err := fmt.Errorf("image builder job %s/%s failed: %s", imgUnstruct.GetNamespace(), imgUnstruct.GetName(), cond.(map[string]any)["message"])
+								kdexv1alpha1.SetConditions(
+									&hc.function.Status.Conditions,
+									kdexv1alpha1.ConditionStatuses{
+										Degraded:    metav1.ConditionTrue,
+										Progressing: metav1.ConditionFalse,
+										Ready:       metav1.ConditionFalse,
+									},
+									kdexv1alpha1.ConditionReasonReconcileError,
+									err.Error(),
+								)
+								return ctrl.Result{}, err
+							}
+						}
+					}
 				}
 			}
 		}
