@@ -89,7 +89,7 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			Ready:       metav1.ConditionUnknown,
 		},
 		kdexv1alpha1.ConditionReasonReconciling,
-		string(kdexv1alpha1.KDexFunctionStatePending),
+		string(function.Status.State),
 	)
 
 	host, shouldReturn, r1, err := ResolveHost(ctx, r.Client, &function, &function.Status.Conditions, &function.Spec.HostRef, r.RequeueDelay)
