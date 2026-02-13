@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	"kdex.dev/web/internal"
@@ -81,6 +82,16 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.V(3).Info("status", "status", function.Status, "err", err, "res", res)
 	}()
 
+	if function.Status.ObservedGeneration < function.Generation {
+		function.Status.State = kdexv1alpha1.KDexFunctionStatePending
+		function.Status.OpenAPISchemaURL = ""
+		function.Status.Generator = nil
+		function.Status.Source = nil
+		function.Status.Executable = nil
+		function.Status.URL = ""
+		function.Status.Detail = ""
+	}
+
 	kdexv1alpha1.SetConditions(
 		&function.Status.Conditions,
 		kdexv1alpha1.ConditionStatuses{
@@ -129,7 +140,12 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			faasAdaptorSpec = &v.Spec
 		}
 
-		function.Status.Attributes["faasAdaptor.generation"] = fmt.Sprintf("%d", faasAdaptorObj.GetGeneration())
+		currentGen := fmt.Sprintf("%d", faasAdaptorObj.GetGeneration())
+		if function.Status.Attributes["faasAdaptor.generation"] != "" && function.Status.Attributes["faasAdaptor.generation"] != currentGen {
+			log.Info("FaaS Adaptor updated, re-reconciling", "oldGen", function.Status.Attributes["faasAdaptor.generation"], "newGen", currentGen)
+			function.Status.State = kdexv1alpha1.KDexFunctionStateOpenAPIValid
+		}
+		function.Status.Attributes["faasAdaptor.generation"] = currentGen
 	}
 
 	hc := handlerContext{
@@ -138,6 +154,24 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		function:        &function,
 		host:            *host,
 		faasAdaptorSpec: *faasAdaptorSpec,
+	}
+
+	// Pick up asynchronous builder updates (e.g. from KPack git polling)
+	if function.Spec.Origin.Executable == nil && function.Status.Source != nil {
+		kImageName := fmt.Sprintf("%s-%s", hc.host.Name, function.Name)
+		image := &unstructured.Unstructured{}
+		image.SetGroupVersionKind(internal.KPackImageGVK)
+		if err := r.Get(ctx, types.NamespacedName{Name: kImageName, Namespace: function.Namespace}, image); err == nil {
+			latestImage, found, _ := unstructured.NestedString(image.Object, "status", "latestImage")
+			if found && latestImage != "" {
+				if function.Status.Executable == nil || function.Status.Executable.Image != latestImage {
+					if function.Status.State != kdexv1alpha1.KDexFunctionStateSourceAvailable {
+						log.Info("New image detected from KPack, re-reconciling from source available", "latestImage", latestImage)
+						function.Status.State = kdexv1alpha1.KDexFunctionStateSourceAvailable
+					}
+				}
+			}
+		}
 	}
 
 	switch function.Status.State {
@@ -340,6 +374,10 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 			)
 
 			log.V(2).Info(fmt.Sprintf("Waiting on code generation job %s/%s to complete", job.Namespace, job.Name))
+
+			if err := r.cleanupJobs(hc.ctx, hc.function, "codegen"); err != nil {
+				return ctrl.Result{}, err
+			}
 
 			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 		} else {
@@ -637,6 +675,10 @@ func (r *KDexFunctionReconciler) handleExecutableAvailable(hc handlerContext) (c
 
 		log.V(2).Info(fmt.Sprintf("Waiting on function deployer job %s/%s to complete", job.Namespace, job.Name))
 
+		if err := r.cleanupJobs(hc.ctx, hc.function, "deployer"); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	} else {
 		pod, err := kjob.GetPodForJob(hc.ctx, r.Client, job)
@@ -821,4 +863,26 @@ func (r *KDexFunctionReconciler) handleReady(hc handlerContext) (ctrl.Result, er
 	log.V(2).Info("Function is ready")
 
 	return ctrl.Result{}, nil
+}
+
+func (r *KDexFunctionReconciler) cleanupJobs(ctx context.Context, function *kdexv1alpha1.KDexFunction, appLabel string) error {
+	log := logf.FromContext(ctx)
+	var jobList batchv1.JobList
+	if err := r.List(ctx, &jobList, client.InNamespace(function.Namespace), client.MatchingLabels{
+		"app":      appLabel,
+		"function": function.Name,
+	}); err != nil {
+		return err
+	}
+
+	currentGen := fmt.Sprintf("%d", function.Generation)
+	for _, job := range jobList.Items {
+		if job.Labels["kdex.dev/generation"] != currentGen && (job.Status.Succeeded > 0 || job.Status.Failed > 0) {
+			log.V(2).Info("Cleaning up obsolete job from previous generation", "job", job.Name, "jobGen", job.Labels["kdex.dev/generation"], "app", appLabel)
+			if err := r.Delete(ctx, &job, client.PropagationPolicy(metav1.DeletePropagationBackground)); client.IgnoreNotFound(err) != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

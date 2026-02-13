@@ -2,6 +2,7 @@ package deploy
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -47,8 +48,19 @@ type Runtime interface {
 // failure along with reasons, and upon success, at least the URL of the function so that the
 // Focal Controller can mount it into the host's service mesh and dispatch requests to it.
 func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFunction) (*batchv1.Job, error) {
-	// Create Job name
-	jobName := fmt.Sprintf("%s-deployer-%d", function.Name, function.Generation)
+	// Create Job identity hash based on the image and the adaptor version
+	image := ""
+	if function.Status.Executable != nil {
+		image = function.Status.Executable.Image
+	}
+	adaptorGen := function.Status.Attributes["faasAdaptor.generation"]
+
+	h := sha256.New()
+	h.Write([]byte(image))
+	h.Write([]byte(adaptorGen))
+	idHash := fmt.Sprintf("%x", h.Sum(nil))[:8]
+
+	jobName := fmt.Sprintf("%s-deployer-%d-%s", function.Name, function.Generation, idHash)
 
 	job := &batchv1.Job{}
 	err := d.Client.Get(ctx, client.ObjectKey{Namespace: function.Namespace, Name: jobName}, job)
