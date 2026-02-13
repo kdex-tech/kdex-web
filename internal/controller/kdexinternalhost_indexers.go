@@ -58,6 +58,16 @@ func (r *KDexInternalHostReconciler) indexers(mgr ctrl.Manager) error {
 		return err
 	}
 
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexInternalUtilityPage{}, internal.HOST_INDEX_KEY, func(rawObj client.Object) []string {
+		up := rawObj.(*kdexv1alpha1.KDexInternalUtilityPage)
+		if up.Spec.HostRef.Name == "" {
+			return nil
+		}
+		return []string{up.Spec.HostRef.Name}
+	}); err != nil {
+		return err
+	}
+
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &kdexv1alpha1.KDexRoleBinding{}, internal.HOST_INDEX_KEY, func(rawObj client.Object) []string {
 		scopeBinding := rawObj.(*kdexv1alpha1.KDexRoleBinding)
 		if scopeBinding.Spec.HostRef.Name == "" {

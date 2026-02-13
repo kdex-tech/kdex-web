@@ -191,12 +191,32 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		scriptDefs = append(scriptDefs, scriptLibrary.Scripts...)
 	}
 
+	var utilityPages kdexv1alpha1.KDexInternalUtilityPageList
+	if err := r.List(ctx, &utilityPages, client.InNamespace(r.ControllerNamespace), client.MatchingFields{internal.HOST_INDEX_KEY: r.FocalHost}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list utility pages: %w", err)
+	}
+
 	for _, utilityPageType := range []kdexv1alpha1.KDexUtilityPageType{
 		kdexv1alpha1.AnnouncementUtilityPageType,
 		kdexv1alpha1.ErrorUtilityPageType,
 		kdexv1alpha1.LoginUtilityPageType,
 	} {
 		pageHandler := r.HostHandler.GetUtilityPageHandler(utilityPageType)
+		if pageHandler.Name == "" {
+			// check if it's supposed to be there
+			expected := false
+			for _, up := range utilityPages.Items {
+				if up.Spec.Type == utilityPageType {
+					expected = true
+					break
+				}
+			}
+			if expected {
+				log.V(2).Info("waiting for host handler to warm up (utility page missing)", "type", utilityPageType)
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+			}
+		}
+
 		packageRefs = append(packageRefs, pageHandler.PackageReferences...)
 		backendRefs = append(backendRefs, pageHandler.RequiredBackends...)
 		// we don't add page scripts here, because they are added by the pages
@@ -212,7 +232,18 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		})
 	}
 
-	for _, pageHandler := range r.HostHandler.Pages.List() {
+	var bindings kdexv1alpha1.KDexPageBindingList
+	if err := r.List(ctx, &bindings, client.InNamespace(r.ControllerNamespace), client.MatchingFields{internal.HOST_INDEX_KEY: r.FocalHost}); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to list page bindings: %w", err)
+	}
+
+	pageHandlers := r.HostHandler.Pages.List()
+	if len(bindings.Items) != len(pageHandlers) {
+		log.V(2).Info("waiting for host handler to warm up (page count mismatch)", "clusterCount", len(bindings.Items), "handlerCount", len(pageHandlers))
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+	}
+
+	for _, pageHandler := range pageHandlers {
 		if seenPaths[pageHandler.Page.BasePath] {
 			err = fmt.Errorf(
 				"duplicated path %s, paths must be unique across backends and pages, obj: %s/%s, kind: %s",
