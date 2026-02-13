@@ -443,15 +443,21 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if internalPackageReferences != nil {
+		be := kdexv1alpha1.Backend{
+			IngressPath:           r.Configuration.BackendDefault.ModulePath,
+			StaticImage:           internalPackageReferences.Status.Attributes["image"],
+			StaticImagePullPolicy: corev1.PullIfNotPresent,
+		}
+
+		if internalHost.Spec.Backend.Env != nil {
+			be.Env = append(be.Env, internalHost.Spec.Backend.Env...)
+		}
+
 		// Synthetic Backend for the packages
 		packagesBackend := resolvedBackend{
-			Backend: kdexv1alpha1.Backend{
-				IngressPath:           r.Configuration.BackendDefault.ModulePath,
-				StaticImage:           internalPackageReferences.Status.Attributes["image"],
-				StaticImagePullPolicy: corev1.PullIfNotPresent,
-			},
-			Name: "packages",
-			Kind: "KDexInternalPackageReferences",
+			Backend: be,
+			Name:    "packages",
+			Kind:    "KDexInternalPackageReferences",
 		}
 
 		requiredBackends = append(requiredBackends, packagesBackend)
@@ -495,7 +501,9 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	if err := r.cleanupObsoleteBackends(ctx, &internalHost, requiredBackends); err != nil {
-		return ctrl.Result{}, err
+		log.V(2).Info("cleanup obsolete backends failed, requeueing", "err", err)
+
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 	}
 
 	var ingressOrHTTPRouteOp controllerutil.OperationResult
@@ -1207,6 +1215,22 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 			}
 
 			deployment.Spec.Template.Spec.Containers[0].Name = "backend"
+
+			if len(resolvedBackend.Backend.Env) > 0 {
+				for _, env := range resolvedBackend.Backend.Env {
+					foundEnv := false
+					for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
+						if value.Name == env.Name {
+							foundEnv = true
+							deployment.Spec.Template.Spec.Containers[0].Env[idx].Value = env.Value
+							break
+						}
+					}
+					if !foundEnv {
+						deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, env)
+					}
+				}
+			}
 
 			foundPathPrefixEnv := false
 			for idx, value := range deployment.Spec.Template.Spec.Containers[0].Env {
