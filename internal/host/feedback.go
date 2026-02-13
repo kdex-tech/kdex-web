@@ -185,8 +185,12 @@ func isCLI(userAgent string) bool {
 
 func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// For paths that are already mapped to a route but for which we want to modify the spec we need to override the
+		// sniffer mode. This is done by setting the X-KDex-Sniffer-Force header to true.
+		forceSniff := r.Header.Get("X-KDex-Sniffer-Force") == "true"
+
 		// Only intercept if we have a sniffer (checker) and it's not an internal path
-		if hh.sniffer == nil || strings.HasPrefix(r.URL.Path, "/-/") {
+		if hh.sniffer == nil || (strings.HasPrefix(r.URL.Path, "/-/") && !forceSniff) {
 			next.ServeHTTP(w, r)
 			return
 		}
