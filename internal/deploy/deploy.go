@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -48,13 +49,13 @@ type Runtime interface {
 // failure along with reasons, and upon success, at least the URL of the function so that the
 // Focal Controller can mount it into the host's service mesh and dispatch requests to it.
 func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFunction) (*batchv1.Job, error) {
-	// Create Job identity hash based on the image and the adaptor version
-	image := ""
-	if function.Status.Executable != nil {
-		image = function.Status.Executable.Image
+	if function.Status.Executable == nil {
+		return nil, fmt.Errorf("function %s/%s has no executable", function.Namespace, function.Name)
 	}
-	adaptorGen := function.Status.Attributes["faasAdaptor.generation"]
 
+	// Create Job identity hash based on the image and the adaptor version
+	image := function.Status.Executable.Image
+	adaptorGen := function.Status.Attributes["faasAdaptor.generation"]
 	h := sha256.New()
 	h.Write([]byte(image))
 	h.Write([]byte(adaptorGen))
@@ -76,14 +77,28 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 		issuer = "https://" + d.Host.Spec.Routing.Domains[0]
 	}
 
-	env := []corev1.EnvVar{
+	env := d.FaaSAdaptor.Deployer.Env
+
+	env = append(env, []corev1.EnvVar{
+		{
+			Name:  "AUDIENCE",
+			Value: issuer,
+		},
+		{
+			Name:  "FUNCTION_BASEPATH",
+			Value: function.Spec.API.BasePath,
+		},
+		{
+			Name:  "FUNCTION_GENERATION",
+			Value: fmt.Sprintf("%d", function.Generation),
+		},
 		{
 			Name:  "FUNCTION_HOST",
 			Value: function.Spec.HostRef.Name,
 		},
 		{
-			Name:  "FUNCTION_GENERATION",
-			Value: fmt.Sprintf("%d", function.Generation),
+			Name:  "FUNCTION_IMAGE",
+			Value: image,
 		},
 		{
 			Name:  "FUNCTION_NAME",
@@ -92,10 +107,6 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 		{
 			Name:  "FUNCTION_NAMESPACE",
 			Value: function.Namespace,
-		},
-		{
-			Name:  "FUNCTION_BASEPATH",
-			Value: function.Spec.API.BasePath,
 		},
 		{
 			Name:  "JWKS_URL",
@@ -109,31 +120,18 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 		// 	Name:  "CLIENT_ID",
 		// 	Value: d.Host.Spec.Auth.OIDCProvider.ClientID,
 		// },
-		{
-			Name:  "AUDIENCE",
-			Value: issuer,
-		},
-	}
+	}...)
 
-	env = append(env, d.FaaSAdaptor.Deployer.Env...)
-
-	if function.Status.Executable != nil {
-		env = append(env, corev1.EnvVar{
-			Name:  "FUNCTION_IMAGE",
-			Value: function.Status.Executable.Image,
-		})
-	}
-
-	forwardedEnvVars := ""
+	var forwardedEnvVars strings.Builder
 	sep := ""
 	for _, e := range env {
-		forwardedEnvVars += fmt.Sprintf("%s%s", sep, e.Name)
+		fmt.Fprintf(&forwardedEnvVars, "%s%s", sep, e.Name)
 		sep = ","
 	}
 
 	env = append(env, corev1.EnvVar{
 		Name:  "FORWARDED_ENV_VARS",
-		Value: forwardedEnvVars,
+		Value: forwardedEnvVars.String(),
 	})
 
 	job = &batchv1.Job{
@@ -208,7 +206,14 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 	cronJob := &batchv1.CronJob{}
 	err := d.Client.Get(ctx, client.ObjectKey{Namespace: function.Namespace, Name: cronJobName}, cronJob)
 	if err == nil {
-		// Update schedule if changed? For now, just return existing.
+		if d.FaaSAdaptor.Observer.Schedule != cronJob.Spec.Schedule {
+			cronJob.Spec.Schedule = d.FaaSAdaptor.Observer.Schedule
+			err = d.Client.Update(ctx, cronJob)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update observation cronjob: %w", err)
+			}
+		}
+
 		return cronJob, nil
 	}
 	if !errors.IsNotFound(err) {
@@ -217,6 +222,14 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 
 	// Reuse deployment environment variables where appropriate
 	env := []corev1.EnvVar{
+		{
+			Name:  "FUNCTION_BASEPATH",
+			Value: function.Spec.API.BasePath,
+		},
+		{
+			Name:  "FUNCTION_GENERATION",
+			Value: fmt.Sprintf("%d", function.Generation),
+		},
 		{
 			Name:  "FUNCTION_HOST",
 			Value: function.Spec.HostRef.Name,
@@ -243,10 +256,10 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 			},
 		},
 		Spec: batchv1.CronJobSpec{
-			Schedule:          d.FaaSAdaptor.Observer.Schedule,
 			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
+					Completions: utils.Ptr(int32(1)),
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
 							AutomountServiceAccountToken: utils.Ptr(true),
@@ -263,8 +276,11 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 							ServiceAccountName: d.FaaSAdaptor.Observer.ServiceAccountName,
 						},
 					},
+					TTLSecondsAfterFinished: utils.Ptr(int32(0)),
 				},
 			},
+			Schedule:                   d.FaaSAdaptor.Observer.Schedule,
+			SuccessfulJobsHistoryLimit: utils.Ptr(int32(1)),
 		},
 	}
 
