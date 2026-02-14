@@ -59,3 +59,16 @@ func filterFromQuery(queryParams url.Values) ko.Filter {
 
 	return filter
 }
+
+// Helper to strip the Domain attribute from a Set-Cookie string
+func (hh *HostHandler) stripCookieDomain(cookieStr string) string {
+	parts := strings.Split(cookieStr, ";")
+	var newParts []string
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if !strings.HasPrefix(strings.ToLower(trimmed), "domain=") {
+			newParts = append(newParts, part)
+		}
+	}
+	return strings.Join(newParts, ";")
+}

@@ -129,6 +129,8 @@ func main() {
 	}
 	ctrl.SetLogger(logger)
 
+	setupLog.Info("named log levels", "levels", namedLogLevels)
+
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
 	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and

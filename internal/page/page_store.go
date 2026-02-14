@@ -22,14 +22,14 @@ func NewPageStore(host string, onUpdate func(), log logr.Logger) *PageStore {
 }
 
 func (s *PageStore) Count() int {
-	s.log.V(2).Info("count")
+	s.log.V(3).Info("count")
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.handlers)
 }
 
 func (s *PageStore) Delete(name string) {
-	s.log.V(2).Info("delete", "name", name)
+	s.log.V(3).Info("delete", "name", name)
 	s.mu.Lock()
 	if _, ok := s.handlers[name]; !ok {
 		s.mu.Unlock()
@@ -43,7 +43,7 @@ func (s *PageStore) Delete(name string) {
 }
 
 func (s *PageStore) Get(name string) (PageHandler, bool) {
-	s.log.V(2).Info("get", "name", name)
+	s.log.V(3).Info("get", "name", name)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	page, ok := s.handlers[name]
@@ -62,7 +62,7 @@ func (s *PageStore) List() []PageHandler {
 }
 
 func (s *PageStore) Set(handler PageHandler) {
-	s.log.V(2).Info("set", "name", handler.Name)
+	s.log.V(3).Info("set", "name", handler.Name)
 	s.mu.Lock()
 	s.handlers[handler.Name] = handler
 	s.mu.Unlock()

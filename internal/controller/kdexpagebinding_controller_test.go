@@ -681,31 +681,6 @@ var _ = Describe("KDexPageBinding Controller", func() {
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, false)
 
-			addOrUpdateInternalHost(
-				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: kdexv1alpha1.KDexInternalHostSpec{
-						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
-							BrandName:    "KDex Tech",
-							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-							Organization: "KDex Tech Inc.",
-							Routing: kdexv1alpha1.Routing{
-								Domains: []string{
-									"example.com",
-								},
-							},
-						},
-					},
-				},
-			)
-
-			assertResourceReady(
-				ctx, k8sClient, focalHost, namespace,
-				&kdexv1alpha1.KDexInternalHost{}, true)
-
 			addOrUpdatePageArchetype(
 				ctx, k8sClient,
 				kdexv1alpha1.KDexPageArchetype{
@@ -762,31 +737,6 @@ var _ = Describe("KDexPageBinding Controller", func() {
 			assertResourceReady(
 				ctx, k8sClient, resourceName, namespace,
 				&kdexv1alpha1.KDexPageBinding{}, false)
-
-			addOrUpdateInternalHost(
-				ctx, k8sClient, kdexv1alpha1.KDexInternalHost{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      focalHost,
-						Namespace: namespace,
-					},
-					Spec: kdexv1alpha1.KDexInternalHostSpec{
-						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
-							BrandName:    "KDex Tech",
-							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
-							Organization: "KDex Tech Inc.",
-							Routing: kdexv1alpha1.Routing{
-								Domains: []string{
-									"example.com",
-								},
-							},
-						},
-					},
-				},
-			)
-
-			assertResourceReady(
-				ctx, k8sClient, focalHost, namespace,
-				&kdexv1alpha1.KDexInternalHost{}, true)
 
 			addOrUpdateClusterPageArchetype(
 				ctx, k8sClient,

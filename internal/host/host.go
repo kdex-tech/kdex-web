@@ -32,7 +32,7 @@ func NewHostHandler(c client.Client, name string, namespace string, log logr.Log
 		Namespace:                 namespace,
 		client:                    c,
 		defaultLanguage:           "en",
-		log:                       log.WithValues("host", name),
+		log:                       log,
 		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
 		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
 		registeredPaths:           map[string]ko.PathInfo{},
@@ -59,7 +59,7 @@ func (hh *HostHandler) AddOrUpdateTranslation(name string, translation *kdexv1al
 	if translation == nil {
 		return
 	}
-	hh.log.V(1).Info("add or update translation", "translation", name)
+	hh.log.V(3).Info("add or update translation", "translation", name)
 	hh.mu.Lock()
 	hh.translationResources[name] = *translation
 	hh.mu.Unlock()
@@ -70,7 +70,7 @@ func (hh *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
 	if ph.UtilityPage == nil {
 		return
 	}
-	hh.log.V(1).Info("add or update utility page", "name", ph.Name, "type", ph.UtilityPage.Type)
+	hh.log.V(3).Info("add or update utility page", "name", ph.Name, "type", ph.UtilityPage.Type)
 	hh.mu.Lock()
 	hh.utilityPages[ph.UtilityPage.Type] = ph
 	hh.mu.Unlock()
@@ -228,7 +228,7 @@ func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 }
 
 func (hh *HostHandler) RebuildMux() {
-	hh.log.V(1).Info("rebuilding mux")
+	hh.log.V(3).Info("rebuilding mux")
 	hh.mu.RLock()
 
 	if hh.host == nil {
@@ -254,7 +254,7 @@ func (hh *HostHandler) RebuildMux() {
 
 	pageHandlers := hh.Pages.List()
 
-	if len(pageHandlers) == 0 {
+	if len(pageHandlers) == 0 && len(hh.functions) == 0 {
 		handler := func(w http.ResponseWriter, r *http.Request) {
 			l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
 			if err != nil {
@@ -299,7 +299,6 @@ func (hh *HostHandler) RebuildMux() {
 	}
 
 	renderedPages := []pageRender{}
-
 	for _, ph := range pageHandlers {
 		basePath := ph.BasePath()
 
@@ -312,13 +311,33 @@ func (hh *HostHandler) RebuildMux() {
 		renderedPages = append(renderedPages, pageRender{ph: ph, l10nRenders: l10nRenders})
 	}
 
+	functionHandlers := []functionHandler{}
+	for _, f := range hh.functions {
+		if f.Status.State != kdexv1alpha1.KDexFunctionStateReady {
+			continue
+		}
+		functionHandlers = append(functionHandlers, functionHandler{
+			basePath: f.Spec.API.BasePath,
+			handler:  hh.reverseProxyHandler(&f),
+		})
+	}
+
 	hh.mu.RUnlock()
+
+	hh.mu.Lock()
 
 	for _, pr := range renderedPages {
 		hh.addHandlerAndRegister(mux, pr, registeredPaths)
 	}
+	for _, fh := range functionHandlers {
+		// Register both the exact path and the prefix path (with trailing slash)
+		// to ensure all sub-paths are proxied correctly.
+		mux.HandleFunc(fh.basePath, fh.handler)
+		if !strings.HasSuffix(fh.basePath, "/") {
+			mux.HandleFunc(fh.basePath+"/", fh.handler)
+		}
+	}
 
-	hh.mu.Lock()
 	hh.Translations = *newTranslations
 	hh.registeredPaths = registeredPaths
 	hh.Mux = mux
@@ -426,6 +445,7 @@ func (hh *HostHandler) SetHost(
 	hh.mu.Lock()
 	hh.host = host
 	hh.defaultLanguage = host.DefaultLang
+	hh.functions = functions
 	hh.favicon = ico.NewICO(host.FaviconSVGTemplate, render.TemplateData{
 		BrandName:       host.BrandName,
 		DefaultLanguage: host.DefaultLang,

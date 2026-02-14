@@ -185,15 +185,15 @@ func isCLI(userAgent string) bool {
 
 func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// For paths that are already mapped to a route but for which we want to modify the spec we need to override the
-		// sniffer mode. This is done by setting the X-KDex-Sniffer-Force header to true.
-		forceSniff := r.Header.Get("X-KDex-Sniffer-Force") == "true"
-
-		// Only intercept if we have a sniffer (checker) and it's not an internal path
-		if hh.sniffer == nil || (strings.HasPrefix(r.URL.Path, "/-/") && !forceSniff) {
+		// Only intercept if we have a sniffer (checker), it's not an internal path
+		if hh.sniffer == nil || strings.HasPrefix(r.URL.Path, "/-/") {
 			next.ServeHTTP(w, r)
 			return
 		}
+
+		// TODO: There has to be a way we can avoid reading the body here. Maybe we need to somehow determine if the
+		// request will match amount the registeredPaths using a dummy mux and only activate read when we've determined
+		// that it won't match any... i.e. the sniffer model of operation on 404.
 
 		// Body Persistence: Read body so we can restore it for the next handler AND the sniffer
 		var bodyBytes []byte
@@ -204,7 +204,8 @@ func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 
 		// Create a wrapper to capture the status code
 		ew := &errorResponseWriter{ResponseWriter: w}
-		next.ServeHTTP(ew, r)
+		wrapped := wrappedErrorResponseWriter(ew, w)
+		next.ServeHTTP(wrapped, r)
 
 		skipSniffer := r.Header.Get("X-KDex-Sniffer-Skip") == "true"
 
@@ -266,8 +267,27 @@ func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 		// If code < 400, it passed through immediately.
 		// If code >= 400, it buffered it.
 		if ew.statusCode >= 400 {
-			// Write the buffered status code structure
-			hh.serveError(w, r, ew.statusCode, ew.statusMsg)
+			// Check if the client accepts HTML
+			accept := r.Header.Get("Accept")
+			if strings.Contains(accept, "text/html") {
+				// Important: Clear headers before calling serveError, as previous
+				// handlers (like ReverseProxy) might have set headers (e.g. Content-Length)
+				// based on a response body that we've suppressed.
+				header := w.Header()
+				for k := range header {
+					delete(header, k)
+				}
+
+				// Write the buffered status code structure
+				hh.serveError(w, r, ew.statusCode, ew.statusMsg)
+			} else {
+				// Preserve original Content-Type if set, otherwise fallback to plain text
+				if w.Header().Get("Content-Type") == "" {
+					w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				}
+				w.WriteHeader(ew.statusCode)
+				_, _ = w.Write([]byte(ew.statusMsg))
+			}
 		}
 	})
 }
