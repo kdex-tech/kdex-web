@@ -24,7 +24,7 @@ func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 	finalPath := toFinalPath(pr.ph.BasePath())
 	label := pr.ph.Label()
 
-	handler := hh.pageHandlerFunc(finalPath, pr.ph.Name, pr.l10nRenders, pr.ph)
+	handler := hh.pageHandlerFunc(pr.ph, pr.l10nRenders)
 
 	regFunc := func(p string, n string, l string, pattern bool, localized bool) {
 		reqs := hh.convertRequirements(pr.ph.Page.Security)

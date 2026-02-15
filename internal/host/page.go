@@ -2,57 +2,20 @@ package host
 
 import (
 	"net/http"
-	"net/url"
 
-	"kdex.dev/web/internal/auth"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	kdexhttp "kdex.dev/web/internal/http"
 	"kdex.dev/web/internal/page"
 )
 
 func (hh *HostHandler) pageHandlerFunc(
-	basePath string,
-	name string,
-	l10nRenders map[string]string,
 	pageHandler page.PageHandler,
+	l10nRenders map[string]string,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if hh.authConfig.IsAuthEnabled() {
-			// Check authorization before processing the request
-
-			// Perform authorization check
-			authorized, err := hh.authChecker.CheckAccess(
-				r.Context(), "pages", basePath, hh.pageRequirements(&pageHandler))
-
-			if err != nil {
-				hh.log.Error(err, "authorization check failed", "page", name, "basePath", basePath)
-				http.Error(w, http.StatusText(http.StatusNotFound)+" "+r.URL.Path, http.StatusNotFound)
-				return
-			}
-
-			// User is not authorized
-			if !authorized {
-				hh.log.V(1).Info("unauthorized access attempt", "page", name, "basePath", basePath)
-
-				// But is logged in, error page
-				if _, isLoggedIn := auth.GetClaims(r.Context()); isLoggedIn {
-					r.Header.Set("X-KDex-Sniffer-Skip", "true")
-					http.Error(w, http.StatusText(http.StatusNotFound)+" "+r.URL.Path, http.StatusNotFound)
-					return
-				}
-
-				// Redirect to login with return URL
-
-				// TODO: I'm not sure if this is the best way to do this. Redirecting to login on a page that requires authorization
-				// doesn't seem right. I think we should just return a 401 Unauthorized.
-
-				returnURL := r.URL.Path
-				if r.URL.RawQuery != "" {
-					returnURL += "?" + r.URL.RawQuery
-				}
-				redirectURL := "/-/login?return=" + url.QueryEscape(returnURL)
-				http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-				return
-			}
+		shouldReturn := hh.handleAuth(r, w, "pages", pageHandler.BasePath(), hh.pageRequirements(&pageHandler))
+		if shouldReturn {
+			return
 		}
 
 		l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
@@ -68,7 +31,7 @@ func (hh *HostHandler) pageHandlerFunc(
 			return
 		}
 
-		hh.log.V(1).Info("serving", "page", name, "basePath", basePath, "language", l.String())
+		hh.log.V(1).Info("serving", "page", pageHandler.Name, "basePath", pageHandler.BasePath(), "language", l.String())
 
 		w.Header().Set("Content-Language", l.String())
 		w.Header().Set("Content-Type", "text/html")
@@ -78,4 +41,34 @@ func (hh *HostHandler) pageHandlerFunc(
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
+}
+
+func (hh *HostHandler) handleAuth(
+	r *http.Request,
+	w http.ResponseWriter,
+	resource string,
+	resourceName string,
+	requirements []kdexv1alpha1.SecurityRequirement,
+) bool {
+	if !hh.authConfig.IsAuthEnabled() {
+		return false
+	}
+
+	authorized, err := hh.authChecker.CheckAccess(
+		r.Context(), resource, resourceName, requirements)
+
+	if err != nil {
+		hh.log.Error(err, "authorization check failed", resource, resourceName)
+		http.Error(w, http.StatusText(http.StatusNotFound)+" "+r.URL.Path, http.StatusNotFound)
+		return true
+	}
+
+	if !authorized {
+		hh.log.V(1).Info("unauthorized access attempt", resource, resourceName)
+		r.Header.Set("X-KDex-Sniffer-Skip", "true")
+		http.Error(w, http.StatusText(http.StatusNotFound)+" "+r.URL.Path, http.StatusNotFound)
+		return true
+	}
+
+	return false
 }
