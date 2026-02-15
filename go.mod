@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.25.6
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.119
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.120
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -83,6 +83,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kdex-tech/dmapper v0.1.0 // indirect
 	github.com/mailru/easyjson v0.9.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
