@@ -2,7 +2,7 @@ module kdex.dev/web
 
 go 1.25.6
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.118
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.119
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -14,7 +14,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/cel-go v0.27.0
 	github.com/google/uuid v1.6.0
-	github.com/kdex-tech/entitlements v0.1.7
+	github.com/kdex-tech/entitlements v0.1.8
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.0
 	// Pin to compatible versions to avoid breaking changes
