@@ -33,6 +33,7 @@ func NewConfig(
 	ctx context.Context,
 	c client.Client,
 	auth *kdexv1alpha1.Auth,
+	audience string,
 	issuer string,
 	namespace string,
 	devMode bool,
@@ -82,7 +83,7 @@ func NewConfig(
 			}
 		}
 		signer, err := sign.NewSigner(
-			issuer,
+			audience,
 			ttl,
 			issuer,
 			&cfg.ActivePair.Private,

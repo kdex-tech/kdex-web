@@ -568,6 +568,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		r.Client,
 		internalHost.Spec.Auth,
 		issuer,
+		issuer,
 		internalHost.Namespace,
 		internalHost.Spec.DevMode,
 	)

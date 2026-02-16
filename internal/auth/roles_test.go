@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +72,7 @@ func TestNewRoleProvider(t *testing.T) {
 			controllerNamespace: "foo",
 			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				ident := &Identity{}
+				ident := jwt.MapClaims{}
 				err := got.ResolveIdentity("username", "password", ident)
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "invalid credentials")
@@ -116,7 +117,7 @@ func TestNewRoleProvider(t *testing.T) {
 			controllerNamespace: "foo",
 			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				ident := &Identity{}
+				ident := jwt.MapClaims{}
 				err := got.ResolveIdentity("username", "password", ident)
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "invalid credentials")
@@ -173,7 +174,7 @@ func TestNewRoleProvider(t *testing.T) {
 			controllerNamespace: "foo",
 			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				ident := &Identity{}
+				ident := jwt.MapClaims{}
 				err := got.ResolveIdentity("username", "password", ident)
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "invalid credentials: no secret")
@@ -230,11 +231,11 @@ func TestNewRoleProvider(t *testing.T) {
 			controllerNamespace: "foo",
 			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				ident := &Identity{}
+				ident := jwt.MapClaims{}
 				err := got.ResolveIdentity("username", "passw0rd", ident)
 				assert.Nil(t, err)
-				assert.Equal(t, "username", ident.Subject)
-				assert.Equal(t, "username@email.foo", ident.Email)
+				assert.Equal(t, "username", ident["sub"])
+				assert.Equal(t, "username@email.foo", ident["email"])
 			},
 		},
 		{
@@ -434,9 +435,9 @@ func TestNewRoleProvider(t *testing.T) {
 				ident, err := got.VerifyLocalIdentity("username", "passw0rd")
 				assert.Nil(t, err)
 				assert.NotNil(t, ident)
-				assert.Equal(t, "username", ident.Subject)
-				assert.Equal(t, "username@email.foo", ident.Email)
-				assert.Equal(t, []string{"page::read", "page::write"}, ident.Entitlements)
+				assert.Equal(t, "username", ident["sub"])
+				assert.Equal(t, "username@email.foo", ident["email"])
+				assert.Equal(t, []string{"page::read", "page::write"}, ident["entitlements"])
 			},
 		},
 	}

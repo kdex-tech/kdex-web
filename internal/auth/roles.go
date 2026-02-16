@@ -3,33 +3,19 @@ package auth
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/golang-jwt/jwt/v5"
 	corev1 "k8s.io/api/core/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/web/internal"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type Identity struct {
-	Email        string
-	Extra        map[string]any
-	FamilyName   string
-	GivenName    string
-	MiddleName   string
-	Name         string
-	Nickname     string
-	Picture      string
-	Roles        []string
-	Entitlements []string
-	Subject      string
-	Scope        string
-	UpdatedAt    int64
-}
-
 type ScopeProvider interface {
-	ResolveIdentity(subject string, password string, identity *Identity) error
+	ResolveIdentity(subject string, password string, identity jwt.MapClaims) error
 	ResolveRolesAndEntitlements(subject string) ([]string, []string, error)
-	VerifyLocalIdentity(subject string, password string) (*Identity, error)
+	VerifyLocalIdentity(subject string, password string) (jwt.MapClaims, error)
 }
 
 type scopeProvider struct {
@@ -59,7 +45,9 @@ func NewRoleProvider(ctx context.Context, c client.Client, focalHost string, con
 	return rc, nil
 }
 
-func (rp *scopeProvider) ResolveIdentity(subject string, password string, identity *Identity) error {
+func (rp *scopeProvider) ResolveIdentity(subject string, password string, identity jwt.MapClaims) error {
+	// TODO: implement external lookup like LDAP
+
 	bindings, err := rp.resolveBindings(subject)
 	if err != nil {
 		return err
@@ -67,8 +55,6 @@ func (rp *scopeProvider) ResolveIdentity(subject string, password string, identi
 	if len(bindings.Items) == 0 {
 		return fmt.Errorf("invalid credentials: no binding")
 	}
-
-	// TODO: implement external lookup like LDAP
 
 	passwordValid := false
 	for _, binding := range bindings.Items {
@@ -83,8 +69,8 @@ func (rp *scopeProvider) ResolveIdentity(subject string, password string, identi
 			passBytes, ok := secret.Data[subject]
 			if ok && string(passBytes) == password {
 				passwordValid = true
-				identity.Email = binding.Spec.Email
-				identity.Subject = subject
+				identity["email"] = binding.Spec.Email
+				identity["sub"] = subject
 				break
 			}
 		}
@@ -106,10 +92,13 @@ func (rp *scopeProvider) ResolveRolesAndEntitlements(subject string) ([]string, 
 	return roles, rp.collectEntitlements(roles), nil
 }
 
-func (rp *scopeProvider) VerifyLocalIdentity(subject string, password string) (*Identity, error) {
-	localIdentity := &Identity{
-		Email:   subject,
-		Subject: subject,
+func (rp *scopeProvider) VerifyLocalIdentity(subject string, password string) (jwt.MapClaims, error) {
+	localIdentity := jwt.MapClaims{
+		"sub": subject,
+	}
+
+	if strings.Contains(subject, "@") {
+		localIdentity["email"] = subject
 	}
 
 	err := rp.ResolveIdentity(subject, password, localIdentity)
@@ -122,8 +111,8 @@ func (rp *scopeProvider) VerifyLocalIdentity(subject string, password string) (*
 		return nil, fmt.Errorf("failed to resolve scopes: %w", err)
 	}
 
-	localIdentity.Roles = roles
-	localIdentity.Entitlements = entitlements
+	localIdentity["roles"] = roles
+	localIdentity["entitlements"] = entitlements
 
 	return localIdentity, nil
 }

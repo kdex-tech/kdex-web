@@ -449,7 +449,7 @@ L51w6mkJ5U6GWpH1eZsXgKm0ZZJKEPsN9wYKe2LXT/WPpa5AwGzo7BLm
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := NewConfig(context.Background(), tt.args.c, tt.args.auth, "issuer", tt.args.namespace, tt.args.devMode)
+			got, gotErr := NewConfig(context.Background(), tt.args.c, tt.args.auth, "audience", "issuer", tt.args.namespace, tt.args.devMode)
 			tt.assertions(t, got, gotErr)
 		})
 	}
@@ -694,6 +694,7 @@ func TestConfig_AddAuthentication(t *testing.T) {
 				context.Background(),
 				tt.args.c,
 				tt.args.auth,
+				"audience",
 				"issuer",
 				tt.args.namespace,
 				tt.args.devMode,
@@ -714,16 +715,16 @@ func TestConfig_OIDC(t *testing.T) {
 		},
 	}
 	scopeProvider := &mockScopeProvider{
-		verifyLocalIdentity: func(subject string, password string) (*Identity, error) {
+		verifyLocalIdentity: func(subject string, password string) (jwt.MapClaims, error) {
 			if subject == "not-allowed" {
 				return nil, fmt.Errorf("invalid credentials")
 			}
 
-			return &Identity{
-				Email:        subject,
-				Extra:        extra,
-				Subject:      subject,
-				Entitlements: []string{"foo", "bar"},
+			return jwt.MapClaims{
+				"email":        subject,
+				"extra":        extra,
+				"sub":          subject,
+				"entitlements": []string{"foo", "bar"},
 			}, nil
 		},
 		resolveRolesAndEntitlements: func(subject string) ([]string, []string, error) {
@@ -742,11 +743,19 @@ func TestConfig_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string) {
 				client := fake.NewClientBuilder().WithObjects().Build()
-				_, gotErr := NewConfig(context.Background(), client, &v1alpha1.Auth{
-					OIDCProvider: &v1alpha1.OIDCProvider{
-						OIDCProviderURL: "http://bad",
+				_, gotErr := NewConfig(
+					context.Background(),
+					client,
+					&v1alpha1.Auth{
+						OIDCProvider: &v1alpha1.OIDCProvider{
+							OIDCProviderURL: "http://bad",
+						},
 					},
-				}, "issuer", "foo", true)
+					"audience",
+					"issuer",
+					"foo",
+					true,
+				)
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), "there is no client id configured in")
 			},
@@ -756,12 +765,20 @@ func TestConfig_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string) {
 				client := fake.NewClientBuilder().WithObjects().Build()
-				_, gotErr := NewConfig(context.Background(), client, &v1alpha1.Auth{
-					OIDCProvider: &v1alpha1.OIDCProvider{
-						ClientID:        "foo",
-						OIDCProviderURL: "http://bad",
+				_, gotErr := NewConfig(
+					context.Background(),
+					client,
+					&v1alpha1.Auth{
+						OIDCProvider: &v1alpha1.OIDCProvider{
+							ClientID:        "foo",
+							OIDCProviderURL: "http://bad",
+						},
 					},
-				}, "issuer", "foo", true)
+					"audience",
+					"issuer",
+					"foo",
+					true,
+				)
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), "there is no Secret containing the OIDC client_secret configured")
 			},
@@ -771,18 +788,26 @@ func TestConfig_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string) {
 				client := fake.NewClientBuilder().WithObjects().Build()
-				_, gotErr := NewConfig(context.Background(), client, &v1alpha1.Auth{
-					OIDCProvider: &v1alpha1.OIDCProvider{
-						ClientID: "foo",
-						ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-							KeyProperty: "client_secret",
-							SecretRef: v1.LocalObjectReference{
-								Name: "foo",
+				_, gotErr := NewConfig(
+					context.Background(),
+					client,
+					&v1alpha1.Auth{
+						OIDCProvider: &v1alpha1.OIDCProvider{
+							ClientID: "foo",
+							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
+								KeyProperty: "client_secret",
+								SecretRef: v1.LocalObjectReference{
+									Name: "foo",
+								},
 							},
+							OIDCProviderURL: "http://bad",
 						},
-						OIDCProviderURL: "http://bad",
 					},
-				}, "issuer", "foo", true)
+					"audience",
+					"issuer",
+					"foo",
+					true,
+				)
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), `secrets "foo" not found`)
 			},
@@ -802,18 +827,26 @@ func TestConfig_OIDC(t *testing.T) {
 						},
 					},
 				).Build()
-				_, gotErr := NewConfig(context.Background(), client, &v1alpha1.Auth{
-					OIDCProvider: &v1alpha1.OIDCProvider{
-						ClientID: "foo",
-						ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-							KeyProperty: "client_secret",
-							SecretRef: v1.LocalObjectReference{
-								Name: "foo",
+				_, gotErr := NewConfig(
+					context.Background(),
+					client,
+					&v1alpha1.Auth{
+						OIDCProvider: &v1alpha1.OIDCProvider{
+							ClientID: "foo",
+							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
+								KeyProperty: "client_secret",
+								SecretRef: v1.LocalObjectReference{
+									Name: "foo",
+								},
 							},
+							OIDCProviderURL: "http://bad",
 						},
-						OIDCProviderURL: "http://bad",
 					},
-				}, "issuer", "foo", true)
+					"audience",
+					"issuer",
+					"foo",
+					true,
+				)
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), `secret foo/foo does not contain the key`)
 			},
@@ -833,18 +866,26 @@ func TestConfig_OIDC(t *testing.T) {
 						},
 					},
 				).Build()
-				cfg, gotErr := NewConfig(context.Background(), client, &v1alpha1.Auth{
-					OIDCProvider: &v1alpha1.OIDCProvider{
-						ClientID: "foo",
-						ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-							KeyProperty: "client_secret",
-							SecretRef: v1.LocalObjectReference{
-								Name: "foo",
+				cfg, gotErr := NewConfig(
+					context.Background(),
+					client,
+					&v1alpha1.Auth{
+						OIDCProvider: &v1alpha1.OIDCProvider{
+							ClientID: "foo",
+							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
+								KeyProperty: "client_secret",
+								SecretRef: v1.LocalObjectReference{
+									Name: "foo",
+								},
 							},
+							OIDCProviderURL: "http://bad",
 						},
-						OIDCProviderURL: "http://bad",
 					},
-				}, "issuer", "foo", true)
+					"audience",
+					"issuer",
+					"foo",
+					true,
+				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 			},

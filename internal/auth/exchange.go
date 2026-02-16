@@ -175,9 +175,7 @@ func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, pas
 		return "", "", fmt.Errorf("local auth not configured")
 	}
 
-	signingContext := jwt.MapClaims{}
-
-	identity, err := e.sp.VerifyLocalIdentity(username, password)
+	signingContext, err := e.sp.VerifyLocalIdentity(username, password)
 	if err != nil {
 		return "", "", err
 	}
@@ -196,49 +194,39 @@ func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, pas
 
 	// email scope
 	if hasScope("email") {
-		signingContext["email"] = identity.Email
 		grantedScopes = append(grantedScopes, "email")
+	} else {
+		delete(signingContext, "email")
 	}
 
 	// profile scope
 	if hasScope("profile") {
 		grantedScopes = append(grantedScopes, "profile")
-		if identity.FamilyName != "" {
-			signingContext["family_name"] = identity.FamilyName
-		}
-		if identity.GivenName != "" {
-			signingContext["given_name"] = identity.GivenName
-		}
-		if identity.MiddleName != "" {
-			signingContext["middle_name"] = identity.MiddleName
-		}
-		if identity.Name != "" {
-			signingContext["name"] = identity.Name
-		}
-		if identity.Nickname != "" {
-			signingContext["nickname"] = identity.Nickname
-		}
-		if identity.Picture != "" {
-			signingContext["picture"] = identity.Picture
-		}
-		if identity.UpdatedAt != 0 {
-			signingContext["updated_at"] = identity.UpdatedAt
-		}
+	} else {
+		delete(signingContext, "family_name")
+		delete(signingContext, "given_name")
+		delete(signingContext, "middle_name")
+		delete(signingContext, "name")
+		delete(signingContext, "nickname")
+		delete(signingContext, "picture")
+		delete(signingContext, "updated_at")
 	}
 
 	// entitlements and roles
-	if hasScope("entitlements") && len(identity.Entitlements) > 0 {
-		signingContext["entitlements"] = identity.Entitlements
+	if hasScope("entitlements") {
 		grantedScopes = append(grantedScopes, "entitlements")
+	} else {
+		delete(signingContext, "entitlements")
 	}
-	if hasScope("roles") && len(identity.Roles) > 0 {
-		signingContext["roles"] = identity.Roles
+	if hasScope("roles") {
 		grantedScopes = append(grantedScopes, "roles")
+	} else {
+		delete(signingContext, "roles")
 	}
 
 	// Map any remaining identity scopes
-	if identity.Scope != "" {
-		for s := range strings.SplitSeq(identity.Scope, " ") {
+	if scope, ok := signingContext["scope"].(string); ok && scope != "" {
+		for s := range strings.SplitSeq(scope, " ") {
 			if !slices.Contains(grantedScopes, s) {
 				grantedScopes = append(grantedScopes, s)
 			}
