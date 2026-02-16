@@ -1,4 +1,4 @@
-package auth
+package keys
 
 import (
 	"context"
@@ -77,7 +77,7 @@ func LoadOrGenerateKeyPair(
 			return nil, err
 		}
 
-		kp, err := loadKeysFromSecret(&secret, jwt.ActiveKey)
+		kp, err := LoadKeysFromSecret(&secret, jwt.ActiveKey)
 		if err != nil {
 			return nil, err
 		}
@@ -127,28 +127,48 @@ func GenerateECDSAKeyPair() *KeyPairs {
 	return instance
 }
 
-// loadKeysFromSecret loads an RSA key pair from a Kubernetes Secret.
-func loadKeysFromSecret(secret *corev1.Secret, activeKey string) (*KeyPair, error) {
-	privateKeyPEM, ok := secret.Data[PrivateKeySecretKey]
-	if !ok {
-		return nil, fmt.Errorf("secret does not contain %s", PrivateKeySecretKey)
-	}
+func GenerateRSAKeyPair() *KeyPairs {
+	once.Do(func() {
+		// 1. Generate a 2048-bit RSA key.
+		// Note: RSA generation is mathematically more intensive than ECDSA
+		// and may take a few hundred milliseconds.
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			// Panic because entropy is critical for RSA prime generation.
+			panic(fmt.Errorf("failed to generate RSA key: %w", err))
+		}
 
+		// 2. Generate a unique ID based on the startup time.
+		kid := fmt.Sprintf("kdex-rsa-dev-%d", time.Now().Unix())
+
+		instance = &KeyPairs{
+			{
+				ActiveKey: true,
+				KeyId:     kid,
+				Private:   privateKey,
+			},
+		}
+	})
+	return instance
+}
+
+// LoadKeyFromPEM loads a private key from a PEM encoded private key.
+func LoadKeyFromPEM(privateKeyPEM []byte) (*KeyPair, error) {
 	block, _ := pem.Decode(privateKeyPEM)
 	if block == nil {
 		return nil, fmt.Errorf("failed to decode PEM block containing private key")
 	}
 
-	var privKey any // Use 'any' (interface{}) to hold RSA or ECDSA
+	var privKey any
 	var err error
 
-	// 1. Try PKCS8 first (Modern standard, supports both RSA and ECDSA)
+	// Try PKCS8 first (Modern standard, supports both RSA and ECDSA)
 	privKey, err = x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		// 2. Fallback to PKCS1 (RSA Specific)
+		// Fallback to PKCS1 (RSA Specific)
 		privKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
-			// 3. Fallback to SEC1 (EC Specific)
+			// Fallback to SEC1 (EC Specific)
 			privKey, err = x509.ParseECPrivateKey(block.Bytes)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse private key in any format: %w", err)
@@ -156,7 +176,7 @@ func loadKeysFromSecret(secret *corev1.Secret, activeKey string) (*KeyPair, erro
 		}
 	}
 
-	// Optional: Validation. Ensure it's a type your app actually supports.
+	// Ensure it's a type that we support
 	switch privKey.(type) {
 	case *rsa.PrivateKey, *ecdsa.PrivateKey:
 		// Valid keys
@@ -169,9 +189,33 @@ func loadKeysFromSecret(secret *corev1.Secret, activeKey string) (*KeyPair, erro
 		return nil, fmt.Errorf("key type %T does not implement crypto.Signer", privKey)
 	}
 
-	return &KeyPair{
-		ActiveKey: activeKey == secret.Name,
-		KeyId:     secret.Name,
-		Private:   signer,
-	}, nil
+	kid, ok := block.Headers["KID"]
+	if ok {
+		return &KeyPair{Private: signer, KeyId: kid}, nil
+	}
+
+	return &KeyPair{Private: signer}, nil
+}
+
+// LoadKeysFromSecret loads an RSA key pair from a Kubernetes Secret.
+func LoadKeysFromSecret(secret *corev1.Secret, activeKey string) (*KeyPair, error) {
+	privateKeyPEM, ok := secret.Data[PrivateKeySecretKey]
+	if !ok {
+		return nil, fmt.Errorf("secret does not contain %s", PrivateKeySecretKey)
+	}
+
+	key, err := LoadKeyFromPEM(privateKeyPEM)
+	if err != nil {
+		return nil, err
+	}
+
+	if key.KeyId == "" {
+		key.KeyId = secret.Name
+	}
+
+	if activeKey == key.KeyId {
+		key.ActiveKey = true
+	}
+
+	return key, nil
 }

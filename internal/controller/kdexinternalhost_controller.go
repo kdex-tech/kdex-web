@@ -558,7 +558,19 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
-	authConfig, err := auth.NewConfig(ctx, r.Client, internalHost.Spec.Auth, internalHost.Namespace, internalHost.Spec.DevMode)
+	issuer := fmt.Sprintf("http://%s", internalHost.Spec.Routing.Domains[0])
+	if internalHost.Spec.Routing.TLS != nil && internalHost.Spec.Routing.TLS.SecretRef.Name != "" {
+		issuer = fmt.Sprintf("https://%s", internalHost.Spec.Routing.Domains[0])
+	}
+
+	authConfig, err := auth.NewConfig(
+		ctx,
+		r.Client,
+		internalHost.Spec.Auth,
+		issuer,
+		internalHost.Namespace,
+		internalHost.Spec.DevMode,
+	)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&internalHost.Status.Conditions,

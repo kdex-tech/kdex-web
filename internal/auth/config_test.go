@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/kdex-tech/dmapper"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,8 +56,8 @@ func TestNewConfig(t *testing.T) {
 				devMode:   false,
 			},
 			assertions: func(t *testing.T, got *Config, gotErr error) {
-				assert.Nil(t, gotErr)
-				assert.Equal(t, &Config{CookieName: "auth_token", MappingRules: []CompiledMappingRule{}}, got)
+				assert.NotNil(t, gotErr)
+				assert.Contains(t, gotErr.Error(), "no key pairs found")
 			},
 		},
 		{
@@ -418,7 +420,7 @@ L51w6mkJ5U6GWpH1eZsXgKm0ZZJKEPsN9wYKe2LXT/WPpa5AwGzo7BLm
 				).Build(),
 				auth: &kdexv1alpha1.Auth{
 					JWT: kdexv1alpha1.JWT{
-						ActiveKey: "bar",
+						ActiveKey: "kdex-dev-1769451504",
 						JWTKeysSecrets: []kdexv1alpha1.LocalSecretWithKeyReference{
 							{
 								KeyProperty: "private-key",
@@ -447,7 +449,7 @@ L51w6mkJ5U6GWpH1eZsXgKm0ZZJKEPsN9wYKe2LXT/WPpa5AwGzo7BLm
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := NewConfig(context.Background(), tt.args.c, tt.args.auth, tt.args.namespace, tt.args.devMode)
+			got, gotErr := NewConfig(context.Background(), tt.args.c, tt.args.auth, "issuer", tt.args.namespace, tt.args.devMode)
 			tt.assertions(t, got, gotErr)
 		})
 	}
@@ -601,12 +603,17 @@ func TestConfig_AddAuthentication(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/foo", http.NoBody)
 
-				token, err := SignToken("foo", "foo@foo.bar", got.ClientID, "issuer", nil, got.ActivePair, got.TokenTTL)
-				assert.Nil(t, err)
-
-				r.Header.Set("Authorization", "Bearer "+token)
-				handler.ServeHTTP(w, r)
-				assert.Equal(t, 200, w.Code)
+				token, err := got.Signer.Sign(jwt.MapClaims{
+					"sub":   "foo",
+					"email": "foo@foo.bar",
+					"iss":   "issuer",
+					"aud":   "audience",
+				})
+				if assert.NoError(t, err) {
+					r.Header.Set("Authorization", "Bearer "+token)
+					handler.ServeHTTP(w, r)
+					assert.Equal(t, 200, w.Code)
+				}
 			},
 		},
 		{
@@ -626,7 +633,13 @@ func TestConfig_AddAuthentication(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/foo", http.NoBody)
 
-				token, err := SignToken("foo", "foo@foo.bar", got.ClientID, "issuer", nil, got.ActivePair, got.TokenTTL)
+				token, err := got.Signer.Sign(jwt.MapClaims{
+					"sub":   "foo",
+					"email": "foo@foo.bar",
+					"iss":   "issuer",
+					"aud":   got.ClientID,
+				})
+
 				assert.Nil(t, err)
 
 				r.Header.Set("Cookie", "auth_token="+token)
@@ -637,8 +650,16 @@ func TestConfig_AddAuthentication(t *testing.T) {
 		{
 			name: "authentication - Cookie token expired",
 			args: testargs{
-				c:         nil,
-				auth:      &kdexv1alpha1.Auth{},
+				c: nil,
+				auth: &kdexv1alpha1.Auth{
+					ClaimMappings: []dmapper.MappingRule{
+						{
+							SourceExpression: "-1",
+							TargetPropPath:   "exp",
+							Required:         true,
+						},
+					},
+				},
 				namespace: "foo",
 				devMode:   true,
 			},
@@ -651,7 +672,13 @@ func TestConfig_AddAuthentication(t *testing.T) {
 				w := httptest.NewRecorder()
 				r := httptest.NewRequest("GET", "/foo", http.NoBody)
 
-				token, err := SignToken("foo", "foo@foo.bar", got.ClientID, "issuer", nil, got.ActivePair, 1*time.Microsecond)
+				token, err := got.Signer.Sign(jwt.MapClaims{
+					"sub":   "foo",
+					"email": "foo@foo.bar",
+					"iss":   "issuer",
+					"aud":   got.ClientID,
+				})
+
 				assert.Nil(t, err)
 
 				r.Header.Set("Cookie", "auth_token="+token)
@@ -663,7 +690,14 @@ func TestConfig_AddAuthentication(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := NewConfig(context.Background(), tt.args.c, tt.args.auth, tt.args.namespace, tt.args.devMode)
+			got, gotErr := NewConfig(
+				context.Background(),
+				tt.args.c,
+				tt.args.auth,
+				"issuer",
+				tt.args.namespace,
+				tt.args.devMode,
+			)
 			tt.assertions(t, got, gotErr)
 		})
 	}
@@ -712,7 +746,7 @@ func TestConfig_OIDC(t *testing.T) {
 					OIDCProvider: &v1alpha1.OIDCProvider{
 						OIDCProviderURL: "http://bad",
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), "there is no client id configured in")
 			},
@@ -727,7 +761,7 @@ func TestConfig_OIDC(t *testing.T) {
 						ClientID:        "foo",
 						OIDCProviderURL: "http://bad",
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), "there is no Secret containing the OIDC client_secret configured")
 			},
@@ -748,7 +782,7 @@ func TestConfig_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: "http://bad",
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), `secrets "foo" not found`)
 			},
@@ -779,7 +813,7 @@ func TestConfig_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: "http://bad",
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), `secret foo/foo does not contain the key`)
 			},
@@ -810,7 +844,7 @@ func TestConfig_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: "http://bad",
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 			},

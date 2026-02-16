@@ -603,6 +603,14 @@ func (hh *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPag
 	return rendered
 }
 
+func (hh *HostHandler) issuerAddress() string {
+	scheme := "http"
+	if hh.host.Routing.TLS != nil {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s", scheme, hh.host.Routing.Domains[0])
+}
+
 func (hh *HostHandler) serverAddress(r *http.Request) string {
 	scheme := "http"
 	if hh.isSecure(r) {

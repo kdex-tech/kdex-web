@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"kdex.dev/crds/api/v1alpha1"
 )
@@ -34,7 +35,7 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 		name            string
 		kind            string
 		resourceName    string
-		claims          *Claims
+		claims          jwt.MapClaims
 		req             []v1alpha1.SecurityRequirement
 		anonymousGrants []string
 		succeeds        bool
@@ -86,8 +87,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=admin / req=[{bearer:[foo:1:read]}{oauth2:[admin]}]",
 			kind:         "foo",
 			resourceName: "1",
-			claims: &Claims{
-				Scope: "admin",
+			claims: jwt.MapClaims{
+				"scope": "admin",
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -104,8 +105,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=admin / req=[{bearer:[foo:1:read],oauth2:[admin]}]",
 			kind:         "foo",
 			resourceName: "1",
-			claims: &Claims{
-				Scope: "admin",
+			claims: jwt.MapClaims{
+				"scope": "admin",
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -119,8 +120,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages / req=[{bearer:[pages]}] + anon",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -134,8 +135,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages / req=[{bearer:[]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -148,8 +149,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=users / req=[{bearer:[pages]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"users"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"users"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -162,8 +163,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=read / req=[{beader:[read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -176,8 +177,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=read / req=[{beader:[read]}] + anon",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -191,8 +192,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages:1:read / req=[{bearer:[pages:1:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages:1:read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -205,8 +206,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages::read / req=[{bearer:[pages:1:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages::read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages::read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -219,8 +220,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages:read / req=[{bearer:[pages:1:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages:read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -233,8 +234,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages:1:read / req=[{bearer:[pages:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages:1:read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -247,8 +248,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages:read / req=[{bearer:[pages:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages:read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -261,8 +262,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages:1:read / req=[{bearer:[pages:2:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages:1:read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -275,8 +276,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages:1:read / req=[{bearer:[bar:1:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages:1:read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -289,8 +290,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages:all / req=[{bearer:[pages:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages:all"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages:all"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -303,8 +304,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages:all / req=[{bearer:[pages:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages:all"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages:all"},
 			},
 			req:      []v1alpha1.SecurityRequirement{},
 			succeeds: true,
@@ -313,8 +314,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=pages:1:all / req=[{bearer:[pages:read]}]",
 			kind:         "pages",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"pages:1:all"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"pages:1:all"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -327,8 +328,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=foo:1:all / req=[{bearer:[foo:1:all]}]",
 			kind:         "foo",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"foo:1:all"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"foo:1:all"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -341,8 +342,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=foo:1:foo / req=[{bearer:[foo:1:read]}]",
 			kind:         "foo",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"foo:1:foo"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"foo:1:foo"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -355,8 +356,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=foo:1:read / req=[{bearer:[foo:1:read]}{oauth2:[admin]}]",
 			kind:         "foo",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"foo:1:read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"foo:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -372,8 +373,8 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=foo:1:read / req=[{bearer:[foo:1:read],oauth2:[admin]}]",
 			kind:         "foo",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"foo:1:read"},
+			claims: jwt.MapClaims{
+				"entitlements": []string{"foo:1:read"},
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{
@@ -387,9 +388,9 @@ func TestAuthorizationChecker_CheckAccess(t *testing.T) {
 			name:         "CheckPageAccess - claims=foo:1:read,admin / req=[{bearer:[foo:1:read],oauth2:[admin]}]",
 			kind:         "foo",
 			resourceName: "1",
-			claims: &Claims{
-				Entitlements: []string{"foo:1:read"},
-				Scope:        "admin",
+			claims: jwt.MapClaims{
+				"entitlements": []string{"foo:1:read"},
+				"scope":        "admin",
 			},
 			req: []v1alpha1.SecurityRequirement{
 				{

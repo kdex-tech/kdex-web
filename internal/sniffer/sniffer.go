@@ -218,7 +218,7 @@ func (s *RequestSniffer) calculatePaths(r *http.Request, patternPath string) (st
 	}
 
 	// The pattern path must follow the net/http pattern rules
-	if err := s.validatePattern(patternPath, r); err != nil {
+	if err := kh.ValidatePattern(patternPath, r); err != nil {
 		return "", "", err
 	}
 
@@ -965,24 +965,6 @@ func (s *RequestSniffer) sniff(r *http.Request) (*kdexv1alpha1.KDexFunction, err
 		r.Header.Get("X-KDex-Function-Keep-Schema-Conflict") == TRUE)
 
 	return fn, nil
-}
-
-func (s *RequestSniffer) validatePattern(pattern string, r *http.Request) (err error) {
-	// http.NewServeMux().HandleFunc panics if the pattern is invalid.
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("invalid pattern path %q: %v", pattern, r)
-		}
-	}()
-
-	mux := http.NewServeMux()
-	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {})
-	_, matched := mux.Handler(r)
-	if matched == "" {
-		return fmt.Errorf("request %s %s does not align with pattern path %q", r.Method, r.URL.Path, pattern)
-	}
-
-	return nil
 }
 
 func getOp(method string, calcItem *openapi.PathItem) *openapi.Operation {

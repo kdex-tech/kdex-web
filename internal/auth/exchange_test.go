@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kdex-tech/dmapper"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -167,7 +167,7 @@ func TestNewExchanger(t *testing.T) {
 		{
 			name: "LoginLocal invalid subject",
 			cfg: func() Config {
-				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{}, "foo", true)
+				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{}, "issuer", "foo", true)
 				return *c
 			}(),
 			sp: scopeProvider,
@@ -182,7 +182,7 @@ func TestNewExchanger(t *testing.T) {
 		{
 			name: "LoginLocal valid subject",
 			cfg: func() Config {
-				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{}, "foo", true)
+				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{}, "issuer", "foo", true)
 				return *c
 			}(),
 			sp: scopeProvider,
@@ -197,13 +197,13 @@ func TestNewExchanger(t *testing.T) {
 			name: "Mapping rules - simple",
 			cfg: func() Config {
 				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{
-					Mappers: []v1alpha1.MappingRule{
+					ClaimMappings: []dmapper.MappingRule{
 						{
-							SourceExpression: "token.address",
+							SourceExpression: "self.address",
 							TargetPropPath:   "address",
 						},
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				return *c
 			}(),
 			sp: scopeProvider,
@@ -228,14 +228,14 @@ func TestNewExchanger(t *testing.T) {
 			name: "Mapping rules - required, but fails",
 			cfg: func() Config {
 				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{
-					Mappers: []v1alpha1.MappingRule{
+					ClaimMappings: []dmapper.MappingRule{
 						{
 							Required:         true,
-							SourceExpression: "token.job",
+							SourceExpression: "self.job",
 							TargetPropPath:   "job",
 						},
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				return *c
 			}(),
 			sp: scopeProvider,
@@ -250,18 +250,18 @@ func TestNewExchanger(t *testing.T) {
 			name: "Mapping rules - required, success",
 			cfg: func() Config {
 				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{
-					Mappers: []v1alpha1.MappingRule{
+					ClaimMappings: []dmapper.MappingRule{
 						{
 							Required:         true,
-							SourceExpression: "token.address.street",
+							SourceExpression: "self.address.street",
 							TargetPropPath:   "street",
 						},
 						{
-							SourceExpression: "token.job",
+							SourceExpression: "self.job",
 							TargetPropPath:   "job",
 						},
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				return *c
 			}(),
 			sp: scopeProvider,
@@ -285,14 +285,14 @@ func TestNewExchanger(t *testing.T) {
 			name: "Mapping rules - deeply nest",
 			cfg: func() Config {
 				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{
-					Mappers: []v1alpha1.MappingRule{
+					ClaimMappings: []dmapper.MappingRule{
 						{
 							Required:         true,
-							SourceExpression: "token.address.street",
+							SourceExpression: "self.address.street",
 							TargetPropPath:   "other.place.street",
 						},
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				return *c
 			}(),
 			sp: scopeProvider,
@@ -382,7 +382,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: "http://bad",
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 
@@ -419,7 +419,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: serverURL,
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 
@@ -455,7 +455,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: serverURL,
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 
@@ -494,7 +494,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 						OIDCProviderURL: serverURL,
 						Scopes:          []string{"job"},
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 
@@ -532,7 +532,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: serverURL,
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 
@@ -578,7 +578,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: serverURL,
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 
@@ -617,7 +617,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: serverURL,
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 
@@ -656,7 +656,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: serverURL,
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 
@@ -698,7 +698,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 						},
 						OIDCProviderURL: serverURL,
 					},
-				}, "foo", true)
+				}, "issuer", "foo", true)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.ClientSecret)
 
@@ -780,15 +780,13 @@ func TokenHandler(cfg Config) http.HandlerFunc {
 			return
 		}
 
-		scheme := r.URL.Scheme
-		if scheme == "" {
-			scheme = "http"
-		}
-		issuer := fmt.Sprintf("%s://%s", scheme, r.Host)
-
 		// 4. Generate the ID Token (using your SignToken function)
 		// We usually include 'aud' (client_id) and 'sub' (user id)
-		idToken, err := SignToken(code, "email@foo.bar", clientID, issuer, nil, cfg.ActivePair, 5*time.Minute)
+		idToken, err := cfg.Signer.Sign(jwt.MapClaims{
+			"sub":   code,
+			"email": "email@foo.bar",
+			"aud":   clientID,
+		})
 		if err != nil {
 			http.Error(w, "failed to sign token", http.StatusInternalServerError)
 			return

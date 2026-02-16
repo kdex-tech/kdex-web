@@ -24,74 +24,31 @@ const (
 	Trace   Method = http.MethodTrace
 )
 
-func Methods() []Method {
-	return []Method{
-		Connect,
-		Delete,
-		Get,
-		Head,
-		Options,
-		Patch,
-		Post,
-		Put,
-		Trace,
-	}
-}
+func DiscoverPattern(patterns []string, r *http.Request) (string, error) {
+	mux := http.NewServeMux()
+	for _, pattern := range patterns {
+		err := func() (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("invalid pattern path %q: %v", pattern, r)
+				}
+			}()
 
-func MethodFromString(method string) Method {
-	switch method {
-	case string(Connect):
-		return Connect
-	case string(Delete):
-		return Delete
-	case string(Get):
-		return Get
-	case string(Head):
-		return Head
-	case string(Options):
-		return Options
-	case string(Patch):
-		return Patch
-	case string(Post):
-		return Post
-	case string(Put):
-		return Put
-	case string(Trace):
-		return Trace
-	default:
-		return Get
-	}
-}
+			mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {})
+			return nil
+		}()
 
-func GetParam(name string, defaultValue string, r *http.Request) string {
-	value := r.PathValue(name)
-
-	if value == "" {
-		value = r.URL.Query().Get(name)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	if value == "" {
-		return defaultValue
-	} else {
-		return value
-	}
-}
-
-func GetParamArray(name string, defaultValue []string, r *http.Request) []string {
-	value := r.PathValue(name)
-	var values []string
-
-	if value == "" {
-		values = r.URL.Query()[name]
-	} else {
-		values = []string{value}
+	_, matched := mux.Handler(r)
+	if matched == "" {
+		return "", fmt.Errorf("request %s %s does not align with any of the pattern paths", r.Method, r.URL.Path)
 	}
 
-	if len(values) == 0 {
-		return defaultValue
-	} else {
-		return values
-	}
+	return matched, nil
 }
 
 func GetLang(r *http.Request, defaultLanguage string, languages []language.Tag) (language.Tag, error) {
@@ -151,4 +108,92 @@ func GetLang(r *http.Request, defaultLanguage string, languages []language.Tag) 
 	}
 
 	return matchedTag, nil
+}
+
+func GetParam(name string, defaultValue string, r *http.Request) string {
+	value := r.PathValue(name)
+
+	if value == "" {
+		value = r.URL.Query().Get(name)
+	}
+
+	if value == "" {
+		return defaultValue
+	} else {
+		return value
+	}
+}
+
+func GetParamArray(name string, defaultValue []string, r *http.Request) []string {
+	value := r.PathValue(name)
+	var values []string
+
+	if value == "" {
+		values = r.URL.Query()[name]
+	} else {
+		values = []string{value}
+	}
+
+	if len(values) == 0 {
+		return defaultValue
+	} else {
+		return values
+	}
+}
+
+func MethodFromString(method string) Method {
+	switch method {
+	case string(Connect):
+		return Connect
+	case string(Delete):
+		return Delete
+	case string(Get):
+		return Get
+	case string(Head):
+		return Head
+	case string(Options):
+		return Options
+	case string(Patch):
+		return Patch
+	case string(Post):
+		return Post
+	case string(Put):
+		return Put
+	case string(Trace):
+		return Trace
+	default:
+		return Get
+	}
+}
+
+func Methods() []Method {
+	return []Method{
+		Connect,
+		Delete,
+		Get,
+		Head,
+		Options,
+		Patch,
+		Post,
+		Put,
+		Trace,
+	}
+}
+
+func ValidatePattern(pattern string, r *http.Request) (err error) {
+	// http.NewServeMux().HandleFunc panics if the pattern is invalid.
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("invalid pattern path %q: %v", pattern, r)
+		}
+	}()
+
+	mux := http.NewServeMux()
+	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {})
+	_, matched := mux.Handler(r)
+	if matched == "" {
+		return fmt.Errorf("request %s %s does not align with pattern path %q", r.Method, r.URL.Path, pattern)
+	}
+
+	return nil
 }

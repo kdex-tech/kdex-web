@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/kdex-tech/entitlements/entitlements"
+	"github.com/kdex-tech/entitlements"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
@@ -34,19 +34,15 @@ func (ac *AuthorizationChecker) CheckAccess(
 		return false, fmt.Errorf("resource and resourceName must not be empty")
 	}
 
-	// Get claims from context
-	claims, hasClaims := GetClaims(ctx)
-	if !hasClaims {
-		claims = &Claims{}
-	}
+	claims, _ := GetClaims(ctx)
 
 	userEntitlements := entitlements.Entitlements{}
 
-	if len(claims.Entitlements) > 0 {
-		userEntitlements["bearer"] = claims.Entitlements
+	if e, ok := claims["entitlements"].([]string); ok && len(e) > 0 {
+		userEntitlements["bearer"] = e
 	}
-	if claims.Scope != "" {
-		scopes := strings.Split(claims.Scope, " ")
+	if s, ok := claims["scope"].(string); ok && s != "" {
+		scopes := strings.Split(s, " ")
 		userEntitlements["oauth2"] = scopes
 		userEntitlements["oidc"] = scopes
 	}

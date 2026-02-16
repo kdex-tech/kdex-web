@@ -7,30 +7,40 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kdex-tech/dmapper"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/web/internal/keys"
+	"kdex.dev/web/internal/sign"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Config struct {
-	ActivePair            *KeyPair
+	ActivePair            *keys.KeyPair
 	AnonymousEntitlements []string
 	BlockKey              string
 	ClientID              string
 	ClientSecret          string
 	CookieName            string
-	KeyPairs              *KeyPairs
-	MappingRules          []CompiledMappingRule
+	KeyPairs              *keys.KeyPairs
 	OIDCProviderURL       string
 	RedirectURL           string
 	Scopes                []string
+	Signer                sign.Signer
 	TokenTTL              time.Duration
 }
 
-func NewConfig(ctx context.Context, c client.Client, auth *kdexv1alpha1.Auth, namespace string, devMode bool) (*Config, error) {
+func NewConfig(
+	ctx context.Context,
+	c client.Client,
+	auth *kdexv1alpha1.Auth,
+	issuer string,
+	namespace string,
+	devMode bool,
+) (*Config, error) {
 	cfg := &Config{}
 
 	if auth != nil {
-		keyPairs, err := LoadOrGenerateKeyPair(
+		keyPairs, err := keys.LoadOrGenerateKeyPair(
 			ctx,
 			c,
 			namespace,
@@ -39,6 +49,9 @@ func NewConfig(ctx context.Context, c client.Client, auth *kdexv1alpha1.Auth, na
 		)
 		if err != nil {
 			return nil, err
+		}
+		if keyPairs == nil || len(*keyPairs) == 0 {
+			return nil, fmt.Errorf("no key pairs found")
 		}
 
 		cfg.AnonymousEntitlements = auth.AnonymousEntitlements
@@ -51,24 +64,32 @@ func NewConfig(ctx context.Context, c client.Client, auth *kdexv1alpha1.Auth, na
 		cfg.KeyPairs = keyPairs
 		cfg.ActivePair = keyPairs.ActiveKey()
 
-		if cfg.ActivePair != nil {
-			ttlString := auth.JWT.TokenTTL
-			if ttlString == "" {
-				ttlString = "1h"
-			}
-			ttl, err := time.ParseDuration(ttlString)
-			if err != nil {
-				return nil, err
-			}
-
-			cfg.TokenTTL = ttl
+		ttlString := "1h"
+		if auth.JWT.TokenTTL != "" {
+			ttlString = auth.JWT.TokenTTL
 		}
-
-		mappers, err := compileMappers(auth.Mappers)
+		ttl, err := time.ParseDuration(ttlString)
 		if err != nil {
 			return nil, err
 		}
-		cfg.MappingRules = mappers
+		cfg.TokenTTL = ttl
+
+		var mapper *dmapper.Mapper
+		if len(auth.ClaimMappings) > 0 {
+			mapper, err = dmapper.NewMapper(auth.ClaimMappings)
+			if err != nil {
+				return nil, err
+			}
+		}
+		signer, err := sign.NewSigner(
+			issuer,
+			ttl,
+			issuer,
+			&cfg.ActivePair.Private,
+			cfg.ActivePair.KeyId,
+			mapper,
+		)
+		cfg.Signer = *signer
 
 		if auth.OIDCProvider != nil && auth.OIDCProvider.OIDCProviderURL != "" {
 			if auth.OIDCProvider.ClientID == "" {

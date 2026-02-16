@@ -5,16 +5,16 @@ import (
 	"encoding/pem"
 	"fmt"
 
-	"kdex.dev/web/internal/auth"
+	"kdex.dev/web/internal/keys"
 )
 
 func main() {
 	// 1. Generate the keypair using your existing function
-	keys := auth.GenerateECDSAKeyPair()
+	keyPairs := keys.GenerateECDSAKeyPair()
 
 	// Since GenerateKeyPair returns a slice/struct (*KeyPairs),
 	// we grab the first active one.
-	activeKeyPair := (*keys)[0]
+	activeKeyPair := (*keyPairs)[0]
 	privateKey := activeKeyPair.Private
 
 	// 2. Convert the ECDSA private key to PKCS#8 DER bytes

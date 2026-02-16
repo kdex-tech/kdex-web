@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"math/big"
 	"net/http"
+
+	"kdex.dev/web/internal/keys"
 )
 
 // JWK represents a JSON Web Key.
@@ -31,7 +33,7 @@ type JWKSet struct {
 
 // JWKSHandler creates an HTTP handler that serves the JWKS endpoint.
 // This endpoint exposes the public key(s) used to verify JWT signatures.
-func JWKSHandler(keyPairs *KeyPairs) http.HandlerFunc {
+func JWKSHandler(keyPairs *keys.KeyPairs) http.HandlerFunc {
 	keys := []JWK{}
 
 	for _, pair := range *keyPairs {
