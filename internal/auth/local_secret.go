@@ -35,3 +35,30 @@ func LoadValueFromSecret(
 	}
 	return string(clientSecret), nil
 }
+
+func LoadMapFromSecret(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+	secretRef *corev1.LocalObjectReference,
+) (map[string]string, error) {
+	if secretRef == nil || secretRef.Name == "" {
+		return nil, nil
+	}
+
+	var secret corev1.Secret
+	err := c.Get(ctx, client.ObjectKey{
+		Name:      secretRef.Name,
+		Namespace: namespace,
+	}, &secret)
+
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]string)
+	for k, v := range secret.Data {
+		result[k] = string(v)
+	}
+	return result, nil
+}

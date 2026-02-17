@@ -104,6 +104,10 @@ func (s *Signer) Sign(signingContext jwt.MapClaims) (string, error) {
 		outboundClaims["scope"] = scope
 	}
 
+	if grantType, ok := signingContext["grant_type"]; ok {
+		outboundClaims["grant_type"] = grantType
+	}
+
 	// profile claims
 	profileClaims := []string{
 		"birthdate",

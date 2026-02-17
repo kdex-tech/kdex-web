@@ -49,6 +49,7 @@ func DiscoveryHandler(issuer string) http.HandlerFunc {
 			"zoneinfo",
 		},
 		GrantTypesSupported: []string{
+			"client_credentials",
 			"password",
 		},
 		IDTokenSigningAlgValuesSupported: []string{"RS256", "ES256"},

@@ -18,6 +18,7 @@ type Config struct {
 	ActivePair            *keys.KeyPair
 	AnonymousEntitlements []string
 	BlockKey              string
+	Clients               map[string]string
 	ClientID              string
 	ClientSecret          string
 	CookieName            string
@@ -92,6 +93,14 @@ func NewConfig(
 		)
 		cfg.Signer = *signer
 
+		if auth.ClientsSecretRef != nil {
+			clients, err := LoadMapFromSecret(ctx, c, namespace, auth.ClientsSecretRef)
+			if err != nil {
+				return nil, err
+			}
+			cfg.Clients = clients
+		}
+
 		if auth.OIDCProvider != nil && auth.OIDCProvider.OIDCProviderURL != "" {
 			if auth.OIDCProvider.ClientID == "" {
 				return nil, fmt.Errorf("there is no client id configured in spec.auth.oidcProvider.clientID")
@@ -139,6 +148,13 @@ func (c *Config) IsAuthEnabled() bool {
 
 func (c *Config) IsOIDCEnabled() bool {
 	if c == nil || c.ActivePair == nil || c.OIDCProviderURL == "" {
+		return false
+	}
+	return true
+}
+
+func (c *Config) IsM2MEnabled() bool {
+	if c == nil || c.ActivePair == nil || len(c.Clients) == 0 {
 		return false
 	}
 	return true

@@ -182,6 +182,81 @@ func (e *Exchanger) GetScopesSupported() ([]string, error) {
 	return claims.ScopesSupported, nil
 }
 
+func (e *Exchanger) IsClientValid(clientID string) bool {
+	if e == nil {
+		return false
+	}
+	// Check OIDC client
+	if e.config.IsOIDCEnabled() && e.config.ClientID == clientID {
+		return true
+	}
+	// Check M2M clients
+	if e.config.IsM2MEnabled() {
+		_, ok := e.config.Clients[clientID]
+		return ok
+	}
+	return false
+}
+
+func (e *Exchanger) LoginClient(ctx context.Context, clientID, clientSecret string, scope string) (string, string, string, error) {
+	if e == nil {
+		return "", "", "", fmt.Errorf("auth not configured")
+	}
+
+	if !e.config.IsM2MEnabled() {
+		return "", "", "", fmt.Errorf("M2M auth not configured")
+	}
+
+	storedSecret, ok := e.config.Clients[clientID]
+	if !ok {
+		return "", "", "", fmt.Errorf("invalid client_id")
+	}
+
+	if storedSecret != clientSecret {
+		return "", "", "", fmt.Errorf("invalid client_secret")
+	}
+
+	signingContext := jwt.MapClaims{
+		"sub":         clientID,
+		"azp":         clientID,
+		"auth_method": string(AuthMethodOAuth2),
+		"grant_type":  "client_credentials",
+	}
+
+	// Determine granted scopes
+	// For M2M, we can implement a policy here. For now, let's allow all requested scopes
+	// that are configured in the system, or just pass them through if we don't have a rigid list.
+	// A better approach for M2M is to have configured scopes per client, but that requires more complex config.
+	// For this iteration, we will grant what is requested.
+	// TODO: Filter scopes based on client configuration if available.
+
+	requestedScopes := strings.Split(scope, " ")
+	grantedScopes := []string{}
+	for _, s := range requestedScopes {
+		if s != "" {
+			grantedScopes = append(grantedScopes, s)
+		}
+	}
+	grantedScopeStr := strings.Join(grantedScopes, " ")
+	if grantedScopeStr != "" {
+		signingContext["scope"] = grantedScopeStr
+	}
+
+	// Determine Audience.
+	// For M2M, the audience is typically the resource server (API).
+	// We'll use the default audience from the signer.
+	// Optionally, if the request contains an 'audience' parameter (not standard but common), we could use it.
+	// For now, rely on Signer's default or if 'aud' claim mechanism in Sign needed updates again.
+	// The Signer.Sign method uses default audience if 'aud' is not in claims.
+
+	accessToken, err := e.config.Signer.Sign(signingContext)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to sign access token: %w", err)
+	}
+
+	return accessToken, "", grantedScopeStr, nil
+}
+
 func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, scope string, clientID string, authMethod AuthMethod) (string, string, string, error) {
 	if e == nil || !e.config.IsAuthEnabled() {
 		return "", "", "", fmt.Errorf("local auth not configured")
