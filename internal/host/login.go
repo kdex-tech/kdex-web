@@ -71,7 +71,9 @@ func (hh *HostHandler) LoginPost(w http.ResponseWriter, r *http.Request) {
 
 	hh.log.V(1).Info("processing local login", "user", username)
 
-	token, _, err := hh.authExchanger.LoginLocal(r.Context(), username, password, "", auth.AuthMethodLocal)
+	// Local login doesn't have a clientID, so we pass empty string
+	// We also don't need the ID Token for cookie-based session
+	token, _, _, err := hh.authExchanger.LoginLocal(r.Context(), username, password, "", "", auth.AuthMethodLocal)
 	if err != nil {
 		// FAILED: 401 Unauthorized / render login page again with error message?
 		// For now simple redirect back to login

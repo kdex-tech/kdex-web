@@ -63,11 +63,19 @@ func (s *Signer) Sign(signingContext jwt.MapClaims) (string, error) {
 		return "", fmt.Errorf("failed to get subject from claims: %w", err)
 	}
 
+	aud, err := signingContext.GetAudience()
+	if err != nil {
+		// If aud is not a string array or string, or not present, we use default
+		aud = []string{s.audience}
+	} else if len(aud) == 0 {
+		aud = []string{s.audience}
+	}
+
 	outboundClaims := jwt.MapClaims{
 		// registered claims
 		"sub": sub,
 		"iss": s.issuer,
-		"aud": s.audience,
+		"aud": aud,
 		"exp": time.Now().Add(s.duration).Unix(),
 		"iat": time.Now().Unix(),
 		"jti": rand.Text(),
@@ -92,8 +100,31 @@ func (s *Signer) Sign(signingContext jwt.MapClaims) (string, error) {
 		outboundClaims["roles"] = roles
 	}
 
-	if scope, hasScope := signingContext["scope"]; hasScope && hasIdp && idp != "local" {
+	if scope, ok := signingContext["scope"]; ok {
 		outboundClaims["scope"] = scope
+	}
+
+	// profile claims
+	profileClaims := []string{
+		"birthdate",
+		"family_name",
+		"gender",
+		"given_name",
+		"locale",
+		"middle_name",
+		"name",
+		"nickname",
+		"picture",
+		"preferred_username",
+		"profile",
+		"updated_at",
+		"website",
+		"zoneinfo",
+	}
+	for _, claim := range profileClaims {
+		if val, ok := signingContext[claim]; ok {
+			outboundClaims[claim] = val
+		}
 	}
 
 	if s.mapper != nil {

@@ -182,14 +182,14 @@ func (e *Exchanger) GetScopesSupported() ([]string, error) {
 	return claims.ScopesSupported, nil
 }
 
-func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, scope string, authMethod AuthMethod) (string, string, error) {
+func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, scope string, clientID string, authMethod AuthMethod) (string, string, string, error) {
 	if e == nil || !e.config.IsAuthEnabled() {
-		return "", "", fmt.Errorf("local auth not configured")
+		return "", "", "", fmt.Errorf("local auth not configured")
 	}
 
 	signingContext, err := e.sp.VerifyLocalIdentity(username, password)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	switch authMethod {
@@ -198,19 +198,24 @@ func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, s
 	case AuthMethodOAuth2:
 		signingContext["auth_method"] = string(AuthMethodOAuth2)
 	default:
-		return "", "", fmt.Errorf("unsupported local login auth method: %s", authMethod)
+		return "", "", "", fmt.Errorf("unsupported local login auth method: %s", authMethod)
 	}
 
 	// Determine granted scopes and filter claims
 	requestedScopes := strings.Split(scope, " ")
 	if scope == "" {
 		// Default scopes for local login if none requested
-		requestedScopes = []string{"email", "profile", "roles", "entitlements"}
+		requestedScopes = []string{"email", "entitlements", "openid", "profile", "roles"}
 	}
 
 	grantedScopes := []string{}
 	hasScope := func(s string) bool {
 		return slices.Contains(requestedScopes, s)
+	}
+
+	// openid scope
+	if hasScope("openid") {
+		grantedScopes = append(grantedScopes, "openid")
 	}
 
 	// email scope
@@ -259,8 +264,32 @@ func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, s
 		signingContext["scope"] = grantedScopeStr
 	}
 
-	token, err := e.config.Signer.Sign(signingContext)
-	return token, grantedScopeStr, err
+	accessToken, err := e.config.Signer.Sign(signingContext)
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to sign access token: %w", err)
+	}
+
+	var idToken string
+	if slices.Contains(grantedScopes, "openid") {
+		// Clone context for ID Token to avoid mutating the original map which might be used elsewhere or if we add more logic later
+		idTokenContext := make(jwt.MapClaims, len(signingContext))
+		for k, v := range signingContext {
+			idTokenContext[k] = v
+		}
+
+		// ID Token Audience must be the Client ID
+		idTokenContext["aud"] = clientID
+
+		// ID Token should not contain scope
+		delete(idTokenContext, "scope")
+
+		idToken, err = e.config.Signer.Sign(idTokenContext)
+		if err != nil {
+			return "", "", "", fmt.Errorf("failed to sign id token: %w", err)
+		}
+	}
+
+	return accessToken, idToken, grantedScopeStr, nil
 }
 
 func (e *Exchanger) verifyIDToken(ctx context.Context, rawIDToken string) (*oidc.IDToken, error) {

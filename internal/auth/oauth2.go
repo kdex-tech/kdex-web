@@ -37,6 +37,7 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 		grantType := r.FormValue("grant_type")
 		scope := r.FormValue("scope")
 		var token string
+		var idToken string
 		var grantedScope string
 		var err error
 
@@ -44,7 +45,7 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 		case "password":
 			username := r.FormValue("username")
 			password := r.FormValue("password")
-			token, grantedScope, err = exchanger.LoginLocal(r.Context(), username, password, scope, AuthMethodOAuth2)
+			token, idToken, grantedScope, err = exchanger.LoginLocal(r.Context(), username, password, scope, clientId, AuthMethodOAuth2)
 		case "authorization_code":
 			// TODO: Implement authorization_code exchange once code storage is added
 			http.Error(w, "grant_type authorization_code not yet supported for local exchange", http.StatusNotImplemented)
@@ -70,7 +71,8 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 
 		resp := TokenResponse{
 			AccessToken: token,
-			ExpiresIn:   int(exchanger.GetTokenTTL()), // Matching default TTL
+			ExpiresIn:   int(exchanger.GetTokenTTL().Seconds()), // Matching default TTL in seconds
+			IDToken:     idToken,
 			Scope:       grantedScope,
 			TokenType:   "Bearer",
 		}
