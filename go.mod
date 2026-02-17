@@ -2,7 +2,7 @@ module github.com/kdex-tech/kdex-host
 
 go 1.25.6
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.128
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.129
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
@@ -32,6 +32,7 @@ require (
 )
 
 require (
+	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/kdex-tech/dmapper v0.1.0
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
 )
@@ -58,7 +59,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.22.4 // indirect

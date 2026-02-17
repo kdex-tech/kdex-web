@@ -22,7 +22,7 @@ type OpenIDConfiguration struct {
 // DiscoveryHandler creates an HTTP handler that serves the OpenID discovery document.
 func DiscoveryHandler(issuer string) http.HandlerFunc {
 	config := OpenIDConfiguration{
-		AuthorizationEndpoint: issuer + "/-/login",
+		AuthorizationEndpoint: issuer + "/-/oauth/authorize",
 		ClaimsSupported: []string{
 			"aud",
 			"birthdate",
@@ -49,13 +49,14 @@ func DiscoveryHandler(issuer string) http.HandlerFunc {
 			"zoneinfo",
 		},
 		GrantTypesSupported: []string{
+			"authorization_code",
 			"client_credentials",
 			"password",
 		},
 		IDTokenSigningAlgValuesSupported: []string{"RS256", "ES256"},
 		Issuer:                           issuer,
 		JwksURI:                          issuer + "/.well-known/jwks.json",
-		ResponseTypesSupported:           []string{"id_token"},
+		ResponseTypesSupported:           []string{"code", "id_token"},
 		ScopesSupported: []string{
 			"email",
 			"entitlements",

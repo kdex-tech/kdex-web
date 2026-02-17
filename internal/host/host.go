@@ -538,6 +538,7 @@ func (hh *HostHandler) messagePrinter(translations *Translations, tag language.T
 func (hh *HostHandler) muxWithDefaultsLocked(registeredPaths map[string]ko.PathInfo) *http.ServeMux {
 	mux := http.NewServeMux()
 
+	hh.authorizeHandler(mux, registeredPaths)
 	hh.discoveryHandler(mux, registeredPaths)
 	hh.faviconHandler(mux, registeredPaths)
 	hh.jwksHandler(mux, registeredPaths)

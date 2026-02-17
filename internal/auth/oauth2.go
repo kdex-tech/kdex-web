@@ -47,9 +47,9 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 			password := r.FormValue("password")
 			token, idToken, grantedScope, err = exchanger.LoginLocal(r.Context(), username, password, scope, clientId, AuthMethodOAuth2)
 		case "authorization_code":
-			// TODO: Implement authorization_code exchange once code storage is added
-			http.Error(w, "grant_type authorization_code not yet supported for local exchange", http.StatusNotImplemented)
-			return
+			code := r.FormValue("code")
+			redirectURI := r.FormValue("redirect_uri")
+			token, idToken, grantedScope, err = exchanger.RedeemAuthorizationCode(r.Context(), code, clientId, redirectURI)
 		case "client_credentials":
 			clientSecret := r.FormValue("client_secret")
 			token, idToken, grantedScope, err = exchanger.LoginClient(r.Context(), clientId, clientSecret, scope)

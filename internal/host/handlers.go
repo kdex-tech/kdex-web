@@ -439,6 +439,48 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 	}, registeredPaths)
 }
 
+func (hh *HostHandler) authorizeHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if !hh.authConfig.IsAuthEnabled() {
+		return
+	}
+
+	const path = "/-/oauth/authorize"
+	// Apply Authentication Middleware
+	handler := hh.authConfig.AddAuthentication(http.HandlerFunc(hh.AuthorizeHandler))
+	mux.Handle("GET "+path, handler)
+
+	hh.registerPath(path, ko.PathInfo{
+		API: ko.OpenAPI{
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "The OAuth2 authorization endpoint",
+					Get: &openapi.Operation{
+						Description: "GET to start authorization flow",
+						OperationID: "authorize-get",
+						Parameters:  ko.ExtractParameters(path, "client_id=foo&response_type=code&redirect_uri=bar", http.Header{}),
+						Responses: openapi.NewResponses(
+							openapi.WithStatus(302, &openapi.ResponseRef{
+								Ref: "#/components/responses/Found",
+							}),
+							openapi.WithStatus(400, &openapi.ResponseRef{
+								Ref: "#/components/responses/BadRequest",
+							}),
+							openapi.WithStatus(500, &openapi.ResponseRef{
+								Ref: "#/components/responses/InternalServerError",
+							}),
+						),
+						Summary: "OAuth2 Authorization",
+						Tags:    []string{"system", "oauth2", "auth"},
+					},
+					Summary: "OAuth2 authorization",
+				},
+			},
+		},
+		Type: ko.SystemPathType,
+	}, registeredPaths)
+}
+
 func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/-/openapi"
 
