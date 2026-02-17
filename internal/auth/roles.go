@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kdex-tech/kdex-host/internal"
 	corev1 "k8s.io/api/core/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

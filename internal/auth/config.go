@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/kdex-tech/dmapper"
+	"github.com/kdex-tech/kdex-host/internal/keys"
+	"github.com/kdex-tech/kdex-host/internal/sign"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/keys"
-	"kdex.dev/web/internal/sign"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

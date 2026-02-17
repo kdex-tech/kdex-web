@@ -22,13 +22,13 @@ import (
 	"maps"
 	"time"
 
+	"github.com/kdex-tech/kdex-host/internal/host"
+	"github.com/kdex-tech/kdex-host/internal/page"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
-	"kdex.dev/web/internal/host"
-	"kdex.dev/web/internal/page"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const UTILITY_PAGE_FINALIZER = "kdex.dev/kdex-host-utility-page-finalizer"
+const UTILITY_PAGE_FINALIZER = "github.com/kdex-tech/kdex-host-utility-page-finalizer"
 
 // KDexInternalUtilityPageReconciler reconciles a KDexInternalUtilityPage object
 type KDexInternalUtilityPageReconciler struct {

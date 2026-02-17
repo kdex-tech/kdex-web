@@ -8,7 +8,7 @@ import (
 	"math/big"
 	"net/http"
 
-	"kdex.dev/web/internal/keys"
+	"github.com/kdex-tech/kdex-host/internal/keys"
 )
 
 // JWK represents a JSON Web Key.

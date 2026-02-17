@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	ko "github.com/kdex-tech/kdex-host/internal/openapi"
+	"github.com/kdex-tech/kdex-host/internal/page"
 	G "github.com/onsi/gomega"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	ko "kdex.dev/web/internal/openapi"
-	"kdex.dev/web/internal/page"
 )
 
 const (

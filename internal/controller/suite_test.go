@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kdex-tech/kdex-host/internal/host"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
@@ -39,7 +40,6 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/configuration"
 	kdexlog "kdex.dev/crds/log"
-	"kdex.dev/web/internal/host"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/config"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"

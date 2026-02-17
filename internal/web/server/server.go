@@ -3,8 +3,8 @@ package server
 import (
 	"net/http"
 
-	"kdex.dev/web/internal/host"
-	"kdex.dev/web/internal/web/middleware"
+	"github.com/kdex-tech/kdex-host/internal/host"
+	"github.com/kdex-tech/kdex-host/internal/web/middleware"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 

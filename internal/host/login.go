@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"net/url"
 
+	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	kdexhttp "kdex.dev/web/internal/http"
 )
 
 func (hh *HostHandler) LoginGet(w http.ResponseWriter, r *http.Request) {

@@ -5,7 +5,7 @@ import (
 	"encoding/pem"
 	"fmt"
 
-	"kdex.dev/web/internal/keys"
+	"github.com/kdex-tech/kdex-host/internal/keys"
 )
 
 func main() {

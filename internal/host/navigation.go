@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kdex-tech/kdex-host/internal/auth"
+	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
+	"github.com/kdex-tech/kdex-host/internal/page"
 	"golang.org/x/text/language"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"kdex.dev/crds/render"
-	"kdex.dev/web/internal/auth"
-	kdexhttp "kdex.dev/web/internal/http"
-	"kdex.dev/web/internal/page"
 )
 
 func (hh *HostHandler) BuildMenuEntries(

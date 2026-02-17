@@ -3,8 +3,8 @@ package utils_test
 import (
 	"testing"
 
+	"github.com/kdex-tech/kdex-host/internal/utils"
 	. "github.com/onsi/gomega"
-	"kdex.dev/web/internal/utils"
 )
 
 func TestDomainsToMatcher(t *testing.T) {

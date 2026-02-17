@@ -3,8 +3,8 @@ package host
 import (
 	"net/http"
 
-	kdexhttp "kdex.dev/web/internal/http"
-	"kdex.dev/web/internal/page"
+	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
+	"github.com/kdex-tech/kdex-host/internal/page"
 )
 
 func (hh *HostHandler) pageHandlerFunc(

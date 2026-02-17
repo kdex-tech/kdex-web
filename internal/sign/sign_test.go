@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/kdex-tech/dmapper"
+	"github.com/kdex-tech/kdex-host/internal/keys"
+	"github.com/kdex-tech/kdex-host/internal/sign"
 	"github.com/stretchr/testify/assert"
-	"kdex.dev/web/internal/keys"
-	"kdex.dev/web/internal/sign"
 )
 
 func TestNewSigner(t *testing.T) {

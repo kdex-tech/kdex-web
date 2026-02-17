@@ -9,9 +9,9 @@ import (
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-logr/logr"
+	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	"github.com/stretchr/testify/assert"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	ko "kdex.dev/web/internal/openapi"
 )
 
 func TestHostHandler_SchemaHandler(t *testing.T) {

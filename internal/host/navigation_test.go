@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/kdex-tech/kdex-host/internal/page"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message/catalog"
@@ -12,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
-	"kdex.dev/web/internal/page"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 

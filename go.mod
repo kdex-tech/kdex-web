@@ -1,4 +1,4 @@
-module kdex.dev/web
+module github.com/kdex-tech/kdex-host
 
 go 1.25.6
 

@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/kdex-tech/kdex-host/internal/auth"
+	"github.com/kdex-tech/kdex-host/internal/host/ico"
+	ko "github.com/kdex-tech/kdex-host/internal/openapi"
+	"github.com/kdex-tech/kdex-host/internal/page"
+	"github.com/kdex-tech/kdex-host/internal/sniffer"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/auth"
-	"kdex.dev/web/internal/host/ico"
-	ko "kdex.dev/web/internal/openapi"
-	"kdex.dev/web/internal/page"
-	"kdex.dev/web/internal/sniffer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

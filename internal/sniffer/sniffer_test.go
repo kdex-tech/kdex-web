@@ -12,11 +12,11 @@ import (
 	"testing"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
+	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	ko "kdex.dev/web/internal/openapi"
 )
 
 func TestRequestSniffer_analyze(t *testing.T) {

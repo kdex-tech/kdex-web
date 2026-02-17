@@ -11,10 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kdex-tech/dmapper"
+	"github.com/kdex-tech/kdex-host/internal/auth"
+	"github.com/kdex-tech/kdex-host/internal/sign"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/web/internal/auth"
-	"kdex.dev/web/internal/sign"
 )
 
 func (hh *HostHandler) reverseProxyHandler(fn *kdexv1alpha1.KDexFunction) http.HandlerFunc {

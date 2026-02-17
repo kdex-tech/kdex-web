@@ -6,9 +6,9 @@ import (
 	"net/http"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
-	"kdex.dev/web/internal/auth"
-	ko "kdex.dev/web/internal/openapi"
-	"kdex.dev/web/internal/utils"
+	"github.com/kdex-tech/kdex-host/internal/auth"
+	ko "github.com/kdex-tech/kdex-host/internal/openapi"
+	"github.com/kdex-tech/kdex-host/internal/utils"
 )
 
 func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, registeredPaths map[string]ko.PathInfo) {

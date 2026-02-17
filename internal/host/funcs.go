@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
+	kh "github.com/kdex-tech/kdex-host/internal/http"
+	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	kh "kdex.dev/web/internal/http"
-	ko "kdex.dev/web/internal/openapi"
 )
 
 func (hh *HostHandler) convertRequirements(in *[]kdexv1alpha1.SecurityRequirement) *openapi.SecurityRequirements {
