@@ -82,6 +82,7 @@ var _ = Describe("KDexInternalTranslation Controller", func() {
 					Spec: kdexv1alpha1.KDexInternalHostSpec{
 						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
 							BrandName:    "KDex Tech",
+							DevMode:      true,
 							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
 							Organization: "KDex Tech Inc.",
 							Routing: kdexv1alpha1.Routing{

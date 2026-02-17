@@ -83,8 +83,17 @@ func (s *Signer) Sign(signingContext jwt.MapClaims) (string, error) {
 		outboundClaims["entitlements"] = entitlements
 	}
 
+	idp, hasIdp := signingContext["idp"]
+	if hasIdp {
+		outboundClaims["idp"] = idp
+	}
+
 	if roles, ok := signingContext["roles"]; ok {
 		outboundClaims["roles"] = roles
+	}
+
+	if scope, hasScope := signingContext["scope"]; hasScope && hasIdp && idp != "local" {
+		outboundClaims["scope"] = scope
 	}
 
 	if s.mapper != nil {

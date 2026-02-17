@@ -626,14 +626,14 @@ func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 func (hh *HostHandler) stateHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/-/state/"
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
-		claims, ok := auth.GetClaims(r.Context())
+		authContext, ok := auth.GetAuthContext(r.Context())
 		if !ok {
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(claims); err != nil {
+		if err := json.NewEncoder(w).Encode(authContext); err != nil {
 			hh.log.Error(err, "failed to encode claims")
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		}
@@ -684,8 +684,7 @@ func (hh *HostHandler) tokenHandler(mux *http.ServeMux, registeredPaths map[stri
 
 	const path = "/-/token"
 	mux.HandleFunc("POST "+path, func(w http.ResponseWriter, r *http.Request) {
-		issuer := hh.serverAddress(r)
-		auth.OAuth2TokenHandler(hh.authExchanger, issuer)(w, r)
+		auth.OAuth2TokenHandler(hh.authExchanger)(w, r)
 	})
 	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{

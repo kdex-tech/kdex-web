@@ -14,6 +14,14 @@ import (
 	"golang.org/x/oauth2"
 )
 
+type AuthMethod string
+
+const (
+	AuthMethodLocal  AuthMethod = "local"
+	AuthMethodOIDC   AuthMethod = "oidc"
+	AuthMethodOAuth2 AuthMethod = "oauth2"
+)
+
 type CompiledMappingRule struct {
 	dmapper.MappingRule
 	Program cel.Program
@@ -101,7 +109,7 @@ func (e *Exchanger) ExchangeCode(ctx context.Context, code string) (string, erro
 	return rawIDToken, nil
 }
 
-func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken string) (string, error) {
+func (e *Exchanger) ExchangeToken(ctx context.Context, rawIDToken string) (string, error) {
 	if e == nil || !e.config.IsOIDCEnabled() {
 		return "", fmt.Errorf("OIDC is not configured")
 	}
@@ -112,12 +120,14 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken
 		return "", fmt.Errorf("failed to verify ID token: %w", err)
 	}
 
-	var oidcClaims jwt.MapClaims
-	if err := idToken.Claims(&oidcClaims); err != nil {
+	var signingContext jwt.MapClaims
+	if err := idToken.Claims(&signingContext); err != nil {
 		return "", fmt.Errorf("failed to parse claims: %w", err)
 	}
 
-	sub, err := oidcClaims.GetSubject()
+	signingContext["idp"] = "oidc"
+
+	sub, err := signingContext.GetSubject()
 	if err != nil {
 		return "", fmt.Errorf("no sub in id_token")
 	}
@@ -127,28 +137,30 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, issuer string, rawIDToken
 		return "", err
 	}
 
-	oidcRoles, _ := oidcClaims["roles"]
-	switch oidcRoles.(type) {
+	oidcRoles, _ := signingContext["roles"]
+	switch v := oidcRoles.(type) {
 	case []string:
-		oidcRoles = append(oidcRoles.([]string), roles...)
+		oidcRoles = append(v, roles...)
 	case string:
-		oidcRoles = append([]string{oidcRoles.(string)}, roles...)
+		oidcRoles = append([]string{v}, roles...)
 	default:
-		oidcClaims["roles"] = roles
+		oidcRoles = roles
 	}
+	signingContext["roles"] = oidcRoles
 
-	oidcEntitlements, _ := oidcClaims["entitlements"]
-	switch oidcEntitlements.(type) {
+	oidcEntitlements, _ := signingContext["entitlements"]
+	switch v := oidcEntitlements.(type) {
 	case []string:
-		oidcEntitlements = append(oidcEntitlements.([]string), entitlements...)
+		oidcEntitlements = append(v, entitlements...)
 	case string:
-		oidcEntitlements = append([]string{oidcEntitlements.(string)}, entitlements...)
+		oidcEntitlements = append([]string{v}, entitlements...)
 	default:
-		oidcClaims["entitlements"] = entitlements
+		oidcEntitlements = entitlements
 	}
+	signingContext["entitlements"] = oidcEntitlements
 
 	// 3. Mint Primary Access Token
-	return e.config.Signer.Sign(oidcClaims)
+	return e.config.Signer.Sign(signingContext)
 }
 
 func (e *Exchanger) GetClientID() string {
@@ -170,7 +182,7 @@ func (e *Exchanger) GetScopesSupported() ([]string, error) {
 	return claims.ScopesSupported, nil
 }
 
-func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, password string, scope string) (string, string, error) {
+func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, scope string, authMethod AuthMethod) (string, string, error) {
 	if e == nil || !e.config.IsAuthEnabled() {
 		return "", "", fmt.Errorf("local auth not configured")
 	}
@@ -180,11 +192,20 @@ func (e *Exchanger) LoginLocal(ctx context.Context, issuer string, username, pas
 		return "", "", err
 	}
 
+	switch authMethod {
+	case AuthMethodLocal:
+		signingContext["auth_method"] = string(AuthMethodLocal)
+	case AuthMethodOAuth2:
+		signingContext["auth_method"] = string(AuthMethodOAuth2)
+	default:
+		return "", "", fmt.Errorf("unsupported local login auth method: %s", authMethod)
+	}
+
 	// Determine granted scopes and filter claims
 	requestedScopes := strings.Split(scope, " ")
 	if scope == "" {
 		// Default scopes for local login if none requested
-		requestedScopes = []string{"email", "roles", "entitlements"}
+		requestedScopes = []string{"email", "profile", "roles", "entitlements"}
 	}
 
 	grantedScopes := []string{}

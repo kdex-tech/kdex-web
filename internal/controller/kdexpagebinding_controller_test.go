@@ -150,6 +150,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					Spec: kdexv1alpha1.KDexInternalHostSpec{
 						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
 							BrandName:    "KDex Tech",
+							DevMode:      true,
 							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
 							Organization: "KDex Tech Inc.",
 							Routing: kdexv1alpha1.Routing{
@@ -237,13 +238,13 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					Spec: kdexv1alpha1.KDexInternalHostSpec{
 						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
 							BrandName:    "KDex Tech",
+							DevMode:      true,
 							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
 							Organization: "KDex Tech Inc.",
 							Routing: kdexv1alpha1.Routing{
 								Domains: []string{
 									"example.com",
 								},
-								Strategy: kdexv1alpha1.IngressRoutingStrategy,
 							},
 						},
 					},
@@ -344,6 +345,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					Spec: kdexv1alpha1.KDexInternalHostSpec{
 						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
 							BrandName:    "KDex Tech",
+							DevMode:      true,
 							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
 							Organization: "KDex Tech Inc.",
 							Routing: kdexv1alpha1.Routing{
@@ -455,6 +457,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					Spec: kdexv1alpha1.KDexInternalHostSpec{
 						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
 							BrandName:    "KDex Tech",
+							DevMode:      true,
 							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
 							Organization: "KDex Tech Inc.",
 							Routing: kdexv1alpha1.Routing{
@@ -593,6 +596,7 @@ var _ = Describe("KDexPageBinding Controller", func() {
 					Spec: kdexv1alpha1.KDexInternalHostSpec{
 						KDexHostSpec: kdexv1alpha1.KDexHostSpec{
 							BrandName:    "KDex Tech",
+							DevMode:      true,
 							ModulePolicy: kdexv1alpha1.LooseModulePolicy,
 							Organization: "KDex Tech Inc.",
 							Routing: kdexv1alpha1.Routing{

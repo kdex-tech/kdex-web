@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/kdex-tech/entitlements"
@@ -34,17 +33,24 @@ func (ac *AuthorizationChecker) CheckAccess(
 		return false, fmt.Errorf("resource and resourceName must not be empty")
 	}
 
-	claims, _ := GetClaims(ctx)
+	authContext, _ := GetAuthContext(ctx)
 
 	userEntitlements := entitlements.Entitlements{}
 
-	if e, ok := claims["entitlements"].([]string); ok && len(e) > 0 {
-		userEntitlements["bearer"] = e
+	contextEntitlements, _ := authContext.GetEntitlements()
+	if len(contextEntitlements) > 0 {
+		userEntitlements["bearer"] = contextEntitlements
 	}
-	if s, ok := claims["scope"].(string); ok && s != "" {
-		scopes := strings.Split(s, " ")
-		userEntitlements["oauth2"] = scopes
-		userEntitlements["oidc"] = scopes
+
+	contextScopes, _ := authContext.GetScopes()
+	if len(contextScopes) > 0 {
+		authMethod, _ := authContext.GetAuthMethod()
+		switch authMethod {
+		case AuthMethodOIDC:
+			userEntitlements["oidc"] = contextScopes
+		case AuthMethodOAuth2:
+			userEntitlements["oauth2"] = contextScopes
+		}
 	}
 
 	requirements := entitlements.Requirements{}
@@ -52,7 +58,7 @@ func (ac *AuthorizationChecker) CheckAccess(
 		requirements = append(requirements, v)
 	}
 
-	ac.log.V(2).Info("CheckAccess", "claim", claims, "entitlements", userEntitlements, "requirements", requirements)
+	ac.log.V(2).Info("CheckAccess", "claim", authContext, "entitlements", userEntitlements, "requirements", requirements)
 
 	return ac.ec.VerifyResourceEntitlements(resource, resourceName, userEntitlements, requirements)
 }

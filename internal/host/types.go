@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/kdex-tech/kdex-host/internal/auth"
@@ -42,6 +41,7 @@ type HostHandler struct {
 
 	analysisCache             *AnalysisCache
 	authConfig                *auth.Config
+	authExchanger             *auth.Exchanger
 	client                    client.Client
 	defaultLanguage           string
 	favicon                   *ico.Ico
@@ -60,23 +60,13 @@ type HostHandler struct {
 	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 
 	authChecker interface {
-		CalculateRequirements(resource string, resourceName string, kdexreqs []kdexv1alpha1.SecurityRequirement) ([]kdexv1alpha1.SecurityRequirement, error)
-		CheckAccess(ctx context.Context, resource string, resourceName string, requirements []kdexv1alpha1.SecurityRequirement) (bool, error)
-	}
-
-	authExchanger interface {
-		AuthCodeURL(state string) string
-		EndSessionURL() (string, error)
-		ExchangeCode(ctx context.Context, code string) (string, error)
-		ExchangeToken(ctx context.Context, issuer string, rawIDToken string) (string, error)
-		GetClientID() string
-		GetTokenTTL() time.Duration
-		LoginLocal(ctx context.Context, issuer string, username, password string, scope string) (string, string, error)
+		CalculateRequirements(string, string, []kdexv1alpha1.SecurityRequirement) ([]kdexv1alpha1.SecurityRequirement, error)
+		CheckAccess(context.Context, string, string, []kdexv1alpha1.SecurityRequirement) (bool, error)
 	}
 
 	sniffer interface {
-		Analyze(r *http.Request) (*sniffer.AnalysisResult, error)
-		DocsHandler(w http.ResponseWriter, r *http.Request)
+		Analyze(*http.Request) (*sniffer.AnalysisResult, error)
+		DocsHandler(http.ResponseWriter, *http.Request)
 	}
 }
 

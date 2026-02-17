@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/kdex-tech/kdex-host/internal/auth"
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
@@ -70,9 +71,7 @@ func (hh *HostHandler) LoginPost(w http.ResponseWriter, r *http.Request) {
 
 	hh.log.V(1).Info("processing local login", "user", username)
 
-	issuer := hh.serverAddress(r)
-
-	token, _, err := hh.authExchanger.LoginLocal(r.Context(), issuer, username, password, "")
+	token, _, err := hh.authExchanger.LoginLocal(r.Context(), username, password, "", auth.AuthMethodLocal)
 	if err != nil {
 		// FAILED: 401 Unauthorized / render login page again with error message?
 		// For now simple redirect back to login

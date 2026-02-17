@@ -22,10 +22,8 @@ func (hh *HostHandler) OAuthGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	issuer := hh.serverAddress(r)
-
 	// Exchange ID Token for Local Token
-	localToken, err := hh.authExchanger.ExchangeToken(r.Context(), issuer, rawIDToken)
+	localToken, err := hh.authExchanger.ExchangeToken(r.Context(), rawIDToken)
 	if err != nil {
 		hh.log.Error(err, "failed to exchange for local token")
 		http.Error(w, "Failed to exchange for local token", http.StatusUnauthorized)

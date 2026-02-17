@@ -120,10 +120,10 @@ func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
 	hh.BuildMenuEntries(r.Context(), rootEntry, &l, l.String() == hh.defaultLanguage, nil)
 	pageMap := *rootEntry.Children
 
-	claims, _ := auth.GetClaims(r.Context())
+	authContext, _ := auth.GetAuthContext(r.Context())
 	extra := map[string]any{}
-	if claims != nil {
-		extra["Identity"] = claims
+	if authContext != nil {
+		extra["Identity"] = authContext
 	}
 
 	renderer := render.Renderer{

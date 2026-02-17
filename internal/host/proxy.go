@@ -67,24 +67,24 @@ func (hh *HostHandler) reverseProxyHandler(fn *kdexv1alpha1.KDexFunction) http.H
 			// This copies the encoded query string (e.g., ?user=123&sort=asc)
 			preq.Out.URL.RawQuery = preq.In.URL.RawQuery
 
-			signingContext, isLoggedIn := auth.GetClaims(preq.In.Context())
+			authContext, isLoggedIn := auth.GetAuthContext(preq.In.Context())
 			if isLoggedIn {
 				cookies := map[string]any{}
 				for _, cookie := range preq.In.Cookies() {
 					cookies[cookie.Name] = cookie.Value
 				}
 				if len(cookies) > 0 {
-					signingContext["cookies"] = cookies
+					authContext["cookies"] = cookies
 				}
 				headers := map[string]any{}
 				for key, value := range preq.In.Header {
 					headers[key] = value
 				}
 				if len(headers) > 0 {
-					signingContext["headers"] = headers
+					authContext["headers"] = headers
 				}
 
-				token, err := signer.Sign(signingContext)
+				token, err := signer.Sign(jwt.MapClaims(authContext))
 				if err != nil {
 					hh.log.Error(err, "failed to sign token")
 				} else {

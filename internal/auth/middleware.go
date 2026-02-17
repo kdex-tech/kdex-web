@@ -1,21 +1,12 @@
 package auth
 
 import (
-	"context"
 	"crypto"
 	"net/http"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-)
-
-// ContextKey is a custom type for context keys to avoid collisions.
-type ContextKey string
-
-const (
-	// ClaimsContextKey is the key used to store the JWT claims in the context.
-	ClaimsContextKey ContextKey = "claims"
 )
 
 // WithAuthentication creates a middleware that validates JWT tokens from the Authorization header.
@@ -52,9 +43,9 @@ func WithAuthentication(publicKey crypto.PublicKey, cookieName string) func(http
 				authSource = "cookie"
 			}
 
-			claims := &jwt.MapClaims{}
+			authContext := AuthContext{}
 
-			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
+			token, err := jwt.ParseWithClaims(tokenString, &authContext, func(token *jwt.Token) (any, error) {
 				return publicKey, nil
 			})
 
@@ -78,15 +69,9 @@ func WithAuthentication(publicKey crypto.PublicKey, cookieName string) func(http
 				return
 			}
 
-			// Inject claims into context
-			ctx := context.WithValue(r.Context(), ClaimsContextKey, claims)
+			// Inject authContext into context
+			ctx := SetAuthContext(r.Context(), authContext)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
-}
-
-// GetClaims retrieves the claims from the context.
-func GetClaims(ctx context.Context) (jwt.MapClaims, bool) {
-	claims, ok := ctx.Value(ClaimsContextKey).(jwt.MapClaims)
-	return claims, ok
 }

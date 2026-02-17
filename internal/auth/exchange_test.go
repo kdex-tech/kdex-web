@@ -145,7 +145,7 @@ func TestNewExchanger(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				_, err := got.ExchangeToken(context.Background(), "issuer", "foo")
+				_, err := got.ExchangeToken(context.Background(), "foo")
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "OIDC is not configured")
 			},
@@ -155,7 +155,7 @@ func TestNewExchanger(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, err := got.LoginLocal(context.Background(), "issuer", "not-allowed", "password", "")
+				token, _, err := got.LoginLocal(context.Background(), "not-allowed", "password", "", "local")
 				assert.Equal(t, "", token)
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "local auth not configured")
@@ -170,7 +170,7 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, err := got.LoginLocal(context.Background(), "issuer", "not-allowed", "password", "")
+				token, _, err := got.LoginLocal(context.Background(), "not-allowed", "password", "", "local")
 				assert.Equal(t, "", token)
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "invalid credentials")
@@ -185,7 +185,7 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, err := got.LoginLocal(context.Background(), "issuer", "joe", "password", "")
+				token, _, err := got.LoginLocal(context.Background(), "joe", "password", "", "local")
 				assert.True(t, len(token) > 100)
 				assert.Nil(t, err)
 			},
@@ -214,7 +214,7 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, err := got.LoginLocal(context.Background(), "issuer", "joe", "password", "")
+				token, _, err := got.LoginLocal(context.Background(), "joe", "password", "", AuthMethodLocal)
 				assert.True(t, len(token) > 100)
 				assert.Nil(t, err)
 
@@ -254,7 +254,7 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				_, _, err := got.LoginLocal(context.Background(), "issuer", "joe", "password", "")
+				_, _, err := got.LoginLocal(context.Background(), "joe", "password", "", AuthMethodLocal)
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "failed to map claims: failed to eval expression")
 			},
@@ -288,7 +288,7 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, err := got.LoginLocal(context.Background(), "issuer", "joe", "password", "")
+				token, _, err := got.LoginLocal(context.Background(), "joe", "password", "", AuthMethodLocal)
 				assert.True(t, len(token) > 100)
 				assert.Nil(t, err)
 
@@ -327,7 +327,7 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, err := got.LoginLocal(context.Background(), "issuer", "joe", "password", "")
+				token, _, err := got.LoginLocal(context.Background(), "joe", "password", "", AuthMethodLocal)
 				assert.True(t, len(token) > 100)
 				assert.Nil(t, err)
 
@@ -808,7 +808,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Nil(t, gotErr)
 				rawIDToken, err := ex.ExchangeCode(ctx, "foo")
 				assert.Nil(t, err)
-				strinToken, err := ex.ExchangeToken(ctx, cfg.OIDCProviderURL, rawIDToken)
+				strinToken, err := ex.ExchangeToken(ctx, rawIDToken)
 				assert.Nil(t, err)
 				claims := jwt.MapClaims{}
 				parser := new(jwt.Parser)

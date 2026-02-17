@@ -1,21 +1,12 @@
 package auth
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 )
 
-// LoginExchanger defines the interface for authenticating users locally.
-type LoginExchanger interface {
-	GetClientID() string
-	GetTokenTTL() time.Duration
-	LoginLocal(ctx context.Context, issuer string, username, password string, scope string) (string, string, error)
-}
-
 // OAuth2TokenHandler creates an HTTP handler for the OAuth2 token endpoint.
-func OAuth2TokenHandler(exchanger LoginExchanger, issuer string) http.HandlerFunc {
+func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -53,7 +44,7 @@ func OAuth2TokenHandler(exchanger LoginExchanger, issuer string) http.HandlerFun
 		case "password":
 			username := r.FormValue("username")
 			password := r.FormValue("password")
-			token, grantedScope, err = exchanger.LoginLocal(r.Context(), issuer, username, password, scope)
+			token, grantedScope, err = exchanger.LoginLocal(r.Context(), username, password, scope, AuthMethodOAuth2)
 		case "authorization_code":
 			// TODO: Implement authorization_code exchange once code storage is added
 			http.Error(w, "grant_type authorization_code not yet supported for local exchange", http.StatusNotImplemented)
