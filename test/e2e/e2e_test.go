@@ -34,10 +34,10 @@ import (
 )
 
 // namespace where the project is deployed in
-const namespace = "kdex-web-system"
+const namespace = "kdex-host-system"
 
 // serviceAccountName created for the project
-const serviceAccountName = "kdex-web-controller-manager"
+const serviceAccountName = "kdex-host-controller-manager"
 
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string

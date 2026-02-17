@@ -7,10 +7,10 @@ const (
 	BACKEND                 = "backend"
 	HOST_INDEX_KEY          = "spec.hostRef.name"
 	OCI_IMAGE               = "oci-image"
-	PAGE_BINDING_FINALIZER  = "kdex.dev/kdex-web-page-binding-finalizer"
+	PAGE_BINDING_FINALIZER  = "kdex.dev/kdex-host-page-binding-finalizer"
 	SHARED_VOLUME           = "shared-volume"
 	SUB_INDEX_KEY           = "spec.subject"
-	TRANSLATION_FINALIZER   = "kdex.dev/kdex-web-translation-finalizer"
+	TRANSLATION_FINALIZER   = "kdex.dev/kdex-host-translation-finalizer"
 	WORKDIR                 = "/shared"
 )
 

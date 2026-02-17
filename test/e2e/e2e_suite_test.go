@@ -42,7 +42,7 @@ var (
 
 	// projectImage is the name of the image which will be build and loaded
 	// with the code source changes to be tested.
-	projectImage = "kdex-tech/kdex-web:test-e2e"
+	projectImage = "kdex-tech/kdex-host:test-e2e"
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
@@ -51,7 +51,7 @@ var (
 // CertManager.
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	_, _ = fmt.Fprintf(GinkgoWriter, "Starting kdex-web integration test suite\n")
+	_, _ = fmt.Fprintf(GinkgoWriter, "Starting kdex-host integration test suite\n")
 	RunSpecs(t, "e2e suite")
 }
 

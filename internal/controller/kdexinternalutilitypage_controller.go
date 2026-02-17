@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-const UTILITY_PAGE_FINALIZER = "kdex.dev/kdex-web-utility-page-finalizer"
+const UTILITY_PAGE_FINALIZER = "kdex.dev/kdex-host-utility-page-finalizer"
 
 // KDexInternalUtilityPageReconciler reconciles a KDexInternalUtilityPage object
 type KDexInternalUtilityPageReconciler struct {

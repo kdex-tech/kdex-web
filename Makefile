@@ -1,5 +1,5 @@
 # Image URL to use all building/pushing image targets
-IMG ?= kdex-tech/kdex-web:latest
+IMG ?= kdex-tech/kdex-host:latest
 
 REPOSITORY ?= 
 # if REPOSITORY is set make sure it ends with a /
@@ -74,7 +74,7 @@ else
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $(TEST_PKGS) -coverprofile cover.out $(TEST_ARGS)
 endif
 
-KIND_CLUSTER ?= kdex-web-test-e2e
+KIND_CLUSTER ?= kdex-host-test-e2e
 
 .PHONY: setup-test-e2e
 setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
@@ -157,7 +157,7 @@ PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-	$(CONTAINER_TOOL) buildx inspect kdex-web-builder >/dev/null 2>&1 || $(CONTAINER_TOOL) buildx create --name kdex-web-builder --use
+	$(CONTAINER_TOOL) buildx inspect kdex-host-builder >/dev/null 2>&1 || $(CONTAINER_TOOL) buildx create --name kdex-host-builder --use
 	$(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${REPOSITORY}${IMG} -f Dockerfile.cross .
 	rm Dockerfile.cross
 

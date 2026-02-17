@@ -1,4 +1,4 @@
-# kdex-web
+# kdex-host
 // TODO: Add simple overview of use/purpose
 
 ## Description
@@ -16,7 +16,7 @@
 **Build and push your image to the location specified by `IMG`:**
 
 ```sh
-make docker-buildx-local PLATFORMS=linux/amd64 REPOSITORY=k3d-registry:5000 IMG=kdex-tech/kdex-web
+make docker-buildx-local PLATFORMS=linux/amd64 REPOSITORY=k3d-registry:5000 IMG=kdex-tech/kdex-host
 ```
 
 **NOTE:** This image ought to be published in the personal registry you specified.
@@ -32,7 +32,7 @@ make install
 **Deploy the Manager to the cluster with the image specified by `IMG`:**
 
 ```sh
-make deploy IMG=<some-registry>/kdex-web:tag
+make deploy IMG=<some-registry>/kdex-host:tag
 ```
 
 > **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
@@ -75,7 +75,7 @@ Following the options to release and provide this solution to the users.
 1. Build the installer for the image built and published in the registry:
 
 ```sh
-make build-installer IMG=<some-registry>/kdex-web:tag
+make build-installer IMG=<some-registry>/kdex-host:tag
 ```
 
 **NOTE:** The makefile target mentioned above generates an 'install.yaml'
@@ -89,7 +89,7 @@ Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
 the project, i.e.:
 
 ```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/kdex-web/<tag or branch>/dist/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/<org>/kdex-host/<tag or branch>/dist/install.yaml
 ```
 
 ### By providing a Helm Chart

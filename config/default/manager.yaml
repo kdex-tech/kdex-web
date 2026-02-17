@@ -3,7 +3,7 @@ kind: Namespace
 metadata:
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: kdex-web
+    app.kubernetes.io/name: kdex-host
     app.kubernetes.io/managed-by: kustomize
   name: system
 ---
@@ -12,14 +12,14 @@ kind: Deployment
 metadata:
   labels:
     app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/name: kdex-web
+    app.kubernetes.io/name: kdex-host
     control-plane: controller-manager
   name: controller-manager
   namespace: system
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: kdex-web
+      app.kubernetes.io/name: kdex-host
       control-plane: controller-manager
   replicas: 1
   template:
@@ -27,7 +27,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
-        app.kubernetes.io/name: kdex-web
+        app.kubernetes.io/name: kdex-host
         control-plane: controller-manager
     spec:
       containers:
@@ -91,7 +91,7 @@ metadata:
   namespace: system
   labels:
     control-plane: controller-manager
-    app.kubernetes.io/name: kdex-web
+    app.kubernetes.io/name: kdex-host
     app.kubernetes.io/managed-by: kustomize
 spec:
   selector:

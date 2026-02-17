@@ -113,7 +113,7 @@ func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
 				fn.Annotations = make(map[string]string)
 				fn.Labels = make(map[string]string)
 
-				fn.Labels["app.kubernetes.io/name"] = "kdex-web"
+				fn.Labels["app.kubernetes.io/name"] = "kdex-host"
 				fn.Labels["kdex.dev/instance"] = s.HostName
 			}
 

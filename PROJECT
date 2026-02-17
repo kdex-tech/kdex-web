@@ -6,7 +6,7 @@ cliVersion: 4.8.0
 domain: kdex.dev
 layout:
 - go.kubebuilder.io/v4
-projectName: kdex-web
+projectName: kdex-host
 repo: kdex.dev/web
 resources:
 - controller: true
