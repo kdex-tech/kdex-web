@@ -221,6 +221,7 @@ func cleanupResources(namespace string) {
 		{&kdexv1alpha1.KDexTranslation{}, &kdexv1alpha1.KDexTranslationList{}},
 		{&kdexv1alpha1.KDexUtilityPage{}, &kdexv1alpha1.KDexUtilityPageList{}},
 		{&corev1.Secret{}, &corev1.SecretList{}},
+		{&corev1.ServiceAccount{}, &corev1.ServiceAccountList{}},
 	} {
 		err := k8sClient.DeleteAllOf(ctx, pair.resource, client.InNamespace(namespace))
 		Expect(err).NotTo(HaveOccurred())

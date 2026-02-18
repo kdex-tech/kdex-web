@@ -819,6 +819,9 @@ func (r *KDexInternalHostReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					},
 				}
 			})).
+		Watches(
+			&corev1.ServiceAccount{},
+			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexInternalHost{}, &kdexv1alpha1.KDexInternalHostList{}, "{.Spec.ServiceAccountRef}")).
 		WithEventFilter(enabledFilter).
 		WithOptions(
 			controller.TypedOptions[reconcile.Request]{

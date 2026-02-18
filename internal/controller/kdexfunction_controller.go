@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -111,7 +112,10 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 	faasAdaptorObj, _, _, err := ResolveKDexObjectReference(ctx, r.Client, &function, &function.Status.Conditions, faasAdaptorRef, r.RequeueDelay)
-	if err != nil {
+	if err != nil || faasAdaptorObj == nil {
+		if faasAdaptorObj == nil {
+			err = errors.Join(err, fmt.Errorf("faasAdaptor %s not found", faasAdaptorRef.Name))
+		}
 		kdexv1alpha1.SetConditions(
 			&function.Status.Conditions,
 			kdexv1alpha1.ConditionStatuses{
