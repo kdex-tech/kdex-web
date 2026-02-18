@@ -54,6 +54,7 @@ func TestNewRoleProvider(t *testing.T) {
 		c                   client.Client
 		focalHost           string
 		controllerNamespace string
+		secrets             kdexv1alpha1.ServiceAccountSecrets
 		assertions          func(t *testing.T, got ScopeProvider, gotErr error)
 	}{
 		{
@@ -104,7 +105,6 @@ func TestNewRoleProvider(t *testing.T) {
 						Namespace: "foo",
 					},
 					Spec: kdexv1alpha1.KDexRoleBindingSpec{
-						Email: "username@email.foo",
 						HostRef: v1.LocalObjectReference{
 							Name: "foo",
 						},
@@ -149,12 +149,8 @@ func TestNewRoleProvider(t *testing.T) {
 						Namespace: "foo",
 					},
 					Spec: kdexv1alpha1.KDexRoleBindingSpec{
-						Email: "username@email.foo",
 						HostRef: v1.LocalObjectReference{
 							Name: "foo",
-						},
-						SecretRef: &v1.LocalObjectReference{
-							Name: "passwords",
 						},
 						Subject: "username",
 						Roles:   []string{"role-1"},
@@ -206,12 +202,8 @@ func TestNewRoleProvider(t *testing.T) {
 						Namespace: "foo",
 					},
 					Spec: kdexv1alpha1.KDexRoleBindingSpec{
-						Email: "username@email.foo",
 						HostRef: v1.LocalObjectReference{
 							Name: "foo",
-						},
-						SecretRef: &v1.LocalObjectReference{
-							Name: "passwords",
 						},
 						Subject: "username",
 						Roles:   []string{"role-1"},
@@ -229,6 +221,22 @@ func TestNewRoleProvider(t *testing.T) {
 			).Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
+			secrets: kdexv1alpha1.ServiceAccountSecrets{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo",
+						Namespace: "foo",
+						Annotations: map[string]string{
+							"kdex.dev/secret-type": "subject",
+						},
+					},
+					Data: map[string][]byte{
+						"subject":  []byte("username"),
+						"password": []byte("passw0rd"),
+						"email":    []byte("username@email.foo"),
+					},
+				},
+			},
 			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
 				assert.Nil(t, gotErr)
 				ident := jwt.MapClaims{}
@@ -264,7 +272,6 @@ func TestNewRoleProvider(t *testing.T) {
 						Namespace: "foo",
 					},
 					Spec: kdexv1alpha1.KDexRoleBindingSpec{
-						Email: "username@email.foo",
 						HostRef: v1.LocalObjectReference{
 							Name: "foo",
 						},
@@ -308,7 +315,6 @@ func TestNewRoleProvider(t *testing.T) {
 						Namespace: "foo",
 					},
 					Spec: kdexv1alpha1.KDexRoleBindingSpec{
-						Email: "username@email.foo",
 						HostRef: v1.LocalObjectReference{
 							Name: "foo",
 						},
@@ -352,12 +358,8 @@ func TestNewRoleProvider(t *testing.T) {
 						Namespace: "foo",
 					},
 					Spec: kdexv1alpha1.KDexRoleBindingSpec{
-						Email: "username@email.foo",
 						HostRef: v1.LocalObjectReference{
 							Name: "foo",
-						},
-						SecretRef: &v1.LocalObjectReference{
-							Name: "passwords",
 						},
 						Subject: "username",
 						Roles:   []string{"role-1"},
@@ -407,29 +409,32 @@ func TestNewRoleProvider(t *testing.T) {
 						Namespace: "foo",
 					},
 					Spec: kdexv1alpha1.KDexRoleBindingSpec{
-						Email: "username@email.foo",
 						HostRef: v1.LocalObjectReference{
 							Name: "foo",
-						},
-						SecretRef: &v1.LocalObjectReference{
-							Name: "passwords",
 						},
 						Subject: "username",
 						Roles:   []string{"role-1"},
 					},
 				},
-				&v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "passwords",
-						Namespace: "foo",
-					},
-					Data: map[string][]byte{
-						"username": []byte("passw0rd"),
-					},
-				},
 			).Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
+			secrets: kdexv1alpha1.ServiceAccountSecrets{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo",
+						Namespace: "foo",
+						Annotations: map[string]string{
+							"kdex.dev/secret-type": "subject",
+						},
+					},
+					Data: map[string][]byte{
+						"subject":  []byte("username"),
+						"password": []byte("passw0rd"),
+						"email":    []byte("username@email.foo"),
+					},
+				},
+			},
 			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
 				assert.Nil(t, gotErr)
 				ident, err := got.VerifyLocalIdentity("username", "passw0rd")
@@ -443,7 +448,7 @@ func TestNewRoleProvider(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := NewRoleProvider(context.Background(), tt.c, tt.focalHost, tt.controllerNamespace)
+			got, gotErr := NewRoleProvider(context.Background(), tt.c, tt.focalHost, tt.controllerNamespace, tt.secrets)
 			tt.assertions(t, got, gotErr)
 		})
 	}

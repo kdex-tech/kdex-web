@@ -48,12 +48,12 @@ func NewConfig(
 	issuer string,
 	namespace string,
 	devMode bool,
-	secrets map[string][]corev1.Secret,
+	secrets kdexv1alpha1.ServiceAccountSecrets,
 ) (*Config, error) {
 	cfg := &Config{}
 
 	if auth != nil {
-		jwtSecrets := secrets["jwt-keys"]
+		jwtSecrets := secrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "jwt-keys" })
 		keyPairs, err := keys.LoadOrGenerateKeyPair(
 			ctx,
 			c,
@@ -106,7 +106,7 @@ func NewConfig(
 		)
 		cfg.Signer = *signer
 
-		authClientSecrets := secrets["auth-client"]
+		authClientSecrets := secrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "auth-client" })
 		if len(authClientSecrets) > 0 {
 			cfg.Clients = make(map[string]AuthClient)
 			for _, secret := range authClientSecrets {
@@ -148,7 +148,7 @@ func NewConfig(
 		}
 
 		if auth.OIDCProvider != nil && auth.OIDCProvider.OIDCProviderURL != "" {
-			oidcSecrets := secrets["oidc-client"]
+			oidcSecrets := secrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "oidc-client" })
 			if len(oidcSecrets) == 0 {
 				return nil, fmt.Errorf("missing secret of type 'oidc-client' required for OIDC provider")
 			}

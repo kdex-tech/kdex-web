@@ -122,7 +122,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	seenPaths := map[string]bool{}
 	themeAssets := []kdexv1alpha1.Asset{}
 
-	internalHost.Spec.ServiceAccountSecrets, err = ResolveServiceAccountSecrets(ctx, r.Client, internalHost.Namespace, internalHost.Spec.ServiceAccountRef.Name)
+	secrets, err := ResolveServiceAccountSecrets(ctx, r.Client, internalHost.Namespace, internalHost.Spec.ServiceAccountRef.Name)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&internalHost.Status.Conditions,
@@ -137,6 +137,8 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 		return ctrl.Result{}, err
 	}
+
+	internalHost.Spec.ServiceAccountSecrets = secrets
 
 	themeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, internalHost.Spec.ThemeRef, r.RequeueDelay)
 	if shouldReturn {
@@ -575,7 +577,8 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	useTLS := false
-	if len(internalHost.Spec.ServiceAccountSecrets["tls"]) > 0 {
+	tlsSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Type == corev1.SecretTypeTLS })
+	if len(tlsSecrets) > 0 {
 		useTLS = true
 	}
 
@@ -608,7 +611,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	rp, err := auth.NewRoleProvider(ctx, r.Client, internalHost.Name, internalHost.Namespace)
+	rp, err := auth.NewRoleProvider(ctx, r.Client, internalHost.Name, internalHost.Namespace, internalHost.Spec.ServiceAccountSecrets)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&internalHost.Status.Conditions,
@@ -1162,10 +1165,11 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 			ingress.Spec.Rules = append(r.getMemoizedIngress().Rules, rules...)
 
 			if internalHost.Spec.Routing.Scheme == "https" {
-				tlsSecret, ok := internalHost.Spec.ServiceAccountSecrets["tls"]
-				if ok && len(tlsSecret) > 0 {
+				tlsSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Type == corev1.SecretTypeTLS })
+				if len(tlsSecrets) > 0 {
 					ingress.Spec.TLS = append(ingress.Spec.TLS, networkingv1.IngressTLS{
-						SecretName: tlsSecret[0].Name,
+						Hosts:      internalHost.Spec.Routing.Domains,
+						SecretName: tlsSecrets[0].Name,
 					})
 				}
 			}
@@ -1295,8 +1299,8 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 				})
 			}
 
-			imagePullSecrets, ok := internalHost.Spec.ServiceAccountSecrets["image-pull"]
-			if ok && len(imagePullSecrets) > 0 {
+			imagePullSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Type == corev1.SecretTypeDockerConfigJson })
+			if len(imagePullSecrets) > 0 {
 				for _, sec := range imagePullSecrets {
 					deployment.Spec.Template.Spec.ImagePullSecrets = append(
 						deployment.Spec.Template.Spec.ImagePullSecrets,

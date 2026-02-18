@@ -15,6 +15,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"kdex.dev/crds/api/v1alpha1"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -362,8 +363,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		name       string
 		authConfig *v1alpha1.Auth
 		sp         ScopeProvider
-		secrets    map[string][]v1.Secret
-		assertions func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret)
+		assertions func(t *testing.T, serverURL string, innerHandler *IH)
 	}{
 		{
 			name: "OIDC - constructor, bad provider url",
@@ -372,22 +372,8 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					OIDCProviderURL: "http://bad",
 				},
 			},
-			secrets: map[string][]v1.Secret{
-				"oidc-client": {
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-							"client_id":     []byte("foo"),
-						},
-					},
-				},
-			},
 			sp: scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
 				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
@@ -402,7 +388,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					"http://bad",
 					"foo",
 					true,
-					secrets,
+					kdexv1alpha1.ServiceAccountSecrets{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+								Annotations: map[string]string{
+									"kdex.dev/secret-type": "oidc-client",
+								},
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -416,21 +416,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - constructor, good provider url",
 			sp:   scopeProvider,
-			secrets: map[string][]v1.Secret{
-				"oidc-client": {
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-							"client_id":     []byte("foo"),
-						},
-					},
-				},
-			},
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
 				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
@@ -445,7 +431,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
-					secrets,
+					kdexv1alpha1.ServiceAccountSecrets{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+								Annotations: map[string]string{
+									"kdex.dev/secret-type": "oidc-client",
+								},
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -458,21 +458,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - AuthCodeURL",
 			sp:   scopeProvider,
-			secrets: map[string][]v1.Secret{
-				"oidc-client": {
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-							"client_id":     []byte("foo"),
-						},
-					},
-				},
-			},
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
 				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
@@ -487,7 +473,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
-					secrets,
+					kdexv1alpha1.ServiceAccountSecrets{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+								Annotations: map[string]string{
+									"kdex.dev/secret-type": "oidc-client",
+								},
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -502,21 +502,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - AuthCodeURL, extra scopes",
 			sp:   scopeProvider,
-			secrets: map[string][]v1.Secret{
-				"oidc-client": {
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-							"client_id":     []byte("foo"),
-						},
-					},
-				},
-			},
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
 				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
@@ -532,7 +518,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
-					secrets,
+					kdexv1alpha1.ServiceAccountSecrets{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+								Annotations: map[string]string{
+									"kdex.dev/secret-type": "oidc-client",
+								},
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -547,32 +547,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - ExchangeCode",
 			sp:   scopeProvider,
-			secrets: map[string][]v1.Secret{
-				"oidc-client": {
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-							"client_id":     []byte("foo"),
-						},
-					},
-				},
-				"test-client": []v1.Secret{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-						},
-					},
-				},
-			},
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
 				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
@@ -587,7 +562,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
-					secrets,
+					kdexv1alpha1.ServiceAccountSecrets{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+								Annotations: map[string]string{
+									"kdex.dev/secret-type": "oidc-client",
+								},
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -610,21 +599,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - ExchangeCode, failed exchange",
 			sp:   scopeProvider,
-			secrets: map[string][]v1.Secret{
-				"oidc-client": {
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-							"client_id":     []byte("foo"),
-						},
-					},
-				},
-			},
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
 				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
@@ -639,7 +614,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
-					secrets,
+					kdexv1alpha1.ServiceAccountSecrets{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+								Annotations: map[string]string{
+									"kdex.dev/secret-type": "oidc-client",
+								},
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -655,21 +644,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - ExchangeCode, id token missing",
 			sp:   scopeProvider,
-			secrets: map[string][]v1.Secret{
-				"oidc-client": {
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-							"client_id":     []byte("foo"),
-						},
-					},
-				},
-			},
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
 				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
@@ -684,7 +659,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
-					secrets,
+					kdexv1alpha1.ServiceAccountSecrets{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+								Annotations: map[string]string{
+									"kdex.dev/secret-type": "oidc-client",
+								},
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -700,21 +689,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - VerifyIDToken",
 			sp:   scopeProvider,
-			secrets: map[string][]v1.Secret{
-				"oidc-client": {
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-							"client_id":     []byte("foo"),
-						},
-					},
-				},
-			},
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
 				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
@@ -729,7 +704,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
-					secrets,
+					kdexv1alpha1.ServiceAccountSecrets{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+								Annotations: map[string]string{
+									"kdex.dev/secret-type": "oidc-client",
+								},
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -748,21 +737,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - ExchangeToken",
 			sp:   scopeProvider,
-			secrets: map[string][]v1.Secret{
-				"oidc-client": []v1.Secret{
-					v1.Secret{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_id":     []byte("foo"),
-							"client_secret": []byte("bar"),
-						},
-					},
-				},
-			},
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
 				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
@@ -777,7 +752,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
-					secrets,
+					kdexv1alpha1.ServiceAccountSecrets{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+								Annotations: map[string]string{
+									"kdex.dev/secret-type": "oidc-client",
+								},
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -811,7 +800,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			ih := &IH{}
 			server := MockRunningServer(ih)
 			defer server.Close()
-			tt.assertions(t, server.URL, ih, tt.secrets)
+			tt.assertions(t, server.URL, ih)
 		})
 	}
 }

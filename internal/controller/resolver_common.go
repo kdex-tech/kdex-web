@@ -309,13 +309,13 @@ func ResolveSecret(
 	return &secret, false, ctrl.Result{}, nil
 }
 
-func ResolveServiceAccountSecrets(ctx context.Context, c client.Client, namespace string, saName string) (map[string][]corev1.Secret, error) {
+func ResolveServiceAccountSecrets(ctx context.Context, c client.Client, namespace string, saName string) ([]corev1.Secret, error) {
 	var sa corev1.ServiceAccount
 	if err := c.Get(ctx, types.NamespacedName{Name: saName, Namespace: namespace}, &sa); err != nil {
 		return nil, fmt.Errorf("failed to get service account %s/%s: %w", namespace, saName, err)
 	}
 
-	secrets := make(map[string][]corev1.Secret)
+	secrets := []corev1.Secret{}
 	for _, secretRef := range sa.Secrets {
 		var secret corev1.Secret
 		// corev1.ObjectReference but in ServiceAccount context usually LocalObjectReference semantics but typed as ObjectReference
@@ -324,10 +324,7 @@ func ResolveServiceAccountSecrets(ctx context.Context, c client.Client, namespac
 			return nil, fmt.Errorf("failed to get secret %s/%s referenced by service account %s: %w", namespace, secretRef.Name, saName, err)
 		}
 
-		typeVal := secret.Annotations["kdex.dev/secret-type"]
-		if typeVal != "" {
-			secrets[typeVal] = append(secrets[typeVal], secret)
-		}
+		secrets = append(secrets, secret)
 	}
 	return secrets, nil
 }

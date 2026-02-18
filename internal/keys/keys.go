@@ -20,10 +20,7 @@ import (
 )
 
 const (
-	// PrivateKeySecretKey is the key in the secret that contains the private key
 	PrivateKeySecretKey = "private-key"
-	// PublicKeySecretKey is the key in the secret that contains the public key
-	PublicKeySecretKey = "public-key"
 )
 
 var (

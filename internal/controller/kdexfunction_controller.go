@@ -340,8 +340,12 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 			ServiceAccount: hc.host.Name,
 		}
 
-		gitSecrets, ok := hc.host.Spec.ServiceAccountSecrets["git"]
-		if !ok || len(gitSecrets) == 0 {
+		gitSecrets := hc.host.Spec.ServiceAccountSecrets.Filter(
+			func(s corev1.Secret) bool {
+				return s.Type == corev1.SecretTypeDockerConfigJson
+			},
+		)
+		if len(gitSecrets) == 0 {
 			err := fmt.Errorf(
 				"git secret not found for host %s/%s",
 				hc.host.Namespace,

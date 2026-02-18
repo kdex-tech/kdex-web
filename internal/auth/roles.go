@@ -25,14 +25,22 @@ type scopeProvider struct {
 	FocalHost           string
 
 	rolesMap map[string][]string
+	secrets  kdexv1alpha1.ServiceAccountSecrets
 }
 
-func NewRoleProvider(ctx context.Context, c client.Client, focalHost string, controllerNamespace string) (*scopeProvider, error) {
+func NewRoleProvider(
+	ctx context.Context,
+	c client.Client,
+	focalHost string,
+	controllerNamespace string,
+	secrets kdexv1alpha1.ServiceAccountSecrets,
+) (*scopeProvider, error) {
 	rc := &scopeProvider{
 		Client:              c,
 		Context:             ctx,
 		ControllerNamespace: controllerNamespace,
 		FocalHost:           focalHost,
+		secrets:             secrets,
 	}
 
 	roles, err := rc.collectRoles()
@@ -48,31 +56,33 @@ func NewRoleProvider(ctx context.Context, c client.Client, focalHost string, con
 func (rp *scopeProvider) ResolveIdentity(subject string, password string, identity jwt.MapClaims) error {
 	// TODO: implement external lookup like LDAP
 
-	bindings, err := rp.resolveBindings(subject)
-	if err != nil {
-		return err
-	}
-	if len(bindings.Items) == 0 {
-		return fmt.Errorf("invalid credentials: no binding")
-	}
-
 	passwordValid := false
-	for _, binding := range bindings.Items {
-		if binding.Spec.SecretRef != nil {
-			var secret corev1.Secret
-			if err := rp.Client.Get(rp.Context, client.ObjectKey{
-				Name:      binding.Spec.SecretRef.Name,
-				Namespace: binding.Namespace,
-			}, &secret); client.IgnoreNotFound(err) != nil {
-				return fmt.Errorf("failed checking secret for binding %s/%s: %w", binding.Namespace, binding.Name, err)
+	secrets := rp.secrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "subject" })
+	for _, secret := range secrets {
+		subjectBytes, ok := secret.Data["subject"]
+		if !ok {
+			continue
+		}
+		passwordBytes, ok := secret.Data["password"]
+		if !ok {
+			continue
+		}
+		if string(subjectBytes) == subject && string(passwordBytes) == password {
+			passwordValid = true
+			email, ok := secret.Data["email"]
+			if ok {
+				identity["email"] = string(email)
 			}
-			passBytes, ok := secret.Data[subject]
-			if ok && string(passBytes) == password {
-				passwordValid = true
-				identity["email"] = binding.Spec.Email
-				identity["sub"] = subject
-				break
+			firstName, ok := secret.Data["first-name"]
+			if ok {
+				identity["first-name"] = string(firstName)
 			}
+			lastName, ok := secret.Data["last-name"]
+			if ok {
+				identity["last-name"] = string(lastName)
+			}
+			identity["sub"] = string(subjectBytes)
+			break
 		}
 	}
 
