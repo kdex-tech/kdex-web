@@ -25,7 +25,7 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 		name           string
 		queryParams    map[string]string
 		cookie         *http.Cookie
-		clients        map[string]string
+		clients        map[string]auth.AuthClient
 		expectedStatus int
 		expectedLoc    string // Substring check for Location header
 	}{
@@ -57,7 +57,13 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 				"response_type": "code",
 				"redirect_uri":  "http://localhost/cb",
 			},
-			clients:        map[string]string{"client-1": "secret"},
+			clients: map[string]auth.AuthClient{
+				"client-1": {
+					ClientID:     "test-client",
+					ClientSecret: "test-secret",
+					RedirectURIs: []string{"http://localhost/cb"},
+				},
+			},
 			expectedStatus: http.StatusSeeOther,
 			expectedLoc:    "/-/login?return=",
 		},
@@ -69,7 +75,13 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 				"redirect_uri":  "http://localhost/cb",
 				"state":         "xyz",
 			},
-			clients: map[string]string{"client-1": "secret"},
+			clients: map[string]auth.AuthClient{
+				"client-1": {
+					ClientID:     "test-client",
+					ClientSecret: "test-secret",
+					RedirectURIs: []string{"http://localhost/cb"},
+				},
+			},
 			cookie: &http.Cookie{
 				Name:  "kdex-auth",
 				Value: "dummy-token", // In a real test we need a valid token signature or mock

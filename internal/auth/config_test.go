@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kdex-tech/dmapper"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"kdex.dev/crds/api/v1alpha1"
@@ -27,6 +29,7 @@ func TestNewConfig(t *testing.T) {
 		auth      *kdexv1alpha1.Auth
 		namespace string
 		devMode   bool
+		secrets   map[string][]v1.Secret
 	}
 
 	tests := []struct {
@@ -93,29 +96,52 @@ func TestNewConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "constructor, devMode enabled, with JWTKeysSecrets, secret not found",
+			name: "OIDC - constructor, no client id",
 			args: testargs{
 				c: fake.NewClientBuilder().WithObjects().Build(),
-				auth: &kdexv1alpha1.Auth{
-					JWT: kdexv1alpha1.JWT{
-						JWTKeysSecrets: []kdexv1alpha1.LocalSecretWithKeyReference{
-							{
-								KeyProperty: "private-key",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
-						},
+				auth: &v1alpha1.Auth{
+					OIDCProvider: &v1alpha1.OIDCProvider{
+						OIDCProviderURL: "http://bad",
 					},
 				},
 				namespace: "foo",
 				devMode:   true,
+				secrets: map[string][]v1.Secret{
+					"oidc-client": {
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+							},
+						},
+					},
+				},
 			},
 			assertions: func(t *testing.T, got *Config, gotErr error) {
 				assert.NotNil(t, gotErr)
-				assert.Contains(t, gotErr.Error(), `secrets "foo" not found`)
+				assert.Contains(t, gotErr.Error(), `OIDC secret does not contain 'client_id' or 'client-id'`)
 			},
 		},
+		{
+			name: "constructor, devMode enabled, with JWTKeysSecrets, secret not found",
+			args: testargs{
+				c: fake.NewClientBuilder().WithObjects().Build(),
+				auth: &kdexv1alpha1.Auth{
+					JWT: kdexv1alpha1.JWT{},
+				},
+				namespace: "foo",
+				devMode:   false,
+				secrets:   nil, // Empty secrets, no dev mode -> error
+			},
+			assertions: func(t *testing.T, got *Config, gotErr error) {
+				assert.NotNil(t, gotErr)
+				assert.Contains(t, gotErr.Error(), "no key pairs found")
+			},
+		},
+
 		{
 			name: "constructor, devMode enabled, with JWTKeysSecrets, secret no matching key",
 			args: testargs{
@@ -129,23 +155,58 @@ func TestNewConfig(t *testing.T) {
 					},
 				}).Build(),
 				auth: &kdexv1alpha1.Auth{
-					JWT: kdexv1alpha1.JWT{
-						JWTKeysSecrets: []kdexv1alpha1.LocalSecretWithKeyReference{
-							{
-								KeyProperty: "private-key",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
+					JWT: kdexv1alpha1.JWT{},
+				},
+				namespace: "foo",
+				devMode:   true,
+				secrets: map[string][]v1.Secret{
+					"jwt-keys": {
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+							},
+							StringData: map[string]string{
+								"foo": "",
 							},
 						},
 					},
 				},
-				namespace: "foo",
-				devMode:   true,
 			},
+
 			assertions: func(t *testing.T, got *Config, gotErr error) {
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), `secret does not contain private-key`)
+			},
+		},
+		{
+			name: "OIDC - constructor, secret defined but missing key",
+			args: testargs{
+				c: fake.NewClientBuilder().WithObjects().Build(),
+				auth: &v1alpha1.Auth{
+					OIDCProvider: &v1alpha1.OIDCProvider{
+						OIDCProviderURL: "http://bad",
+					},
+				},
+				namespace: "foo",
+				devMode:   true,
+				secrets: map[string][]v1.Secret{
+					"oidc-client": {
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+							},
+							StringData: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			assertions: func(t *testing.T, got *Config, gotErr error) {
+				assert.NotNil(t, gotErr)
+				assert.Contains(t, gotErr.Error(), `OIDC secret does not contain 'client_secret' or 'client-secret'`)
 			},
 		},
 		{
@@ -165,20 +226,29 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXufwXet+BRiqMQDn
 					},
 				}).Build(),
 				auth: &kdexv1alpha1.Auth{
-					JWT: kdexv1alpha1.JWT{
-						JWTKeysSecrets: []kdexv1alpha1.LocalSecretWithKeyReference{
-							{
-								KeyProperty: "private-key",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
+					JWT: kdexv1alpha1.JWT{},
+				},
+				namespace: "foo",
+				devMode:   true,
+				secrets: map[string][]v1.Secret{
+					"jwt-keys": {
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+							},
+							Data: map[string][]byte{
+								"private-key": []byte(`-----BEGIN PRIVATE KEY-----
+KID: kdex-dev-1769451504
+
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXufwXet+BRiqMQDn
+7lWcoIgz6AVTAKOOJXlOz8Jf`),
 							},
 						},
 					},
 				},
-				namespace: "foo",
-				devMode:   true,
 			},
+
 			assertions: func(t *testing.T, got *Config, gotErr error) {
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), "failed to decode PEM block containing private key")
@@ -187,35 +257,31 @@ MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXufwXet+BRiqMQDn
 		{
 			name: "constructor, devMode enabled, with JWTKeysSecrets, secret with matching key (ECDSA P-256)",
 			args: testargs{
-				c: fake.NewClientBuilder().WithObjects(&v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "foo",
-					},
-					Data: map[string][]byte{
-						"private-key": []byte(`-----BEGIN PRIVATE KEY-----
+				c: fake.NewClientBuilder().WithObjects().Build(),
+				auth: &kdexv1alpha1.Auth{
+					JWT: kdexv1alpha1.JWT{},
+				},
+				namespace: "foo",
+				devMode:   true,
+				secrets: map[string][]v1.Secret{
+					"jwt-keys": {
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+							},
+							Data: map[string][]byte{
+								"private-key": []byte(`-----BEGIN PRIVATE KEY-----
 KID: kdex-dev-1769451504
 
 MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXufwXet+BRiqMQDn
 7lWcoIgz6AVTAKOOJXlOz8JfxR2hRANCAASq6yLdpv9BkUW8SumvAkl+13QaAFDY
 L51w6mkJ5U6GWpH1eZsXgKm0ZZJKEPsN9wYKe2LXT/WPpa5AwGzo7BLm
 -----END PRIVATE KEY-----`),
-					},
-				}).Build(),
-				auth: &kdexv1alpha1.Auth{
-					JWT: kdexv1alpha1.JWT{
-						JWTKeysSecrets: []kdexv1alpha1.LocalSecretWithKeyReference{
-							{
-								KeyProperty: "private-key",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
 							},
 						},
 					},
 				},
-				namespace: "foo",
-				devMode:   true,
 			},
 			assertions: func(t *testing.T, got *Config, gotErr error) {
 				assert.Nil(t, gotErr)
@@ -226,13 +292,21 @@ L51w6mkJ5U6GWpH1eZsXgKm0ZZJKEPsN9wYKe2LXT/WPpa5AwGzo7BLm
 		{
 			name: "constructor, devMode enabled, with JWTKeysSecrets, secret with matching key (RSA)",
 			args: testargs{
-				c: fake.NewClientBuilder().WithObjects(&v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "foo",
-						Namespace: "foo",
-					},
-					Data: map[string][]byte{
-						"private-key": []byte(`-----BEGIN RSA PRIVATE KEY-----
+				c: fake.NewClientBuilder().WithObjects().Build(),
+				auth: &kdexv1alpha1.Auth{
+					JWT: kdexv1alpha1.JWT{},
+				},
+				namespace: "foo",
+				devMode:   true,
+				secrets: map[string][]v1.Secret{
+					"jwt-keys": {
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+							},
+							Data: map[string][]byte{
+								"private-key": []byte(`-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAodh9j2EDujZ699rsSiqqv9oCItPSacdVlvDW7bwrkL3MzG3v
 P2RUoU8FCg8JKiuqEq416a/DjWKcFaNg2semYoJXLTlwn+4X3zTIYoHCdQFRQ6MH
 iUxy++Ty/zRGSVArZ0WH1tP8L828BYPqa9ljXSKS4ykn0L5kCBe1p/QB8/T8B/y1
@@ -259,22 +333,10 @@ avshAoGBAMtIw1LXeHrm4x7ngdRPEsyRQ2yKfvbHtgpIWtl9rcEQPoFC+slOlvoA
 xY164RiE6GkAlFI0HwC6Xidg9xRgxNzAC70PjxKS9r2SVOZlsSpN3QE88CBZx62F
 ZMtAm8mrV+h0ef/lr6zdJffz/EmM5MZrRAu2/dcK6S6qSEkwCTZ4
 -----END RSA PRIVATE KEY-----`),
-					},
-				}).Build(),
-				auth: &kdexv1alpha1.Auth{
-					JWT: kdexv1alpha1.JWT{
-						JWTKeysSecrets: []kdexv1alpha1.LocalSecretWithKeyReference{
-							{
-								KeyProperty: "private-key",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
 							},
 						},
 					},
 				},
-				namespace: "foo",
-				devMode:   true,
 			},
 			assertions: func(t *testing.T, got *Config, gotErr error) {
 				assert.Nil(t, gotErr)
@@ -283,16 +345,24 @@ ZMtAm8mrV+h0ef/lr6zdJffz/EmM5MZrRAu2/dcK6S6qSEkwCTZ4
 			},
 		},
 		{
-			name: "constructor, with JWTKeysSecrets, multiple keys, none selected as active",
+			name: "constructor, with JWTKeysSecrets, multiple keys, none selected as active, newest selected",
 			args: testargs{
-				c: fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"private-key": []byte(`-----BEGIN RSA PRIVATE KEY-----
+				c: fake.NewClientBuilder().WithObjects().Build(),
+				auth: &kdexv1alpha1.Auth{
+					JWT: kdexv1alpha1.JWT{},
+				},
+				namespace: "foo",
+				devMode:   true,
+				secrets: map[string][]v1.Secret{
+					"jwt-keys": {
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:              "foo",
+								Namespace:         "foo",
+								CreationTimestamp: metav1.NewTime(time.Now().Add(-24 * time.Hour)),
+							},
+							Data: map[string][]byte{
+								"private-key": []byte(`-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAodh9j2EDujZ699rsSiqqv9oCItPSacdVlvDW7bwrkL3MzG3v
 P2RUoU8FCg8JKiuqEq416a/DjWKcFaNg2semYoJXLTlwn+4X3zTIYoHCdQFRQ6MH
 iUxy++Ty/zRGSVArZ0WH1tP8L828BYPqa9ljXSKS4ykn0L5kCBe1p/QB8/T8B/y1
@@ -319,61 +389,51 @@ avshAoGBAMtIw1LXeHrm4x7ngdRPEsyRQ2yKfvbHtgpIWtl9rcEQPoFC+slOlvoA
 xY164RiE6GkAlFI0HwC6Xidg9xRgxNzAC70PjxKS9r2SVOZlsSpN3QE88CBZx62F
 ZMtAm8mrV+h0ef/lr6zdJffz/EmM5MZrRAu2/dcK6S6qSEkwCTZ4
 -----END RSA PRIVATE KEY-----`),
+							},
 						},
-					},
-					&v1.Secret{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "bar",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"private-key": []byte(`-----BEGIN PRIVATE KEY-----
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:              "bar",
+								Namespace:         "foo",
+								CreationTimestamp: metav1.NewTime(time.Now().Add(-48 * time.Hour)),
+							},
+							Data: map[string][]byte{
+								"private-key": []byte(`-----BEGIN PRIVATE KEY-----
 KID: kdex-dev-1769451504
 
 MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXufwXet+BRiqMQDn
 7lWcoIgz6AVTAKOOJXlOz8JfxR2hRANCAASq6yLdpv9BkUW8SumvAkl+13QaAFDY
 L51w6mkJ5U6GWpH1eZsXgKm0ZZJKEPsN9wYKe2LXT/WPpa5AwGzo7BLm
 -----END PRIVATE KEY-----`),
-						},
-					},
-				).Build(),
-				auth: &kdexv1alpha1.Auth{
-					JWT: kdexv1alpha1.JWT{
-						JWTKeysSecrets: []kdexv1alpha1.LocalSecretWithKeyReference{
-							{
-								KeyProperty: "private-key",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
-							{
-								KeyProperty: "private-key",
-								SecretRef: v1.LocalObjectReference{
-									Name: "bar",
-								},
 							},
 						},
 					},
 				},
-				namespace: "foo",
-				devMode:   true,
 			},
 			assertions: func(t *testing.T, got *Config, gotErr error) {
-				assert.NotNil(t, gotErr)
-				assert.Contains(t, gotErr.Error(), "multiple keys exist but none are specified as the active key")
+				assert.Nil(t, gotErr)
+				assert.NotNil(t, got.ActivePair)
+				assert.Equal(t, "foo", got.ActivePair.KeyId)
 			},
 		},
 		{
 			name: "constructor, with JWTKeysSecrets, multiple keys, one selected as active",
 			args: testargs{
-				c: fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"private-key": []byte(`-----BEGIN RSA PRIVATE KEY-----
+				c: fake.NewClientBuilder().WithObjects().Build(),
+				auth: &kdexv1alpha1.Auth{
+					JWT: kdexv1alpha1.JWT{},
+				},
+				namespace: "foo",
+				devMode:   true,
+				secrets: map[string][]v1.Secret{
+					"jwt-keys": {
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+							},
+							Data: map[string][]byte{
+								"private-key": []byte(`-----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAodh9j2EDujZ699rsSiqqv9oCItPSacdVlvDW7bwrkL3MzG3v
 P2RUoU8FCg8JKiuqEq416a/DjWKcFaNg2semYoJXLTlwn+4X3zTIYoHCdQFRQ6MH
 iUxy++Ty/zRGSVArZ0WH1tP8L828BYPqa9ljXSKS4ykn0L5kCBe1p/QB8/T8B/y1
@@ -400,45 +460,25 @@ avshAoGBAMtIw1LXeHrm4x7ngdRPEsyRQ2yKfvbHtgpIWtl9rcEQPoFC+slOlvoA
 xY164RiE6GkAlFI0HwC6Xidg9xRgxNzAC70PjxKS9r2SVOZlsSpN3QE88CBZx62F
 ZMtAm8mrV+h0ef/lr6zdJffz/EmM5MZrRAu2/dcK6S6qSEkwCTZ4
 -----END RSA PRIVATE KEY-----`),
+							},
 						},
-					},
-					&v1.Secret{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "bar",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"private-key": []byte(`-----BEGIN PRIVATE KEY-----
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "bar",
+								Namespace: "foo",
+							},
+							Data: map[string][]byte{
+								"private-key": []byte(`-----BEGIN PRIVATE KEY-----
 KID: kdex-dev-1769451504
 
 MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgXufwXet+BRiqMQDn
 7lWcoIgz6AVTAKOOJXlOz8JfxR2hRANCAASq6yLdpv9BkUW8SumvAkl+13QaAFDY
 L51w6mkJ5U6GWpH1eZsXgKm0ZZJKEPsN9wYKe2LXT/WPpa5AwGzo7BLm
 -----END PRIVATE KEY-----`),
-						},
-					},
-				).Build(),
-				auth: &kdexv1alpha1.Auth{
-					JWT: kdexv1alpha1.JWT{
-						ActiveKey: "kdex-dev-1769451504",
-						JWTKeysSecrets: []kdexv1alpha1.LocalSecretWithKeyReference{
-							{
-								KeyProperty: "private-key",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
-							{
-								KeyProperty: "private-key",
-								SecretRef: v1.LocalObjectReference{
-									Name: "bar",
-								},
 							},
 						},
 					},
 				},
-				namespace: "foo",
-				devMode:   true,
 			},
 			assertions: func(t *testing.T, got *Config, gotErr error) {
 				assert.Nil(t, gotErr)
@@ -446,10 +486,41 @@ L51w6mkJ5U6GWpH1eZsXgKm0ZZJKEPsN9wYKe2LXT/WPpa5AwGzo7BLm
 				assert.Equal(t, 2, len(*got.KeyPairs))
 			},
 		},
+		{
+			name: "OIDC - constructor, secret defined, valid key",
+			args: testargs{
+				c: fake.NewClientBuilder().WithObjects().Build(),
+				auth: &v1alpha1.Auth{
+					OIDCProvider: &v1alpha1.OIDCProvider{
+						OIDCProviderURL: "http://bad",
+					},
+				},
+				namespace: "foo",
+				devMode:   true,
+				secrets: map[string][]v1.Secret{
+					"oidc-client": {
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "foo",
+								Namespace: "foo",
+							},
+							Data: map[string][]byte{
+								"client_secret": []byte("bar"),
+								"client_id":     []byte("foo"),
+							},
+						},
+					},
+				},
+			},
+			assertions: func(t *testing.T, got *Config, gotErr error) {
+				assert.Nil(t, gotErr)
+				assert.Equal(t, "bar", got.OIDC.ClientSecret)
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := NewConfig(context.Background(), tt.args.c, tt.args.auth, "audience", "issuer", tt.args.namespace, tt.args.devMode)
+			got, gotErr := NewConfig(context.Background(), tt.args.c, tt.args.auth, "audience", "issuer", tt.args.namespace, tt.args.devMode, tt.args.secrets)
 			tt.assertions(t, got, gotErr)
 		})
 	}
@@ -463,6 +534,7 @@ func TestConfig_AddAuthentication(t *testing.T) {
 		auth      *kdexv1alpha1.Auth
 		namespace string
 		devMode   bool
+		secrets   map[string][]v1.Secret
 	}
 
 	tests := []struct {
@@ -637,7 +709,7 @@ func TestConfig_AddAuthentication(t *testing.T) {
 					"sub":   "foo",
 					"email": "foo@foo.bar",
 					"iss":   "issuer",
-					"aud":   got.ClientID,
+					"aud":   got.OIDC.ClientID,
 				})
 
 				assert.Nil(t, err)
@@ -676,7 +748,7 @@ func TestConfig_AddAuthentication(t *testing.T) {
 					"sub":   "foo",
 					"email": "foo@foo.bar",
 					"iss":   "issuer",
-					"aud":   got.ClientID,
+					"aud":   got.OIDC.ClientID,
 				})
 
 				assert.Nil(t, err)
@@ -698,6 +770,7 @@ func TestConfig_AddAuthentication(t *testing.T) {
 				"issuer",
 				tt.args.namespace,
 				tt.args.devMode,
+				tt.args.secrets,
 			)
 			tt.assertions(t, got, gotErr)
 		})
@@ -736,12 +809,19 @@ func TestConfig_OIDC(t *testing.T) {
 		name       string
 		cfg        func(string) (Config, error)
 		sp         ScopeProvider
-		assertions func(t *testing.T, serverURL string)
+		secrets    map[string][]corev1.Secret
+		assertions func(t *testing.T, serverURL string, secrets map[string][]corev1.Secret)
 	}{
 		{
 			name: "OIDC - constructor, no client id",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string) {
+			secrets: map[string][]corev1.Secret{
+				"oidc-client": {{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo"},
+					Data:       map[string][]byte{"client_secret": []byte("bar")},
+				}},
+			},
+			assertions: func(t *testing.T, serverURL string, secrets map[string][]corev1.Secret) {
 				client := fake.NewClientBuilder().WithObjects().Build()
 				_, gotErr := NewConfig(
 					context.Background(),
@@ -755,22 +835,22 @@ func TestConfig_OIDC(t *testing.T) {
 					"issuer",
 					"foo",
 					true,
+					secrets,
 				)
 				assert.NotNil(t, gotErr)
-				assert.Contains(t, gotErr.Error(), "there is no client id configured in")
+				assert.Contains(t, gotErr.Error(), "OIDC secret does not contain 'client_id' or 'client-id'")
 			},
 		},
 		{
 			name: "OIDC - constructor, no secret defined",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string) {
+			assertions: func(t *testing.T, serverURL string, secrets map[string][]corev1.Secret) {
 				client := fake.NewClientBuilder().WithObjects().Build()
 				_, gotErr := NewConfig(
 					context.Background(),
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID:        "foo",
 							OIDCProviderURL: "http://bad",
 						},
 					},
@@ -778,67 +858,28 @@ func TestConfig_OIDC(t *testing.T) {
 					"issuer",
 					"foo",
 					true,
+					secrets,
 				)
 				assert.NotNil(t, gotErr)
-				assert.Contains(t, gotErr.Error(), "there is no Secret containing the OIDC client_secret configured")
-			},
-		},
-		{
-			name: "OIDC - constructor, secret defined but missing",
-			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string) {
-				client := fake.NewClientBuilder().WithObjects().Build()
-				_, gotErr := NewConfig(
-					context.Background(),
-					client,
-					&v1alpha1.Auth{
-						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
-							OIDCProviderURL: "http://bad",
-						},
-					},
-					"audience",
-					"issuer",
-					"foo",
-					true,
-				)
-				assert.NotNil(t, gotErr)
-				assert.Contains(t, gotErr.Error(), `secrets "foo" not found`)
+				assert.Contains(t, gotErr.Error(), `missing secret of type 'oidc-client' required for OIDC provider`)
 			},
 		},
 		{
 			name: "OIDC - constructor, secret defined but missing key",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string) {
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						StringData: map[string]string{
-							"foo": "bar",
-						},
-					},
-				).Build()
+			secrets: map[string][]corev1.Secret{
+				"oidc-client": {{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo"},
+					StringData: map[string]string{"foo": "bar"},
+				}},
+			},
+			assertions: func(t *testing.T, serverURL string, secrets map[string][]corev1.Secret) {
+				client := fake.NewClientBuilder().WithObjects().Build()
 				_, gotErr := NewConfig(
 					context.Background(),
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: "http://bad",
 						},
 					},
@@ -846,38 +887,28 @@ func TestConfig_OIDC(t *testing.T) {
 					"issuer",
 					"foo",
 					true,
+					secrets,
 				)
 				assert.NotNil(t, gotErr)
-				assert.Contains(t, gotErr.Error(), `secret foo/foo does not contain the key`)
+				assert.Contains(t, gotErr.Error(), "OIDC secret does not contain 'client_secret' or 'client-secret'")
 			},
 		},
 		{
 			name: "OIDC - constructor, secret defined, valid key",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string) {
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "foo",
-							Namespace: "foo",
-						},
-						Data: map[string][]byte{
-							"client_secret": []byte("bar"),
-						},
-					},
-				).Build()
+			secrets: map[string][]corev1.Secret{
+				"oidc-client": {{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo"},
+					Data:       map[string][]byte{"client_secret": []byte("bar"), "client_id": []byte("foo")},
+				}},
+			},
+			assertions: func(t *testing.T, serverURL string, secrets map[string][]corev1.Secret) {
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					context.Background(),
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: "http://bad",
 						},
 					},
@@ -885,15 +916,51 @@ func TestConfig_OIDC(t *testing.T) {
 					"issuer",
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
+			},
+		},
+		{
+			name: "OIDC - constructor, client-auth secrets",
+			sp:   scopeProvider,
+			secrets: map[string][]corev1.Secret{
+				"oidc-client": {{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo"},
+					Data:       map[string][]byte{"client_secret": []byte("bar"), "client_id": []byte("foo")},
+				}},
+				"auth-client": {{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo"},
+					Data:       map[string][]byte{"client_secret": []byte("bar"), "client_id": []byte("foo"), "redirect_uris": []byte("http://ok")},
+				}},
+			},
+			assertions: func(t *testing.T, serverURL string, secrets map[string][]corev1.Secret) {
+				client := fake.NewClientBuilder().WithObjects().Build()
+				cfg, gotErr := NewConfig(
+					context.Background(),
+					client,
+					&v1alpha1.Auth{
+						OIDCProvider: &v1alpha1.OIDCProvider{
+							OIDCProviderURL: "http://bad",
+						},
+					},
+					"audience",
+					"issuer",
+					"foo",
+					true,
+					secrets,
+				)
+				assert.Nil(t, gotErr)
+				authClient := cfg.Clients["foo"]
+				assert.Equal(t, "bar", authClient.ClientSecret)
+				assert.True(t, slices.Contains(authClient.RedirectURIs, "http://ok"), "redirect url not found in list: %v", authClient.RedirectURIs)
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.assertions(t, "http://foo")
+			tt.assertions(t, "http://foo", tt.secrets)
 		})
 	}
 }

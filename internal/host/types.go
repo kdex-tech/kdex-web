@@ -54,6 +54,7 @@ type HostHandler struct {
 	packageReferences         []kdexv1alpha1.PackageReference
 	pathsCollectedInReconcile map[string]ko.PathInfo
 	registeredPaths           map[string]ko.PathInfo
+	scheme                    string
 	scripts                   []kdexv1alpha1.ScriptDef
 	themeAssets               []kdexv1alpha1.Asset
 	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec

@@ -122,6 +122,22 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	seenPaths := map[string]bool{}
 	themeAssets := []kdexv1alpha1.Asset{}
 
+	internalHost.Spec.ServiceAccountSecrets, err = ResolveServiceAccountSecrets(ctx, r.Client, internalHost.Namespace, internalHost.Spec.ServiceAccountRef.Name)
+	if err != nil {
+		kdexv1alpha1.SetConditions(
+			&internalHost.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			err.Error(),
+		)
+
+		return ctrl.Result{}, err
+	}
+
 	themeObj, shouldReturn, r1, err := ResolveKDexObjectReference(ctx, r.Client, &internalHost, &internalHost.Status.Conditions, internalHost.Spec.ThemeRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
@@ -257,7 +273,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					Progressing: metav1.ConditionFalse,
 					Ready:       metav1.ConditionFalse,
 				},
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
 
@@ -279,7 +295,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 						Progressing: metav1.ConditionFalse,
 						Ready:       metav1.ConditionFalse,
 					},
-					kdexv1alpha1.ConditionReasonReconcileSuccess,
+					kdexv1alpha1.ConditionReasonReconcileError,
 					err.Error(),
 				)
 
@@ -350,7 +366,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					Progressing: metav1.ConditionFalse,
 					Ready:       metav1.ConditionFalse,
 				},
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
 
@@ -391,7 +407,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 						Progressing: metav1.ConditionFalse,
 						Ready:       metav1.ConditionFalse,
 					},
-					kdexv1alpha1.ConditionReasonReconcileSuccess,
+					kdexv1alpha1.ConditionReasonReconcileError,
 					err.Error(),
 				)
 
@@ -421,7 +437,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					Progressing: metav1.ConditionFalse,
 					Ready:       metav1.ConditionFalse,
 				},
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
 
@@ -479,7 +495,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					Progressing: metav1.ConditionFalse,
 					Ready:       metav1.ConditionFalse,
 				},
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
 			return ctrl.Result{}, err
@@ -493,7 +509,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					Progressing: metav1.ConditionFalse,
 					Ready:       metav1.ConditionFalse,
 				},
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
 			return ctrl.Result{}, err
@@ -517,7 +533,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					Progressing: metav1.ConditionFalse,
 					Ready:       metav1.ConditionFalse,
 				},
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
 			return ctrl.Result{}, err
@@ -532,7 +548,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 					Progressing: metav1.ConditionFalse,
 					Ready:       metav1.ConditionFalse,
 				},
-				kdexv1alpha1.ConditionReasonReconcileSuccess,
+				kdexv1alpha1.ConditionReasonReconcileError,
 				err.Error(),
 			)
 			return ctrl.Result{}, err
@@ -558,8 +574,13 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
+	useTLS := false
+	if len(internalHost.Spec.ServiceAccountSecrets["tls"]) > 0 {
+		useTLS = true
+	}
+
 	issuer := fmt.Sprintf("http://%s", internalHost.Spec.Routing.Domains[0])
-	if internalHost.Spec.Routing.TLS != nil && internalHost.Spec.Routing.TLS.SecretRef.Name != "" {
+	if useTLS {
 		issuer = fmt.Sprintf("https://%s", internalHost.Spec.Routing.Domains[0])
 	}
 
@@ -571,6 +592,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		issuer,
 		internalHost.Namespace,
 		internalHost.Spec.DevMode,
+		internalHost.Spec.ServiceAccountSecrets,
 	)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
@@ -580,7 +602,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				Progressing: metav1.ConditionFalse,
 				Ready:       metav1.ConditionFalse,
 			},
-			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			kdexv1alpha1.ConditionReasonReconcileError,
 			err.Error(),
 		)
 		return ctrl.Result{}, err
@@ -595,7 +617,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				Progressing: metav1.ConditionFalse,
 				Ready:       metav1.ConditionFalse,
 			},
-			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			kdexv1alpha1.ConditionReasonReconcileError,
 			err.Error(),
 		)
 		return ctrl.Result{}, err
@@ -610,10 +632,15 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				Progressing: metav1.ConditionFalse,
 				Ready:       metav1.ConditionFalse,
 			},
-			kdexv1alpha1.ConditionReasonReconcileSuccess,
+			kdexv1alpha1.ConditionReasonReconcileError,
 			err.Error(),
 		)
 		return ctrl.Result{}, err
+	}
+
+	scheme := "http"
+	if useTLS {
+		scheme = "https"
 	}
 
 	r.HostHandler.SetHost(
@@ -627,6 +654,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		functions.Items,
 		authExchanger,
 		authConfig,
+		scheme,
 	)
 
 	kdexv1alpha1.SetConditions(
@@ -1130,10 +1158,13 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 
 			ingress.Spec.Rules = append(r.getMemoizedIngress().Rules, rules...)
 
-			if internalHost.Spec.Routing.TLS != nil {
-				ingress.Spec.TLS = append(ingress.Spec.TLS, networkingv1.IngressTLS{
-					SecretName: internalHost.Spec.Routing.TLS.SecretRef.Name,
-				})
+			if internalHost.Spec.Routing.Scheme == "https" {
+				tlsSecret, ok := internalHost.Spec.ServiceAccountSecrets["tls"]
+				if ok && len(tlsSecret) > 0 {
+					ingress.Spec.TLS = append(ingress.Spec.TLS, networkingv1.IngressTLS{
+						SecretName: tlsSecret[0].Name,
+					})
+				}
 			}
 
 			return ctrl.SetControllerReference(internalHost, ingress, r.Scheme)
@@ -1261,8 +1292,16 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 				})
 			}
 
-			if len(resolvedBackend.Backend.ImagePullSecrets) > 0 {
-				deployment.Spec.Template.Spec.ImagePullSecrets = append(r.getMemoizedBackendDeployment().Template.Spec.ImagePullSecrets, resolvedBackend.Backend.ImagePullSecrets...)
+			imagePullSecrets, ok := internalHost.Spec.ServiceAccountSecrets["image-pull"]
+			if ok && len(imagePullSecrets) > 0 {
+				for _, sec := range imagePullSecrets {
+					deployment.Spec.Template.Spec.ImagePullSecrets = append(
+						deployment.Spec.Template.Spec.ImagePullSecrets,
+						corev1.LocalObjectReference{
+							Name: sec.Name,
+						},
+					)
+				}
 			}
 
 			if resolvedBackend.Backend.Replicas != nil {

@@ -441,11 +441,13 @@ func (hh *HostHandler) SetHost(
 	functions []kdexv1alpha1.KDexFunction,
 	authExchanger *auth.Exchanger,
 	authConfig *auth.Config,
+	scheme string,
 ) {
 	hh.mu.Lock()
 	hh.host = host
 	hh.defaultLanguage = host.DefaultLang
 	hh.functions = functions
+	hh.scheme = scheme
 	hh.favicon = ico.NewICO(host.FaviconSVGTemplate, render.TemplateData{
 		BrandName:       host.BrandName,
 		DefaultLanguage: host.DefaultLang,
@@ -605,19 +607,11 @@ func (hh *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPag
 }
 
 func (hh *HostHandler) issuerAddress() string {
-	scheme := "http"
-	if hh.host.Routing.TLS != nil {
-		scheme = "https"
-	}
-	return fmt.Sprintf("%s://%s", scheme, hh.host.Routing.Domains[0])
+	return fmt.Sprintf("%s://%s", hh.scheme, hh.host.Routing.Domains[0])
 }
 
 func (hh *HostHandler) serverAddress(r *http.Request) string {
-	scheme := "http"
-	if hh.isSecure(r) {
-		scheme = "https"
-	}
-	return fmt.Sprintf("%s://%s", scheme, r.Host)
+	return fmt.Sprintf("%s://%s", hh.scheme, r.Host)
 }
 
 func (hh *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {

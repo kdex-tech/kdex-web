@@ -72,10 +72,7 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 		return nil, err
 	}
 
-	issuer := "http://" + d.Host.Spec.Routing.Domains[0]
-	if d.Host.Spec.Routing.TLS != nil {
-		issuer = "https://" + d.Host.Spec.Routing.Domains[0]
-	}
+	issuer := fmt.Sprintf("%s://%s", d.Host.Spec.Routing.Scheme, d.Host.Spec.Routing.Domains[0])
 
 	env := d.FaaSAdaptor.Deployer.Env
 

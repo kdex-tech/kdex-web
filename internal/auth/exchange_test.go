@@ -15,6 +15,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"kdex.dev/crds/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -32,7 +33,7 @@ func MockOIDCProvider(cfg Config) http.HandlerFunc {
 
 	mux.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		// Use server.URL to get the actual assigned port/address
-		issuer := cfg.OIDCProviderURL
+		issuer := cfg.OIDC.ProviderURL
 
 		config := map[string]any{
 			"authorization_endpoint":                issuer + "/auth",
@@ -99,7 +100,10 @@ func TestNewExchanger(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		cfg        Config
+		namespace  string
+		devMode    bool
+		secrets    []v1.Secret
+		authConfig *v1alpha1.Auth
 		sp         ScopeProvider
 		assertions func(t *testing.T, got *Exchanger, goterr error)
 	}{
@@ -151,8 +155,10 @@ func TestNewExchanger(t *testing.T) {
 			},
 		},
 		{
-			name: "LoginLocal when there is no auth.Config",
-			sp:   scopeProvider,
+			name:      "LoginLocal when there is no auth.Config",
+			namespace: "foo",
+			devMode:   true,
+			sp:        scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
 				token, _, _, err := got.LoginLocal(context.Background(), "not-allowed", "password", "", "test-client", AuthMethodLocal)
@@ -162,12 +168,11 @@ func TestNewExchanger(t *testing.T) {
 			},
 		},
 		{
-			name: "LoginLocal invalid subject",
-			cfg: func() Config {
-				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{}, "audience", "issuer", "foo", true)
-				return *c
-			}(),
-			sp: scopeProvider,
+			name:       "LoginLocal invalid subject",
+			namespace:  "foo",
+			devMode:    true,
+			authConfig: &v1alpha1.Auth{},
+			sp:         scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
 				token, _, _, err := got.LoginLocal(context.Background(), "not-allowed", "password", "", "test-client", AuthMethodLocal)
@@ -177,12 +182,11 @@ func TestNewExchanger(t *testing.T) {
 			},
 		},
 		{
-			name: "LoginLocal valid subject",
-			cfg: func() Config {
-				c, _ := NewConfig(context.Background(), nil, &v1alpha1.Auth{}, "audience", "issuer", "foo", true)
-				return *c
-			}(),
-			sp: scopeProvider,
+			name:       "LoginLocal valid subject",
+			namespace:  "foo",
+			devMode:    true,
+			authConfig: &v1alpha1.Auth{},
+			sp:         scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
 				token, _, _, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", "local")
@@ -191,26 +195,17 @@ func TestNewExchanger(t *testing.T) {
 			},
 		},
 		{
-			name: "Mapping rules - simple",
-			cfg: func() Config {
-				c, _ := NewConfig(
-					context.Background(),
-					nil,
-					&v1alpha1.Auth{
-						ClaimMappings: []dmapper.MappingRule{
-							{
-								SourceExpression: "self.address",
-								TargetPropPath:   "address",
-							},
-						},
+			name:      "Mapping rules - simple",
+			namespace: "foo",
+			devMode:   true,
+			authConfig: &v1alpha1.Auth{
+				ClaimMappings: []dmapper.MappingRule{
+					{
+						SourceExpression: "self.address",
+						TargetPropPath:   "address",
 					},
-					"audience",
-					"issuer",
-					"foo",
-					true,
-				)
-				return *c
-			}(),
+				},
+			},
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
@@ -230,27 +225,18 @@ func TestNewExchanger(t *testing.T) {
 			},
 		},
 		{
-			name: "Mapping rules - required, but fails",
-			cfg: func() Config {
-				c, _ := NewConfig(
-					context.Background(),
-					nil,
-					&v1alpha1.Auth{
-						ClaimMappings: []dmapper.MappingRule{
-							{
-								Required:         true,
-								SourceExpression: "self.job",
-								TargetPropPath:   "job",
-							},
-						},
+			name:      "Mapping rules - required, but fails",
+			namespace: "foo",
+			devMode:   true,
+			authConfig: &v1alpha1.Auth{
+				ClaimMappings: []dmapper.MappingRule{
+					{
+						Required:         true,
+						SourceExpression: "self.job",
+						TargetPropPath:   "job",
 					},
-					"audience",
-					"issuer",
-					"foo",
-					true,
-				)
-				return *c
-			}(),
+				},
+			},
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
@@ -260,31 +246,22 @@ func TestNewExchanger(t *testing.T) {
 			},
 		},
 		{
-			name: "Mapping rules - required, success",
-			cfg: func() Config {
-				c, _ := NewConfig(
-					context.Background(),
-					nil,
-					&v1alpha1.Auth{
-						ClaimMappings: []dmapper.MappingRule{
-							{
-								Required:         true,
-								SourceExpression: "self.address.street",
-								TargetPropPath:   "street",
-							},
-							{
-								SourceExpression: "self.job",
-								TargetPropPath:   "job",
-							},
-						},
+			name:      "Mapping rules - required, success",
+			namespace: "foo",
+			devMode:   true,
+			authConfig: &v1alpha1.Auth{
+				ClaimMappings: []dmapper.MappingRule{
+					{
+						Required:         true,
+						SourceExpression: "self.address.street",
+						TargetPropPath:   "street",
 					},
-					"audience",
-					"issuer",
-					"foo",
-					true,
-				)
-				return *c
-			}(),
+					{
+						SourceExpression: "self.job",
+						TargetPropPath:   "job",
+					},
+				},
+			},
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
@@ -303,27 +280,18 @@ func TestNewExchanger(t *testing.T) {
 			},
 		},
 		{
-			name: "Mapping rules - deeply nest",
-			cfg: func() Config {
-				c, _ := NewConfig(
-					context.Background(),
-					nil,
-					&v1alpha1.Auth{
-						ClaimMappings: []dmapper.MappingRule{
-							{
-								Required:         true,
-								SourceExpression: "self.address.street",
-								TargetPropPath:   "other.place.street",
-							},
-						},
+			name:      "Mapping rules - deeply nest",
+			namespace: "foo",
+			devMode:   true,
+			authConfig: &v1alpha1.Auth{
+				ClaimMappings: []dmapper.MappingRule{
+					{
+						Required:         true,
+						SourceExpression: "self.address.street",
+						TargetPropPath:   "other.place.street",
 					},
-					"audience",
-					"issuer",
-					"foo",
-					true,
-				)
-				return *c
-			}(),
+				},
+			},
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
@@ -344,22 +312,28 @@ func TestNewExchanger(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			got, gotErr := NewExchanger(ctx, tt.cfg, tt.sp)
+			objects := make([]client.Object, len(tt.secrets))
+			for i := range tt.secrets {
+				objects[i] = &tt.secrets[i]
+			}
+			client := fake.NewClientBuilder().WithObjects(objects...).Build()
+			cfg, err := NewConfig(ctx, client, tt.authConfig, "audience", "issuer", tt.namespace, tt.devMode, nil)
+			if err != nil && tt.authConfig != nil { // If authConfig is nil, NewConfig will return an error, which is expected for some tests
+				assert.Nil(t, err)
+			}
+			var got *Exchanger
+			var gotErr error
+			if cfg != nil {
+				got, gotErr = NewExchanger(ctx, *cfg, tt.sp)
+			} else {
+				got, gotErr = NewExchanger(ctx, Config{}, tt.sp) // Pass an empty config if NewConfig failed
+			}
 			tt.assertions(t, got, gotErr)
 		})
 	}
 }
 
 func TestNewExchanger_OIDC(t *testing.T) {
-	extra := map[string]any{
-		"firstName": "Joe",
-		"lastName":  "Bar",
-		"address": map[string]any{
-			"street":  "1 Long Dr",
-			"city":    "Baytown",
-			"country": "Supernautica",
-		},
-	}
 	scopeProvider := &mockScopeProvider{
 		verifyLocalIdentity: func(subject string, password string) (jwt.MapClaims, error) {
 			if subject == "not-allowed" {
@@ -367,8 +341,14 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			}
 
 			return jwt.MapClaims{
-				"email":        subject,
-				"extra":        extra,
+				"email":     subject,
+				"firstName": "Joe",
+				"lastName":  "Bar",
+				"address": map[string]any{
+					"street":  "1 Long Dr",
+					"city":    "Baytown",
+					"country": "Supernautica",
+				},
 				"sub":          subject,
 				"entitlements": []string{"foo", "bar"},
 			}, nil
@@ -380,38 +360,41 @@ func TestNewExchanger_OIDC(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		cfg        func(string) (Config, error)
+		authConfig *v1alpha1.Auth
 		sp         ScopeProvider
-		assertions func(t *testing.T, serverURL string, innerHandler *IH)
+		secrets    map[string][]v1.Secret
+		assertions func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret)
 	}{
 		{
 			name: "OIDC - constructor, bad provider url",
-			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
-				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
+			authConfig: &v1alpha1.Auth{
+				OIDCProvider: &v1alpha1.OIDCProvider{
+					OIDCProviderURL: "http://bad",
+				},
+			},
+			secrets: map[string][]v1.Secret{
+				"oidc-client": {
+					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "foo",
 						},
 						Data: map[string][]byte{
 							"client_secret": []byte("bar"),
+							"client_id":     []byte("foo"),
 						},
 					},
-				).Build()
+				},
+			},
+			sp: scopeProvider,
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+				ctx := context.Background()
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					ctx,
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: "http://bad",
 						},
 					},
@@ -419,9 +402,10 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					"http://bad",
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
 				_, gotErr = NewExchanger(ctx, *cfg, scopeProvider)
@@ -432,31 +416,28 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - constructor, good provider url",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
-				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
+			secrets: map[string][]v1.Secret{
+				"oidc-client": {
+					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "foo",
 						},
 						Data: map[string][]byte{
 							"client_secret": []byte("bar"),
+							"client_id":     []byte("foo"),
 						},
 					},
-				).Build()
+				},
+			},
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+				ctx := context.Background()
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					ctx,
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: serverURL,
 						},
 					},
@@ -464,9 +445,10 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
 				_, gotErr = NewExchanger(ctx, *cfg, scopeProvider)
@@ -476,31 +458,28 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - AuthCodeURL",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
-				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
+			secrets: map[string][]v1.Secret{
+				"oidc-client": {
+					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "foo",
 						},
 						Data: map[string][]byte{
 							"client_secret": []byte("bar"),
+							"client_id":     []byte("foo"),
 						},
 					},
-				).Build()
+				},
+			},
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+				ctx := context.Background()
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					ctx,
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: serverURL,
 						},
 					},
@@ -508,9 +487,10 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
 				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
@@ -522,31 +502,28 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - AuthCodeURL, extra scopes",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
-				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
+			secrets: map[string][]v1.Secret{
+				"oidc-client": {
+					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "foo",
 						},
 						Data: map[string][]byte{
 							"client_secret": []byte("bar"),
+							"client_id":     []byte("foo"),
 						},
 					},
-				).Build()
+				},
+			},
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+				ctx := context.Background()
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					ctx,
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: serverURL,
 							Scopes:          []string{"job"},
 						},
@@ -555,9 +532,10 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
 				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
@@ -569,10 +547,21 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - ExchangeCode",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
-				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
+			secrets: map[string][]v1.Secret{
+				"oidc-client": {
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      "foo",
+							Namespace: "foo",
+						},
+						Data: map[string][]byte{
+							"client_secret": []byte("bar"),
+							"client_id":     []byte("foo"),
+						},
+					},
+				},
+				"test-client": []v1.Secret{
+					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "foo",
@@ -581,19 +570,16 @@ func TestNewExchanger_OIDC(t *testing.T) {
 							"client_secret": []byte("bar"),
 						},
 					},
-				).Build()
+				},
+			},
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+				ctx := context.Background()
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					ctx,
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: serverURL,
 						},
 					},
@@ -601,9 +587,10 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
 				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
@@ -617,37 +604,34 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Contains(t, jwtToken.Header["kid"], "kdex-dev-")
 				iss, err := claims.GetIssuer()
 				assert.Nil(t, err)
-				assert.Equal(t, cfg.OIDCProviderURL, iss)
+				assert.Equal(t, cfg.OIDC.ProviderURL, iss)
 			},
 		},
 		{
 			name: "OIDC - ExchangeCode, failed exchange",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
-				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
+			secrets: map[string][]v1.Secret{
+				"oidc-client": {
+					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "foo",
 						},
 						Data: map[string][]byte{
 							"client_secret": []byte("bar"),
+							"client_id":     []byte("foo"),
 						},
 					},
-				).Build()
+				},
+			},
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+				ctx := context.Background()
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					ctx,
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: serverURL,
 						},
 					},
@@ -655,9 +639,10 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
 				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
@@ -670,31 +655,28 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - ExchangeCode, id token missing",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
-				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
+			secrets: map[string][]v1.Secret{
+				"oidc-client": {
+					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "foo",
 						},
 						Data: map[string][]byte{
 							"client_secret": []byte("bar"),
+							"client_id":     []byte("foo"),
 						},
 					},
-				).Build()
+				},
+			},
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+				ctx := context.Background()
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					ctx,
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: serverURL,
 						},
 					},
@@ -702,9 +684,10 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
 				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
@@ -717,31 +700,28 @@ func TestNewExchanger_OIDC(t *testing.T) {
 		{
 			name: "OIDC - VerifyIDToken",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
-				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
+			secrets: map[string][]v1.Secret{
+				"oidc-client": {
+					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "foo",
 						},
 						Data: map[string][]byte{
 							"client_secret": []byte("bar"),
+							"client_id":     []byte("foo"),
 						},
 					},
-				).Build()
+				},
+			},
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+				ctx := context.Background()
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					ctx,
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: serverURL,
 						},
 					},
@@ -749,9 +729,10 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
 				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
@@ -761,37 +742,34 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				oidcToken, err := ex.verifyIDToken(ctx, rawIDToken)
 				assert.Nil(t, err)
 				assert.NotNil(t, oidcToken)
-				assert.Equal(t, cfg.ClientID, oidcToken.Audience[0])
+				assert.Equal(t, cfg.OIDC.ClientID, oidcToken.Audience[0])
 			},
 		},
 		{
 			name: "OIDC - ExchangeToken",
 			sp:   scopeProvider,
-			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
-				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects(
-					&v1.Secret{
+			secrets: map[string][]v1.Secret{
+				"oidc-client": []v1.Secret{
+					v1.Secret{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "foo",
 							Namespace: "foo",
 						},
 						Data: map[string][]byte{
+							"client_id":     []byte("foo"),
 							"client_secret": []byte("bar"),
 						},
 					},
-				).Build()
+				},
+			},
+			assertions: func(t *testing.T, serverURL string, innerHandler *IH, secrets map[string][]v1.Secret) {
+				ctx := context.Background()
+				client := fake.NewClientBuilder().WithObjects().Build()
 				cfg, gotErr := NewConfig(
 					ctx,
 					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
-							ClientID: "foo",
-							ClientSecretRef: v1alpha1.LocalSecretWithKeyReference{
-								KeyProperty: "client_secret",
-								SecretRef: v1.LocalObjectReference{
-									Name: "foo",
-								},
-							},
 							OIDCProviderURL: serverURL,
 						},
 					},
@@ -799,9 +777,10 @@ func TestNewExchanger_OIDC(t *testing.T) {
 					serverURL,
 					"foo",
 					true,
+					secrets,
 				)
 				assert.Nil(t, gotErr)
-				assert.Equal(t, "bar", cfg.ClientSecret)
+				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
 				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
@@ -818,7 +797,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Contains(t, jwtToken.Header["kid"], "kdex-dev-")
 				iss, err := claims.GetIssuer()
 				assert.Nil(t, err)
-				assert.Equal(t, cfg.OIDCProviderURL, iss)
+				assert.Equal(t, cfg.OIDC.ProviderURL, iss)
 				entitlements := []string{}
 				for _, s := range claims["entitlements"].([]any) {
 					entitlements = append(entitlements, s.(string))
@@ -832,7 +811,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			ih := &IH{}
 			server := MockRunningServer(ih)
 			defer server.Close()
-			tt.assertions(t, server.URL, ih)
+			tt.assertions(t, server.URL, ih, tt.secrets)
 		})
 	}
 }

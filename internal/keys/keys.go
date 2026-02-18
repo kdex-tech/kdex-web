@@ -10,12 +10,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -60,24 +61,27 @@ func LoadOrGenerateKeyPair(
 	ctx context.Context,
 	c client.Client,
 	namespace string,
-	jwt kdexv1alpha1.JWT,
+	secrets []corev1.Secret,
+	ttlSeconds int, // Unused? Kept for signature compatibility if needed, or remove.
 	devMode bool,
 ) (*KeyPairs, error) {
 	pairs := &KeyPairs{}
 	found := false
 
-	for _, secRef := range jwt.JWTKeysSecrets {
-		var secret corev1.Secret
-		err := c.Get(ctx, client.ObjectKey{
-			Name:      secRef.SecretRef.Name,
-			Namespace: namespace,
-		}, &secret)
+	// Sort keys oldest to newest
+	sort.Slice(secrets, func(i, j int) bool {
+		return secrets[i].CreationTimestamp.Before(&secrets[j].CreationTimestamp)
+	})
 
-		if err != nil {
-			return nil, err
+	// The newest secret with the active key annotation is the active key. If no
+	// active key annotation is found, the newest secret is the active key.
+	for _, secret := range secrets {
+		isActive := false
+		if secret.Annotations["kdex.dev/active-key"] == "true" {
+			isActive = true
 		}
 
-		kp, err := LoadKeysFromSecret(&secret, jwt.ActiveKey)
+		kp, err := LoadKeysFromSecret(&secret, isActive)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +92,18 @@ func LoadOrGenerateKeyPair(
 
 	if found {
 		if len(*pairs) > 1 && pairs.ActiveKey() == nil {
-			return nil, fmt.Errorf("multiple keys exist but none are specified as the active key via spec.auth.jwt.activeKey=%s", jwt.ActiveKey)
+			// get a logger from context
+			log := logf.FromContext(ctx)
+
+			log.Info("Multiple keys exist but none are specified as the active key via annotation kdex.dev/active-key='true'. Defaulting to the newest key.")
+
+			// set the newest key as active
+			(*pairs)[len(*pairs)-1].ActiveKey = true
+		}
+
+		// If only one key, make it active if not already
+		if len(*pairs) == 1 && pairs.ActiveKey() == nil {
+			(*pairs)[0].ActiveKey = true
 		}
 
 		return pairs, nil
@@ -198,7 +213,7 @@ func LoadKeyFromPEM(privateKeyPEM []byte) (*KeyPair, error) {
 }
 
 // LoadKeysFromSecret loads an RSA key pair from a Kubernetes Secret.
-func LoadKeysFromSecret(secret *corev1.Secret, activeKey string) (*KeyPair, error) {
+func LoadKeysFromSecret(secret *corev1.Secret, isActive bool) (*KeyPair, error) {
 	privateKeyPEM, ok := secret.Data[PrivateKeySecretKey]
 	if !ok {
 		return nil, fmt.Errorf("secret does not contain %s", PrivateKeySecretKey)
@@ -213,9 +228,7 @@ func LoadKeysFromSecret(secret *corev1.Secret, activeKey string) (*KeyPair, erro
 		key.KeyId = secret.Name
 	}
 
-	if activeKey == key.KeyId {
-		key.ActiveKey = true
-	}
+	key.ActiveKey = isActive
 
 	return key, nil
 }

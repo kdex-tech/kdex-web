@@ -30,6 +30,7 @@ import (
 	"github.com/kdex-tech/kdex-host/internal/generate"
 	kjob "github.com/kdex-tech/kdex-host/internal/job"
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -221,10 +222,7 @@ func (r *KDexFunctionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *KDexFunctionReconciler) handlePending(hc handlerContext) (ctrl.Result, error) {
 	log := logf.FromContext(hc.ctx)
 
-	scheme := "http"
-	if hc.host.Spec.Routing.TLS != nil {
-		scheme = "https"
-	}
+	scheme := hc.host.Spec.Routing.Scheme
 	hc.function.Status.OpenAPISchemaURL = fmt.Sprintf("%s://%s/-/openapi?type=function&tag=%s", scheme, hc.host.Spec.Routing.Domains[0], hc.function.Name)
 	port := ""
 	for _, p := range r.Configuration.HostDefault.Service.Ports {
@@ -338,7 +336,31 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 			ServiceAccount: hc.host.Name,
 		}
 
-		job, err := gImpl.GetOrCreateGenerateJob(hc.ctx, hc.function)
+		gitSecrets, ok := hc.host.Spec.ServiceAccountSecrets["git"]
+		if !ok || len(gitSecrets) == 0 {
+			err := fmt.Errorf(
+				"git secret not found for host %s/%s",
+				hc.host.Namespace,
+				hc.host.Name,
+			)
+			kdexv1alpha1.SetConditions(
+				&hc.function.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionTrue,
+					Progressing: metav1.ConditionFalse,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconcileError,
+				err.Error(),
+			)
+			return ctrl.Result{}, err
+		}
+
+		gitSecret := corev1.LocalObjectReference{
+			Name: gitSecrets[0].Name,
+		}
+
+		job, err := gImpl.GetOrCreateGenerateJob(hc.ctx, hc.function, gitSecret)
 		if err != nil {
 			kdexv1alpha1.SetConditions(
 				&hc.function.Status.Conditions,

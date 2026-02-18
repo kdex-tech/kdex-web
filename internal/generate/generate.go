@@ -27,7 +27,7 @@ type Generator struct {
 	ServiceAccount string
 }
 
-func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1alpha1.KDexFunction) (*batchv1.Job, error) {
+func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1alpha1.KDexFunction, gitSecret corev1.LocalObjectReference) (*batchv1.Job, error) {
 	// Create Job name
 	jobName := fmt.Sprintf("%s-codegen-%d", function.Name, function.Generation)
 
@@ -103,7 +103,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "host",
-					LocalObjectReference: g.Config.Git.RepoSecretRef,
+					LocalObjectReference: gitSecret,
 				},
 			},
 		},
@@ -112,7 +112,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "org",
-					LocalObjectReference: g.Config.Git.RepoSecretRef,
+					LocalObjectReference: gitSecret,
 				},
 			},
 		},
@@ -121,7 +121,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "repo",
-					LocalObjectReference: g.Config.Git.RepoSecretRef,
+					LocalObjectReference: gitSecret,
 				},
 			},
 		},
@@ -130,7 +130,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "token",
-					LocalObjectReference: g.Config.Git.RepoSecretRef,
+					LocalObjectReference: gitSecret,
 				},
 			},
 		},
@@ -139,7 +139,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "user",
-					LocalObjectReference: g.Config.Git.RepoSecretRef,
+					LocalObjectReference: gitSecret,
 				},
 			},
 		},

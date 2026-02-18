@@ -428,7 +428,6 @@ type MockScriptLibraryReconciler struct {
 
 func (r *MockScriptLibraryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	var status *kdexv1alpha1.KDexObjectStatus
-	var spec kdexv1alpha1.KDexScriptLibrarySpec
 	var om metav1.ObjectMeta
 	var o client.Object
 
@@ -438,7 +437,6 @@ func (r *MockScriptLibraryReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 		status = &clusterScriptLibrary.Status
-		spec = clusterScriptLibrary.Spec
 		om = clusterScriptLibrary.ObjectMeta
 		o = &clusterScriptLibrary
 	} else {
@@ -447,7 +445,6 @@ func (r *MockScriptLibraryReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 		status = &scriptLibrary.Status
-		spec = scriptLibrary.Spec
 		om = scriptLibrary.ObjectMeta
 		o = &scriptLibrary
 	}
@@ -467,17 +464,6 @@ func (r *MockScriptLibraryReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		}
 		log.Info("print status", "status", status, "err", err, "res", res)
 	}()
-
-	if spec.PackageReference != nil {
-		secret, shouldReturn, r1, err := ResolveSecret(ctx, r.Client, o, &status.Conditions, spec.PackageReference.SecretRef, r.RequeueDelay)
-		if shouldReturn {
-			return r1, err
-		}
-
-		if secret != nil {
-			status.Attributes["secret.generation"] = fmt.Sprintf("%d", secret.Generation)
-		}
-	}
 
 	kdexv1alpha1.SetConditions(
 		&status.Conditions,

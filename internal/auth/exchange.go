@@ -49,25 +49,25 @@ func NewExchanger(
 	}
 
 	if cfg.IsOIDCEnabled() {
-		provider, err := oidc.NewProvider(ctx, cfg.OIDCProviderURL)
+		provider, err := oidc.NewProvider(ctx, cfg.OIDC.ProviderURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize OIDC provider: %w", err)
 		}
 		ex.oidcProvider = provider
-		ex.oidcVerifier = provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
+		ex.oidcVerifier = provider.Verifier(&oidc.Config{ClientID: cfg.OIDC.ClientID})
 
 		scopes := []string{oidc.ScopeOpenID, "profile", "email"}
-		for _, newScope := range cfg.Scopes {
+		for _, newScope := range cfg.OIDC.Scopes {
 			if !slices.Contains(scopes, newScope) {
 				scopes = append(scopes, newScope)
 			}
 		}
 
 		ex.oauth2Config = &oauth2.Config{
-			ClientID:     cfg.ClientID,
-			ClientSecret: cfg.ClientSecret,
+			ClientID:     cfg.OIDC.ClientID,
+			ClientSecret: cfg.OIDC.ClientSecret,
 			Endpoint:     provider.Endpoint(),
-			RedirectURL:  cfg.RedirectURL,
+			RedirectURL:  cfg.OIDC.RedirectURL,
 			Scopes:       scopes,
 		}
 	}
@@ -166,8 +166,8 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, rawIDToken string) (strin
 	return e.config.Signer.Sign(signingContext)
 }
 
-func (e *Exchanger) GetClientID() string {
-	return e.config.ClientID
+func (e *Exchanger) GetOIDCClientID() string {
+	return e.config.OIDC.ClientID
 }
 
 func (e *Exchanger) GetTokenTTL() time.Duration {
@@ -185,20 +185,16 @@ func (e *Exchanger) GetScopesSupported() ([]string, error) {
 	return claims.ScopesSupported, nil
 }
 
-func (e *Exchanger) IsClientValid(clientID string) bool {
+func (e *Exchanger) GetClient(clientID string) (AuthClient, bool) {
 	if e == nil {
-		return false
-	}
-	// Check OIDC client
-	if e.config.IsOIDCEnabled() && e.config.ClientID == clientID {
-		return true
+		return AuthClient{}, false
 	}
 	// Check M2M clients
 	if e.config.IsM2MEnabled() {
-		_, ok := e.config.Clients[clientID]
-		return ok
+		client, ok := e.config.Clients[clientID]
+		return client, ok
 	}
-	return false
+	return AuthClient{}, false
 }
 
 func (e *Exchanger) LoginClient(ctx context.Context, clientID, clientSecret string, scope string) (string, string, string, error) {
@@ -210,12 +206,12 @@ func (e *Exchanger) LoginClient(ctx context.Context, clientID, clientSecret stri
 		return "", "", "", fmt.Errorf("M2M auth not configured")
 	}
 
-	storedSecret, ok := e.config.Clients[clientID]
+	client, ok := e.GetClient(clientID)
 	if !ok {
 		return "", "", "", fmt.Errorf("invalid client_id")
 	}
 
-	if storedSecret != clientSecret {
+	if client.ClientSecret != clientSecret {
 		return "", "", "", fmt.Errorf("invalid client_secret")
 	}
 

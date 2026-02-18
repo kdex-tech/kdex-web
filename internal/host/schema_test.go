@@ -70,7 +70,7 @@ func TestHostHandler_SchemaHandler(t *testing.T) {
 
 	th.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
-	}, nil, nil, nil, "", registeredPaths, nil, nil, nil)
+	}, nil, nil, nil, "", registeredPaths, nil, nil, nil, "http")
 
 	tests := []struct {
 		name       string

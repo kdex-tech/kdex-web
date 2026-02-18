@@ -29,7 +29,7 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 
 		clientId := r.FormValue("client_id")
 
-		if !exchanger.IsClientValid(clientId) {
+		if _, ok := exchanger.GetClient(clientId); !ok {
 			http.Error(w, "Invalid client_id", http.StatusBadRequest)
 			return
 		}

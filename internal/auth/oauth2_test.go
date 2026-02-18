@@ -26,8 +26,12 @@ func TestOAuth2TokenHandler(t *testing.T) {
 	cfg := Config{
 		ActivePair: keyPairs.ActiveKey(),
 		KeyPairs:   keyPairs,
-		Clients: map[string]string{
-			"valid-client": "valid-secret",
+		Clients: map[string]AuthClient{
+			"valid-client": {
+				ClientID:     "valid-client",
+				ClientSecret: "valid-secret",
+				RedirectURIs: []string{"http://localhost/cb"},
+			},
 		},
 		Signer:   *signer,
 		TokenTTL: time.Hour,

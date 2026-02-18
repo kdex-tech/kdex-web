@@ -5,29 +5,39 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/kdex-tech/dmapper"
 	"github.com/kdex-tech/kdex-host/internal/keys"
 	"github.com/kdex-tech/kdex-host/internal/sign"
+	corev1 "k8s.io/api/core/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+type AuthClient struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURIs []string
+}
 
 type Config struct {
 	ActivePair            *keys.KeyPair
 	AnonymousEntitlements []string
 	BlockKey              string
-	Clients               map[string]string
-	ClientID              string
-	ClientSecret          string
+	Clients               map[string]AuthClient
 	CookieName            string
 	KeyPairs              *keys.KeyPairs
-	OIDCProviderURL       string
-	RedirectURL           string
-	Scopes                []string
-	Signer                sign.Signer
-	TokenTTL              time.Duration
+	OIDC                  struct {
+		ClientID     string
+		ClientSecret string
+		ProviderURL  string
+		RedirectURL  string
+		Scopes       []string
+	}
+	Signer   sign.Signer
+	TokenTTL time.Duration
 }
 
 func NewConfig(
@@ -38,15 +48,18 @@ func NewConfig(
 	issuer string,
 	namespace string,
 	devMode bool,
+	secrets map[string][]corev1.Secret,
 ) (*Config, error) {
 	cfg := &Config{}
 
 	if auth != nil {
+		jwtSecrets := secrets["jwt-keys"]
 		keyPairs, err := keys.LoadOrGenerateKeyPair(
 			ctx,
 			c,
 			namespace,
-			auth.JWT,
+			jwtSecrets,
+			1, // default 1 hour if not specified
 			devMode,
 		)
 		if err != nil {
@@ -93,39 +106,97 @@ func NewConfig(
 		)
 		cfg.Signer = *signer
 
-		if auth.ClientsSecretRef != nil {
-			clients, err := LoadMapFromSecret(ctx, c, namespace, auth.ClientsSecretRef)
-			if err != nil {
-				return nil, err
+		authClientSecrets := secrets["auth-client"]
+		if len(authClientSecrets) > 0 {
+			cfg.Clients = make(map[string]AuthClient)
+			for _, secret := range authClientSecrets {
+				// Assuming secret has one key-value pair for clientID:clientSecret
+				// or maybe specific keys "client-id" and "client-secret"?
+				// The previous implementation used LoadMapFromSecret which took all data.
+				// "The secret should contain clientID: clientSecret pairs in its data map."
+				// So we should iterate over data.
+				client := AuthClient{}
+
+				clientSecret := string(secret.Data["client_secret"])
+				if clientSecret == "" {
+					clientSecret = string(secret.Data["client-secret"])
+				}
+
+				clientID := string(secret.Data["client_id"])
+				if clientID == "" {
+					clientID = string(secret.Data["client-id"])
+				}
+
+				redirectURIsStr := string(secret.Data["redirect_uris"])
+				if redirectURIsStr == "" {
+					redirectURIsStr = string(secret.Data["redirect-uris"])
+				}
+
+				redirectURIs := []string{}
+				if redirectURIsStr != "" {
+					redirectURIs = strings.Split(redirectURIsStr, ",")
+				}
+
+				client = AuthClient{
+					ClientID:     clientID,
+					ClientSecret: clientSecret,
+					RedirectURIs: redirectURIs,
+				}
+
+				cfg.Clients[clientID] = client
 			}
-			cfg.Clients = clients
 		}
 
 		if auth.OIDCProvider != nil && auth.OIDCProvider.OIDCProviderURL != "" {
-			if auth.OIDCProvider.ClientID == "" {
-				return nil, fmt.Errorf("there is no client id configured in spec.auth.oidcProvider.clientID")
+			oidcSecrets := secrets["oidc-client"]
+			if len(oidcSecrets) == 0 {
+				return nil, fmt.Errorf("missing secret of type 'oidc-client' required for OIDC provider")
 			}
+			// Use the first one found?
+			oidcSecret := oidcSecrets[0]
 
-			clientSecret, err := LoadValueFromSecret(ctx, c, namespace, &auth.OIDCProvider.ClientSecretRef)
-			if err != nil {
-				return nil, err
+			// Expect "client-secret" and "block-key" in the secret?
+			// Previous model: ClientSecretRef (keyProperty), BlockKeySecretRef (keyProperty).
+			// Now we should standardize.
+			// Let's assume standard keys: "client_secret" (or "client-secret") and "block_key" (or "block-key").
+			// Or maybe "clientSecret" and "blockKey".
+			// Let's check keys usage in existing code or standards.
+			// "client-id" and "client-secret" are common.
+
+			clientSecret := string(oidcSecret.Data["client_secret"])
+			if clientSecret == "" {
+				clientSecret = string(oidcSecret.Data["client-secret"])
 			}
 
 			if clientSecret == "" {
-				return nil, fmt.Errorf("there is no Secret containing the OIDC client_secret configured")
+				return nil, fmt.Errorf("OIDC secret does not contain 'client_secret' or 'client-secret'")
 			}
 
-			blockKey, err := LoadValueFromSecret(ctx, c, namespace, auth.OIDCProvider.BlockKeySecretRef)
-			if err != nil {
-				return nil, err
+			clientID := string(oidcSecret.Data["client_id"])
+			if clientID == "" {
+				clientID = string(oidcSecret.Data["client-id"])
+			}
+
+			if clientID == "" {
+				return nil, fmt.Errorf("OIDC secret does not contain 'client_id' or 'client-id'")
+			}
+
+			blockKey := string(oidcSecret.Data["block_key"])
+			if blockKey == "" {
+				blockKey = string(oidcSecret.Data["block-key"])
+			}
+
+			if blockKey == "" && !devMode {
+				return nil, fmt.Errorf("a 'block_key' or 'block-key' was not found in the OIDC secret, generating a new one is not supported in production")
 			}
 
 			cfg.BlockKey = getOrGenerate(blockKey)
-			cfg.ClientID = auth.OIDCProvider.ClientID
-			cfg.ClientSecret = clientSecret
-			cfg.OIDCProviderURL = auth.OIDCProvider.OIDCProviderURL
-			cfg.RedirectURL = "/-/oauth/callback"
-			cfg.Scopes = auth.OIDCProvider.Scopes
+
+			cfg.OIDC.ClientID = clientID
+			cfg.OIDC.ClientSecret = clientSecret
+			cfg.OIDC.ProviderURL = auth.OIDCProvider.OIDCProviderURL
+			cfg.OIDC.RedirectURL = "/-/oauth/callback"
+			cfg.OIDC.Scopes = auth.OIDCProvider.Scopes
 		}
 	}
 
@@ -147,7 +218,7 @@ func (c *Config) IsAuthEnabled() bool {
 }
 
 func (c *Config) IsOIDCEnabled() bool {
-	if c == nil || c.ActivePair == nil || c.OIDCProviderURL == "" {
+	if c == nil || c.OIDC.ProviderURL == "" {
 		return false
 	}
 	return true
