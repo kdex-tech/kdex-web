@@ -2,7 +2,7 @@ module github.com/kdex-tech/kdex-host
 
 go 1.25.6
 
-replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.139
+replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.140
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
