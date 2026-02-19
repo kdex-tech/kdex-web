@@ -35,13 +35,13 @@ type Exchanger struct {
 	oauth2Config *oauth2.Config
 	oidcProvider *oidc.Provider
 	oidcVerifier *oidc.IDTokenVerifier
-	sp           ScopeProvider
+	sp           InternalIdentityProvider
 }
 
 func NewExchanger(
 	ctx context.Context,
 	cfg Config,
-	sp ScopeProvider,
+	sp InternalIdentityProvider,
 ) (*Exchanger, error) {
 	ex := &Exchanger{
 		config: cfg,
@@ -135,7 +135,7 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, rawIDToken string) (strin
 		return "", fmt.Errorf("no sub in id_token")
 	}
 
-	roles, entitlements, err := e.sp.ResolveRolesAndEntitlements(sub)
+	roles, entitlements, err := e.sp.FindInternalRolesAndEntitlements(sub)
 	if err != nil {
 		return "", err
 	}
@@ -261,7 +261,7 @@ func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, s
 		return "", "", "", fmt.Errorf("local auth not configured")
 	}
 
-	signingContext, err := e.sp.VerifyLocalIdentity(username, password)
+	signingContext, err := e.sp.FindInternal(username, password)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -508,7 +508,7 @@ func (e *Exchanger) mintTokensFromCode(claims AuthorizationCodeClaims) (string, 
 	signingContext["auth_method"] = claims.AuthMethod
 
 	// 2. Resolve Roles/Entitlements
-	roles, entitlements, err := e.sp.ResolveRolesAndEntitlements(claims.Subject)
+	roles, entitlements, err := e.sp.FindInternalRolesAndEntitlements(claims.Subject)
 	if err != nil {
 		return "", "", "", fmt.Errorf("failed to resolve roles: %w", err)
 	}

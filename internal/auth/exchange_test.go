@@ -76,7 +76,7 @@ func MockRunningServer(innerHandler *IH) *httptest.Server {
 
 func TestNewExchanger(t *testing.T) {
 	scopeProvider := &mockScopeProvider{
-		verifyLocalIdentity: func(subject string, password string) (jwt.MapClaims, error) {
+		resolveIdentity: func(subject string, password string) (jwt.MapClaims, error) {
 			if subject == "not-allowed" {
 				return nil, fmt.Errorf("invalid credentials")
 			}
@@ -105,7 +105,7 @@ func TestNewExchanger(t *testing.T) {
 		devMode    bool
 		secrets    []v1.Secret
 		authConfig *v1alpha1.Auth
-		sp         ScopeProvider
+		sp         InternalIdentityProvider
 		assertions func(t *testing.T, got *Exchanger, goterr error)
 	}{
 		{
@@ -336,7 +336,7 @@ func TestNewExchanger(t *testing.T) {
 
 func TestNewExchanger_OIDC(t *testing.T) {
 	scopeProvider := &mockScopeProvider{
-		verifyLocalIdentity: func(subject string, password string) (jwt.MapClaims, error) {
+		resolveIdentity: func(subject string, password string) (jwt.MapClaims, error) {
 			if subject == "not-allowed" {
 				return nil, fmt.Errorf("invalid credentials")
 			}
@@ -362,7 +362,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 	tests := []struct {
 		name       string
 		authConfig *v1alpha1.Auth
-		sp         ScopeProvider
+		sp         InternalIdentityProvider
 		assertions func(t *testing.T, serverURL string, innerHandler *IH)
 	}{
 		{
@@ -879,19 +879,14 @@ func TokenHandler(cfg Config) http.HandlerFunc {
 }
 
 type mockScopeProvider struct {
-	resolveIdentity             func(subject string, password string, identity jwt.MapClaims) error
+	resolveIdentity             func(subject string, password string) (jwt.MapClaims, error)
 	resolveRolesAndEntitlements func(subject string) ([]string, []string, error)
-	verifyLocalIdentity         func(subject string, password string) (jwt.MapClaims, error)
 }
 
-func (m *mockScopeProvider) ResolveIdentity(subject string, password string, identity jwt.MapClaims) error {
-	return m.resolveIdentity(subject, password, identity)
+func (m *mockScopeProvider) FindInternal(subject string, password string) (jwt.MapClaims, error) {
+	return m.resolveIdentity(subject, password)
 }
 
-func (m *mockScopeProvider) ResolveRolesAndEntitlements(subject string) ([]string, []string, error) {
+func (m *mockScopeProvider) FindInternalRolesAndEntitlements(subject string) ([]string, []string, error) {
 	return m.resolveRolesAndEntitlements(subject)
-}
-
-func (m *mockScopeProvider) VerifyLocalIdentity(subject string, password string) (jwt.MapClaims, error) {
-	return m.verifyLocalIdentity(subject, password)
 }

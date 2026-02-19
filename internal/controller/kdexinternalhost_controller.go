@@ -611,7 +611,23 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	rp, err := auth.NewRoleProvider(ctx, r.Client, internalHost.Name, internalHost.Namespace, internalHost.Spec.ServiceAccountSecrets)
+	authLookups := []auth.Lookup{
+		auth.NewSecretLookup(internalHost.Spec.ServiceAccountSecrets),
+	}
+
+	ldapSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "ldap" })
+	if len(ldapSecrets) > 0 {
+		// Put ldap lookup first
+		authLookups = append([]auth.Lookup{auth.NewLDAPLookup(ldapSecrets[0])}, authLookups...)
+	}
+
+	rp, err := auth.NewRoleProvider(
+		ctx,
+		r.Client,
+		internalHost.Name,
+		internalHost.Namespace,
+		authLookups,
+	)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&internalHost.Status.Conditions,

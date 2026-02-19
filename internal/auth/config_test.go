@@ -791,7 +791,7 @@ func TestConfig_OIDC(t *testing.T) {
 		},
 	}
 	scopeProvider := &mockScopeProvider{
-		verifyLocalIdentity: func(subject string, password string) (jwt.MapClaims, error) {
+		resolveIdentity: func(subject string, password string) (jwt.MapClaims, error) {
 			if subject == "not-allowed" {
 				return nil, fmt.Errorf("invalid credentials")
 			}
@@ -811,7 +811,7 @@ func TestConfig_OIDC(t *testing.T) {
 	tests := []struct {
 		name       string
 		cfg        func(string) (Config, error)
-		sp         ScopeProvider
+		sp         InternalIdentityProvider
 		assertions func(t *testing.T, serverURL string)
 	}{
 		{

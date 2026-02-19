@@ -39,11 +39,11 @@ func TestOAuth2TokenHandler(t *testing.T) {
 
 	// Setup Exchanger
 	sp := &mockScopeProvider{
+		resolveIdentity: func(subject string, password string) (jwt.MapClaims, error) {
+			return nil, fmt.Errorf("mock auth failed")
+		},
 		resolveRolesAndEntitlements: func(subject string) ([]string, []string, error) {
 			return []string{"role1"}, []string{"entitlement1"}, nil
-		},
-		verifyLocalIdentity: func(subject string, password string) (jwt.MapClaims, error) {
-			return nil, fmt.Errorf("mock auth failed")
 		},
 	}
 	ex, _ := NewExchanger(context.Background(), cfg, sp)

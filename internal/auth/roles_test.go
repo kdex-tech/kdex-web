@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,14 +54,14 @@ func TestNewRoleProvider(t *testing.T) {
 		focalHost           string
 		controllerNamespace string
 		secrets             kdexv1alpha1.ServiceAccountSecrets
-		assertions          func(t *testing.T, got ScopeProvider, gotErr error)
+		assertions          func(t *testing.T, got InternalIdentityProvider, gotErr error)
 	}{
 		{
 			name:                "constructor",
 			c:                   cb().Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
-			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
+			assertions: func(t *testing.T, got InternalIdentityProvider, gotErr error) {
 				assert.Nil(t, gotErr)
 			},
 		},
@@ -71,10 +70,9 @@ func TestNewRoleProvider(t *testing.T) {
 			c:                   cb().WithObjects().Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
-			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
+			assertions: func(t *testing.T, got InternalIdentityProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				ident := jwt.MapClaims{}
-				err := got.ResolveIdentity("username", "password", ident)
+				_, err := got.FindInternal("username", "password")
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "invalid credentials")
 			},
@@ -115,10 +113,9 @@ func TestNewRoleProvider(t *testing.T) {
 			).Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
-			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
+			assertions: func(t *testing.T, got InternalIdentityProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				ident := jwt.MapClaims{}
-				err := got.ResolveIdentity("username", "password", ident)
+				_, err := got.FindInternal("username", "password")
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "invalid credentials")
 			},
@@ -156,24 +153,30 @@ func TestNewRoleProvider(t *testing.T) {
 						Roles:   []string{"role-1"},
 					},
 				},
-				&v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "passwords",
-						Namespace: "foo",
-					},
-					Data: map[string][]byte{
-						"username": []byte("passw0rd"),
-					},
-				},
 			).Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
-			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
+			secrets: kdexv1alpha1.ServiceAccountSecrets{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo",
+						Namespace: "foo",
+						Annotations: map[string]string{
+							"kdex.dev/secret-type": "subject",
+						},
+					},
+					Data: map[string][]byte{
+						"sub":      []byte("username"),
+						"password": []byte("passw0rd"),
+						"email":    []byte("username@email.foo"),
+					},
+				},
+			},
+			assertions: func(t *testing.T, got InternalIdentityProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				ident := jwt.MapClaims{}
-				err := got.ResolveIdentity("username", "password", ident)
+				_, err := got.FindInternal("username", "password")
 				assert.NotNil(t, err)
-				assert.Contains(t, err.Error(), "invalid credentials: no secret")
+				assert.Contains(t, err.Error(), "invalid password for subject")
 			},
 		},
 		{
@@ -209,15 +212,6 @@ func TestNewRoleProvider(t *testing.T) {
 						Roles:   []string{"role-1"},
 					},
 				},
-				&v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "passwords",
-						Namespace: "foo",
-					},
-					Data: map[string][]byte{
-						"username": []byte("passw0rd"),
-					},
-				},
 			).Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
@@ -231,16 +225,15 @@ func TestNewRoleProvider(t *testing.T) {
 						},
 					},
 					Data: map[string][]byte{
-						"subject":  []byte("username"),
+						"sub":      []byte("username"),
 						"password": []byte("passw0rd"),
 						"email":    []byte("username@email.foo"),
 					},
 				},
 			},
-			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
+			assertions: func(t *testing.T, got InternalIdentityProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				ident := jwt.MapClaims{}
-				err := got.ResolveIdentity("username", "passw0rd", ident)
+				ident, err := got.FindInternal("username", "passw0rd")
 				assert.Nil(t, err)
 				assert.Equal(t, "username", ident["sub"])
 				assert.Equal(t, "username@email.foo", ident["email"])
@@ -282,9 +275,9 @@ func TestNewRoleProvider(t *testing.T) {
 			).Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
-			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
+			assertions: func(t *testing.T, got InternalIdentityProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				_, entitlements, err := got.ResolveRolesAndEntitlements("")
+				_, entitlements, err := got.FindInternalRolesAndEntitlements("")
 				assert.Nil(t, err)
 				assert.Equal(t, []string{}, entitlements)
 			},
@@ -325,9 +318,9 @@ func TestNewRoleProvider(t *testing.T) {
 			).Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
-			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
+			assertions: func(t *testing.T, got InternalIdentityProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				_, entitlements, err := got.ResolveRolesAndEntitlements("username")
+				_, entitlements, err := got.FindInternalRolesAndEntitlements("username")
 				assert.Nil(t, err)
 				assert.Equal(t, []string{"page::read", "page::write"}, entitlements)
 			},
@@ -365,21 +358,28 @@ func TestNewRoleProvider(t *testing.T) {
 						Roles:   []string{"role-1"},
 					},
 				},
-				&v1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "passwords",
-						Namespace: "foo",
-					},
-					Data: map[string][]byte{
-						"username": []byte("passw0rd"),
-					},
-				},
 			).Build(),
 			focalHost:           "foo",
 			controllerNamespace: "foo",
-			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
+			secrets: kdexv1alpha1.ServiceAccountSecrets{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "foo",
+						Namespace: "foo",
+						Annotations: map[string]string{
+							"kdex.dev/secret-type": "subject",
+						},
+					},
+					Data: map[string][]byte{
+						"sub":      []byte("username"),
+						"password": []byte("passw0rd"),
+						"email":    []byte("username@email.foo"),
+					},
+				},
+			},
+			assertions: func(t *testing.T, got InternalIdentityProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				_, err := got.VerifyLocalIdentity("username", "password")
+				_, err := got.FindInternal("username", "password")
 				assert.NotNil(t, err)
 			},
 		},
@@ -429,15 +429,15 @@ func TestNewRoleProvider(t *testing.T) {
 						},
 					},
 					Data: map[string][]byte{
-						"subject":  []byte("username"),
+						"sub":      []byte("username"),
 						"password": []byte("passw0rd"),
 						"email":    []byte("username@email.foo"),
 					},
 				},
 			},
-			assertions: func(t *testing.T, got ScopeProvider, gotErr error) {
+			assertions: func(t *testing.T, got InternalIdentityProvider, gotErr error) {
 				assert.Nil(t, gotErr)
-				ident, err := got.VerifyLocalIdentity("username", "passw0rd")
+				ident, err := got.FindInternal("username", "passw0rd")
 				assert.Nil(t, err)
 				assert.NotNil(t, ident)
 				assert.Equal(t, "username", ident["sub"])
@@ -448,7 +448,9 @@ func TestNewRoleProvider(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := NewRoleProvider(context.Background(), tt.c, tt.focalHost, tt.controllerNamespace, tt.secrets)
+			got, gotErr := NewRoleProvider(context.Background(), tt.c, tt.focalHost, tt.controllerNamespace, []Lookup{
+				NewSecretLookup(tt.secrets),
+			})
 			tt.assertions(t, got, gotErr)
 		})
 	}

@@ -7,20 +7,21 @@ replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.137
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/coreos/go-oidc/v3 v3.17.0
-	github.com/daveshanley/vacuum v0.23.8 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/getkin/kin-openapi v0.133.0
+	github.com/go-jose/go-jose/v4 v4.1.3
+	github.com/go-ldap/ldap/v3 v3.4.12
 	github.com/go-logr/logr v1.4.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/cel-go v0.27.0
 	github.com/google/uuid v1.6.0
+	github.com/kdex-tech/dmapper v0.1.0
 	github.com/kdex-tech/entitlements v0.1.8
+	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.0
-	// Pin to compatible versions to avoid breaking changes
-	github.com/pb33f/libopenapi v0.33.8 // indirect
-	github.com/pb33f/libopenapi-validator v0.11.1 // indirect
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/crypto v0.48.0
 	golang.org/x/oauth2 v0.35.0
 	golang.org/x/text v0.34.0
 	k8s.io/api v0.35.1
@@ -32,14 +33,9 @@ require (
 )
 
 require (
-	github.com/go-jose/go-jose/v4 v4.1.3
-	github.com/kdex-tech/dmapper v0.1.0
-	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
-)
-
-require (
 	cel.dev/expr v0.25.1 // indirect
 	dario.cat/mergo v1.0.2 // indirect
+	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
@@ -51,6 +47,7 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/daveshanley/vacuum v0.23.8 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3 // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14 // indirect
@@ -59,6 +56,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/go-asn1-ber/asn1-ber v1.5.8-0.20250403174932-29230038a667 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.22.4 // indirect
@@ -97,6 +95,8 @@ require (
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/pb33f/doctor v0.0.46 // indirect
 	github.com/pb33f/jsonpath v0.7.1 // indirect
+	github.com/pb33f/libopenapi v0.33.8 // indirect
+	github.com/pb33f/libopenapi-validator v0.11.1 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.0 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
@@ -127,7 +127,6 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/exp v0.0.0-20260211191109-2735e65f0518 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.50.0 // indirect
