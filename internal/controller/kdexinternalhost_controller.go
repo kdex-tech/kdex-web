@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -911,7 +910,9 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 						Get: &openapi.Operation{
 							Description: "GET " + description,
 							OperationID: backend.Name + "-get",
-							Parameters:  ko.ExtractParameters(wildcardPath, "", http.Header{}),
+							Parameters: openapi.Parameters{
+								ko.WildcardPathParam("path", "The path to the static resource"),
+							},
 							Responses: openapi.NewResponses(
 								openapi.WithName("200", &openapi.Response{
 									Content: openapi.NewContentWithSchema(

@@ -88,6 +88,54 @@ func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 	}
 }
 
+func (hh *HostHandler) authorizeHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	if !hh.authConfig.IsAuthEnabled() {
+		return
+	}
+
+	const path = "/-/oauth/authorize"
+	// Apply Authentication Middleware
+	handler := hh.authConfig.AddAuthentication(http.HandlerFunc(hh.AuthorizeHandler))
+	mux.Handle("GET "+path, handler)
+
+	hh.registerPath(path, ko.PathInfo{
+		API: ko.OpenAPI{
+			BasePath: path,
+			Paths: map[string]ko.PathItem{
+				path: {
+					Description: "The OAuth2 authorization endpoint",
+					Get: &openapi.Operation{
+						Description: "GET to start authorization flow",
+						OperationID: "authorize-get",
+						Parameters: openapi.Parameters{
+							ko.QueryParam("client_id", "The client ID"),
+							ko.QueryParam("redirect_uri", "The redirect URI"),
+							ko.QueryParam("response_type", "The response type (must be 'code')"),
+							ko.QueryParam("scope", "The requested scopes"),
+							ko.QueryParam("state", "The state parameter for CSRF protection"),
+						},
+						Responses: openapi.NewResponses(
+							openapi.WithStatus(302, &openapi.ResponseRef{
+								Ref: "#/components/responses/Found",
+							}),
+							openapi.WithStatus(400, &openapi.ResponseRef{
+								Ref: "#/components/responses/BadRequest",
+							}),
+							openapi.WithStatus(500, &openapi.ResponseRef{
+								Ref: "#/components/responses/InternalServerError",
+							}),
+						),
+						Summary: "OAuth2 Authorization",
+						Tags:    []string{"system", "oauth2", "auth"},
+					},
+					Summary: "OAuth2 authorization",
+				},
+			},
+		},
+		Type: ko.SystemPathType,
+	}, registeredPaths)
+}
+
 func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	if !hh.authConfig.IsAuthEnabled() {
 		return
@@ -270,7 +318,9 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 					Get: &openapi.Operation{
 						Description: "GET the login view",
 						OperationID: "login-get",
-						Parameters:  ko.ExtractParameters(loginPath, "return=foo", http.Header{}),
+						Parameters: openapi.Parameters{
+							ko.QueryParam("return", "The URL to redirect to after successful login"),
+						},
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -363,7 +413,11 @@ func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 					Get: &openapi.Operation{
 						Description: "GET Dynamic HTML navigation",
 						OperationID: "navigation-get",
-						Parameters:  ko.ExtractParameters(path, "", http.Header{}),
+						Parameters: openapi.Parameters{
+							ko.WildcardPathParam("basePathMinusLeadingSlash", "The base path without the leading slash"),
+							ko.PathParam("l10n", "The language tag"),
+							ko.PathParam("navKey", "The navigation key"),
+						},
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -413,7 +467,10 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 					Get: &openapi.Operation{
 						Description: "GET OAuth2 Callback",
 						OperationID: "oauth-get",
-						Parameters:  ko.ExtractParameters(path, "code=foo&state=bar", http.Header{}),
+						Parameters: openapi.Parameters{
+							ko.QueryParam("code", "The authorization code"),
+							ko.QueryParam("state", "The state parameter for CSRF protection"),
+						},
 						Responses: openapi.NewResponses(
 							openapi.WithStatus(303, &openapi.ResponseRef{
 								Ref: "#/components/responses/SeeOther",
@@ -439,48 +496,6 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 	}, registeredPaths)
 }
 
-func (hh *HostHandler) authorizeHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
-	if !hh.authConfig.IsAuthEnabled() {
-		return
-	}
-
-	const path = "/-/oauth/authorize"
-	// Apply Authentication Middleware
-	handler := hh.authConfig.AddAuthentication(http.HandlerFunc(hh.AuthorizeHandler))
-	mux.Handle("GET "+path, handler)
-
-	hh.registerPath(path, ko.PathInfo{
-		API: ko.OpenAPI{
-			BasePath: path,
-			Paths: map[string]ko.PathItem{
-				path: {
-					Description: "The OAuth2 authorization endpoint",
-					Get: &openapi.Operation{
-						Description: "GET to start authorization flow",
-						OperationID: "authorize-get",
-						Parameters:  ko.ExtractParameters(path, "client_id=foo&response_type=code&redirect_uri=bar", http.Header{}),
-						Responses: openapi.NewResponses(
-							openapi.WithStatus(302, &openapi.ResponseRef{
-								Ref: "#/components/responses/Found",
-							}),
-							openapi.WithStatus(400, &openapi.ResponseRef{
-								Ref: "#/components/responses/BadRequest",
-							}),
-							openapi.WithStatus(500, &openapi.ResponseRef{
-								Ref: "#/components/responses/InternalServerError",
-							}),
-						),
-						Summary: "OAuth2 Authorization",
-						Tags:    []string{"system", "oauth2", "auth"},
-					},
-					Summary: "OAuth2 authorization",
-				},
-			},
-		},
-		Type: ko.SystemPathType,
-	}, registeredPaths)
-}
-
 func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
 	const path = "/-/openapi"
 
@@ -496,10 +511,11 @@ func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 					Get: &openapi.Operation{
 						Description: "GET OpenAPI 3.0 Spec",
 						OperationID: "openapi-get",
-						Parameters: ko.ExtractParameters(
-							path, "path=one&path=two&tag=one&tag=two&type=one&type=two",
-							http.Header{},
-						),
+						Parameters: openapi.Parameters{
+							ko.ArrayQueryParam("path", "Filter by paths"),
+							ko.ArrayQueryParam("tag", "Filter by tags"),
+							ko.ArrayQueryParam("type", "Filter by path types"),
+						},
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -543,7 +559,9 @@ func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 					Get: &openapi.Operation{
 						Description: "GET JSONschema",
 						OperationID: "schema-get",
-						Parameters:  ko.ExtractParameters(path, "", http.Header{}),
+						Parameters: openapi.Parameters{
+							ko.WildcardPathParam("path", "The schema path (e.g., v1/users/User or User)"),
+						},
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Content: openapi.NewContentWithSchema(
@@ -586,7 +604,10 @@ func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 						Get: &openapi.Operation{
 							Description: "GET Sniffer dashboard",
 							OperationID: "sniffer-dashboard-get",
-							Parameters:  ko.ExtractParameters(inspectPath, "format=text", http.Header{}),
+							Parameters: openapi.Parameters{
+								ko.QueryParam("format", "The output format (e.g., 'text' or 'html')"),
+								ko.PathParam("uuid", "The request UUID"),
+							},
 							Responses: openapi.NewResponses(
 								openapi.WithName("200", &openapi.Response{
 									Description: openapi.Ptr("Dashboard"),
@@ -637,7 +658,7 @@ func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 						Get: &openapi.Operation{
 							Description: "GET Sniffer Docs",
 							OperationID: "sniffer-docs-get",
-							Parameters:  ko.ExtractParameters(docsPath, "", http.Header{}),
+							Parameters:  openapi.Parameters{},
 							Responses: openapi.NewResponses(
 								openapi.WithName("200", &openapi.Response{
 									Description: openapi.Ptr("Markdown"),
@@ -839,7 +860,10 @@ func (hh *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 					Get: &openapi.Operation{
 						Description: "GET localization keys and their translated values",
 						OperationID: "translation-get",
-						Parameters:  ko.ExtractParameters(path, "key=one&key=two", http.Header{}),
+						Parameters: openapi.Parameters{
+							ko.ArrayQueryParam("key", "Filter by specific translation keys"),
+							ko.PathParam("l10n", "The language tag"),
+						},
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
 								Description: openapi.Ptr("JSON translation map"),

@@ -26,35 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func NewHostHandler(c client.Client, name string, namespace string, log logr.Logger) *HostHandler {
-	th := &HostHandler{
-		Name:                      name,
-		Namespace:                 namespace,
-		client:                    c,
-		defaultLanguage:           "en",
-		log:                       log,
-		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
-		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
-		registeredPaths:           map[string]ko.PathInfo{},
-		pathsCollectedInReconcile: map[string]ko.PathInfo{},
-		analysisCache:             NewAnalysisCache(),
-	}
-
-	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
-	if err != nil {
-		panic(err)
-	}
-
-	th.Translations = *translations
-	th.Pages = page.NewPageStore(
-		name,
-		th.RebuildMux,
-		th.log.WithName("pages"),
-	)
-	th.RebuildMux()
-	return th
-}
-
 func (hh *HostHandler) AddOrUpdateTranslation(name string, translation *kdexv1alpha1.KDexTranslationSpec) {
 	if translation == nil {
 		return
@@ -225,6 +196,35 @@ func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 	// data-state-endpoint="/-/state"
 
 	return buffer.String()
+}
+
+func NewHostHandler(c client.Client, name string, namespace string, log logr.Logger) *HostHandler {
+	th := &HostHandler{
+		Name:                      name,
+		Namespace:                 namespace,
+		client:                    c,
+		defaultLanguage:           "en",
+		log:                       log,
+		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
+		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
+		registeredPaths:           map[string]ko.PathInfo{},
+		pathsCollectedInReconcile: map[string]ko.PathInfo{},
+		analysisCache:             NewAnalysisCache(),
+	}
+
+	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
+	if err != nil {
+		panic(err)
+	}
+
+	th.Translations = *translations
+	th.Pages = page.NewPageStore(
+		name,
+		th.RebuildMux,
+		th.log.WithName("pages"),
+	)
+	th.RebuildMux()
+	return th
 }
 
 func (hh *HostHandler) RebuildMux() {
@@ -544,6 +544,10 @@ func (hh *HostHandler) isSecure(r *http.Request) bool {
 	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
+func (hh *HostHandler) issuerAddress() string {
+	return fmt.Sprintf("%s://%s", hh.scheme, hh.host.Routing.Domains[0])
+}
+
 func (hh *HostHandler) messagePrinter(translations *Translations, tag language.Tag) *message.Printer {
 	return message.NewPrinter(
 		tag,
@@ -620,14 +624,6 @@ func (hh *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPag
 	return rendered
 }
 
-func (hh *HostHandler) issuerAddress() string {
-	return fmt.Sprintf("%s://%s", hh.scheme, hh.host.Routing.Domains[0])
-}
-
-func (hh *HostHandler) serverAddress(r *http.Request) string {
-	return fmt.Sprintf("%s://%s", hh.scheme, r.Host)
-}
-
 func (hh *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code int, msg string) {
 	hh.mu.RLock()
 	l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
@@ -658,6 +654,10 @@ func (hh *HostHandler) serveError(w http.ResponseWriter, r *http.Request, code i
 	w.Header().Set("Content-Language", l.String())
 	w.WriteHeader(code)
 	_, _ = w.Write([]byte(rendered))
+}
+
+func (hh *HostHandler) serverAddress(r *http.Request) string {
+	return fmt.Sprintf("%s://%s", hh.scheme, r.Host)
 }
 
 func toFinalPath(path string) string {
