@@ -261,6 +261,7 @@ var _ = BeforeSuite(func() {
 	functionReconciler := &KDexFunctionReconciler{
 		Client:        k8sManager.GetClient(),
 		Configuration: configuration,
+		HostHandler:   hostHandler,
 		RequeueDelay:  requeueDelay,
 		Scheme:        k8sManager.GetScheme(),
 	}

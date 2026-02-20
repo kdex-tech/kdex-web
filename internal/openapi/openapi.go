@@ -41,15 +41,25 @@ func (b *Builder) BuildOneOff(serverUrl string, fn *kdexv1alpha1.KDexFunction) *
 		fn.Spec.API.BasePath: info,
 	}
 
-	return b.BuildOpenAPI(serverUrl, fn.Name, paths, Filter{})
+	return b.buildOpenAPI(serverUrl, fn.Name, paths, Filter{}, true)
 }
 
-// nolint:gocyclo
 func (b *Builder) BuildOpenAPI(
 	serverUrl string,
 	name string,
 	paths map[string]PathInfo,
 	filter Filter,
+) *openapi.T {
+	return b.buildOpenAPI(serverUrl, name, paths, filter, false)
+}
+
+// nolint:gocyclo
+func (b *Builder) buildOpenAPI(
+	serverUrl string,
+	name string,
+	paths map[string]PathInfo,
+	filter Filter,
+	isOneOff bool,
 ) *openapi.T {
 	doc := &openapi.T{
 		Components: &openapi.Components{
@@ -70,6 +80,8 @@ func (b *Builder) BuildOpenAPI(
 	}
 
 	tags := openapi.Tags{}
+
+	securitySchemesUsed := map[string]bool{}
 
 	basePaths := slices.Collect(maps.Keys(paths))
 
@@ -139,6 +151,13 @@ func (b *Builder) BuildOpenAPI(
 						tags = append(tags, &openapi.Tag{
 							Name: t,
 						})
+					}
+				}
+				if op.Security != nil {
+					for _, scheme := range *op.Security {
+						for schemeName := range scheme {
+							securitySchemesUsed[schemeName] = true
+						}
 					}
 				}
 			}
@@ -255,13 +274,22 @@ func (b *Builder) BuildOpenAPI(
 			if scheme.Ref != "" {
 				continue
 			}
-			securitySchemes[name] = scheme
-			security = append(security, openapi.SecurityRequirement{
-				name: {},
-			})
+
+			if isOneOff {
+				if _, ok := securitySchemesUsed[name]; ok {
+					securitySchemes[name] = scheme
+				}
+			} else {
+				securitySchemes[name] = scheme
+				security = append(security, openapi.SecurityRequirement{
+					name: {},
+				})
+			}
 		}
 
-		security = append(security, openapi.SecurityRequirement{})
+		if !isOneOff {
+			security = append(security, openapi.SecurityRequirement{})
+		}
 
 		doc.Components.SecuritySchemes = securitySchemes
 		doc.Security = security

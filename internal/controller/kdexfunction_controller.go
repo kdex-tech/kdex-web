@@ -29,6 +29,7 @@ import (
 	"github.com/kdex-tech/kdex-host/internal/build"
 	"github.com/kdex-tech/kdex-host/internal/deploy"
 	"github.com/kdex-tech/kdex-host/internal/generate"
+	"github.com/kdex-tech/kdex-host/internal/host"
 	kjob "github.com/kdex-tech/kdex-host/internal/job"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -49,6 +50,7 @@ import (
 type KDexFunctionReconciler struct {
 	client.Client
 	Configuration configuration.NexusConfiguration
+	HostHandler   *host.HostHandler
 	RequeueDelay  time.Duration
 	Scheme        *runtime.Scheme
 }
@@ -398,7 +400,9 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 			Config:           *hc.function.Status.Generator,
 			GitSecret:        gitSecret,
 			ImagePullSecrets: hc.imagePullSecrets,
+			OpenAPIBuilder:   r.HostHandler.GetOpenAPIBuilder(),
 			Scheme:           r.Scheme,
+			ServerUrl:        fmt.Sprintf("%s://%s", hc.host.Spec.Routing.Scheme, hc.host.Spec.Routing.Domains[0]),
 			ServiceAccount:   hc.host.Spec.ServiceAccountRef.Name,
 		}
 

@@ -2,9 +2,8 @@ package generate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 
 	"github.com/oasdiff/yaml"
 	batchv1 "k8s.io/api/batch/v1"
@@ -14,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/kdex-tech/kdex-host/internal"
+	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	"github.com/kdex-tech/kdex-host/internal/utils"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -25,7 +25,9 @@ type Generator struct {
 	Config           kdexv1alpha1.Generator
 	GitSecret        corev1.LocalObjectReference
 	ImagePullSecrets []corev1.LocalObjectReference
+	OpenAPIBuilder   *ko.Builder
 	Scheme           *runtime.Scheme
+	ServerUrl        string
 	ServiceAccount   string
 }
 
@@ -42,15 +44,8 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 		return nil, err
 	}
 
-	url := function.Status.Attributes["openapi.schema.url.internal"]
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	functionString, err := io.ReadAll(resp.Body)
+	spec := g.OpenAPIBuilder.BuildOneOff(g.ServerUrl, function)
+	specBytes, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +81,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 		},
 		{
 			Name:  "FUNCTION_API_SPEC",
-			Value: string(functionString),
+			Value: string(specBytes),
 		},
 		{
 			Name:  "COMMITTER_EMAIL",

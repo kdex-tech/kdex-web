@@ -286,6 +286,7 @@ func main() {
 	if err := (&controller.KDexFunctionReconciler{
 		Client:        mgr.GetClient(),
 		Configuration: conf,
+		HostHandler:   hostHandler,
 		RequeueDelay:  requeueDelay,
 		Scheme:        mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {

@@ -66,6 +66,12 @@ func (hh *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	return buffer.String()
 }
 
+func (hh *HostHandler) GetOpenAPIBuilder() *ko.Builder {
+	hh.mu.RLock()
+	defer hh.mu.RUnlock()
+	return &hh.openapiBuilder
+}
+
 func (hh *HostHandler) GetUtilityPageHandler(name kdexv1alpha1.KDexUtilityPageType) page.PageHandler {
 	hh.mu.RLock()
 	defer hh.mu.RUnlock()
