@@ -71,8 +71,6 @@ func (b *Builder) BuildOpenAPI(
 
 	tags := openapi.Tags{}
 
-	securitySchemesUsed := map[string]bool{}
-
 	basePaths := slices.Collect(maps.Keys(paths))
 
 	slices.Sort(basePaths)
@@ -141,13 +139,6 @@ func (b *Builder) BuildOpenAPI(
 						tags = append(tags, &openapi.Tag{
 							Name: t,
 						})
-					}
-				}
-				if op.Security != nil {
-					for _, scheme := range *op.Security {
-						for schemeName := range scheme {
-							securitySchemesUsed[schemeName] = true
-						}
 					}
 				}
 			}
@@ -256,19 +247,24 @@ func (b *Builder) BuildOpenAPI(
 		}
 	}
 
-	if b.SecuritySchemes != nil {
+	if b.SecuritySchemes != nil && len(*b.SecuritySchemes) > 0 {
 		securitySchemes := openapi.SecuritySchemes{}
+		security := openapi.SecurityRequirements{}
 
 		for name, scheme := range *b.SecuritySchemes {
 			if scheme.Ref != "" {
 				continue
 			}
-			if _, ok := securitySchemesUsed[name]; ok {
-				securitySchemes[name] = scheme
-			}
+			securitySchemes[name] = scheme
+			security = append(security, openapi.SecurityRequirement{
+				name: {},
+			})
 		}
 
+		security = append(security, openapi.SecurityRequirement{})
+
 		doc.Components.SecuritySchemes = securitySchemes
+		doc.Security = security
 
 		if len(doc.Components.SecuritySchemes) > 0 {
 			doc.Components.Responses["Unauthorized"] = &openapi.ResponseRef{
