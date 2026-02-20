@@ -108,7 +108,7 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 	if p.NPMSecretRef != nil {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      "npmrc",
-			MountPath: "/workspace/.npmrc",
+			MountPath: internal.WORKDIR + "/.npmrc",
 			SubPath:   ".npmrc",
 			ReadOnly:  true,
 		})
