@@ -749,12 +749,27 @@ func (hh *HostHandler) tokenHandler(mux *http.ServeMux, registeredPaths map[stri
 															Type: &openapi.Types{openapi.TypeString},
 														},
 													},
+													"client_secret": &openapi.SchemaRef{
+														Value: &openapi.Schema{
+															Type: &openapi.Types{openapi.TypeString},
+														},
+													},
+													"code": &openapi.SchemaRef{
+														Value: &openapi.Schema{
+															Type: &openapi.Types{openapi.TypeString},
+														},
+													},
 													"grant_type": &openapi.SchemaRef{
 														Value: &openapi.Schema{
 															Type: &openapi.Types{openapi.TypeString},
 														},
 													},
 													"password": &openapi.SchemaRef{
+														Value: &openapi.Schema{
+															Type: &openapi.Types{openapi.TypeString},
+														},
+													},
+													"redirect_uri": &openapi.SchemaRef{
 														Value: &openapi.Schema{
 															Type: &openapi.Types{openapi.TypeString},
 														},

@@ -387,9 +387,23 @@ func (hh *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 
 	(*req)["oauth2"] = &openapi.SecuritySchemeRef{
 		Value: &openapi.SecurityScheme{
-			Description: "OAuth2 authentication using Password Flow",
+			Description: "OAuth2 authentication using Password, Authorization Code, or Client Credentials Flow",
 			Flows: &openapi.OAuthFlows{
-				// TODO: Add other flows
+				AuthorizationCode: &openapi.OAuthFlow{
+					AuthorizationURL: "/-/oauth/authorize",
+					Scopes: map[string]string{
+						"openid":  "standard oidc scope",
+						"profile": "user profile info",
+					},
+					TokenURL: "/-/token",
+				},
+				ClientCredentials: &openapi.OAuthFlow{
+					Scopes: map[string]string{
+						"openid":  "standard oidc scope",
+						"profile": "user profile info",
+					},
+					TokenURL: "/-/token",
+				},
 				Password: &openapi.OAuthFlow{
 					Scopes: map[string]string{
 						"openid":  "standard oidc scope",
