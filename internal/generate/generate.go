@@ -22,12 +22,14 @@ import (
 
 type Generator struct {
 	client.Client
-	Config         kdexv1alpha1.Generator
-	Scheme         *runtime.Scheme
-	ServiceAccount string
+	Config           kdexv1alpha1.Generator
+	GitSecret        corev1.LocalObjectReference
+	ImagePullSecrets []corev1.LocalObjectReference
+	Scheme           *runtime.Scheme
+	ServiceAccount   string
 }
 
-func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1alpha1.KDexFunction, gitSecret corev1.LocalObjectReference) (*batchv1.Job, error) {
+func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1alpha1.KDexFunction) (*batchv1.Job, error) {
 	// Create Job name
 	jobName := fmt.Sprintf("%s-codegen-%d", function.Name, function.Generation)
 
@@ -103,7 +105,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "host",
-					LocalObjectReference: gitSecret,
+					LocalObjectReference: g.GitSecret,
 				},
 			},
 		},
@@ -112,7 +114,16 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "org",
-					LocalObjectReference: gitSecret,
+					LocalObjectReference: g.GitSecret,
+				},
+			},
+		},
+		{
+			Name: "GIT_PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					Key:                  "password",
+					LocalObjectReference: g.GitSecret,
 				},
 			},
 		},
@@ -121,25 +132,16 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					Key:                  "repo",
-					LocalObjectReference: gitSecret,
+					LocalObjectReference: g.GitSecret,
 				},
 			},
 		},
 		{
-			Name: "GIT_TOKEN",
+			Name: "GIT_USERNAME",
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "token",
-					LocalObjectReference: gitSecret,
-				},
-			},
-		},
-		{
-			Name: "GIT_USER",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					Key:                  "user",
-					LocalObjectReference: gitSecret,
+					Key:                  "username",
+					LocalObjectReference: g.GitSecret,
 				},
 			},
 		},
@@ -180,36 +182,41 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 				},
 				Spec: corev1.PodSpec{
 					AutomountServiceAccountToken: utils.Ptr(true),
-					InitContainers: []corev1.Container{
+					Containers: []corev1.Container{
 						{
-							Name:         "git-checkout",
+							Name: "results",
+
+							Command:      []string{"patch_source_status"},
+							Env:          env,
 							Image:        g.Config.Git.Image,
-							Command:      []string{"git_checkout"},
-							Env:          env,
-							VolumeMounts: volumeMounts,
-						},
-						{
-							Name:         "generate-code",
-							Image:        g.Config.Image,
-							Command:      g.Config.Command,
-							Args:         g.Config.Args,
-							Env:          env,
-							VolumeMounts: volumeMounts,
-						},
-						{
-							Name:         "git-push",
-							Image:        g.Config.Git.Image,
-							Command:      []string{"git_push"},
-							Env:          env,
 							VolumeMounts: volumeMounts,
 						},
 					},
-					Containers: []corev1.Container{
+					ImagePullSecrets: g.ImagePullSecrets,
+					InitContainers: []corev1.Container{
 						{
-							Name:         "results",
-							Image:        g.Config.Git.Image,
-							Command:      []string{"patch_source_status"},
+							Name: "git-checkout",
+
+							Command:      []string{"git_checkout"},
 							Env:          env,
+							Image:        g.Config.Git.Image,
+							VolumeMounts: volumeMounts,
+						},
+						{
+							Name: "generate-code",
+
+							Args:         g.Config.Args,
+							Command:      g.Config.Command,
+							Env:          env,
+							Image:        g.Config.Image,
+							VolumeMounts: volumeMounts,
+						},
+						{
+							Name: "git-push",
+
+							Command:      []string{"git_push"},
+							Env:          env,
+							Image:        g.Config.Git.Image,
 							VolumeMounts: volumeMounts,
 						},
 					},
@@ -228,15 +235,11 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 		},
 	}
 
-	// Add owner reference
-	err = ctrl.SetControllerReference(function, job, g.Scheme)
-	if err != nil {
+	if err = ctrl.SetControllerReference(function, job, g.Scheme); err != nil {
 		return nil, fmt.Errorf("failed to create code generation job: %w", err)
 	}
 
-	// Create the job
-	err = g.Create(ctx, job)
-	if err != nil {
+	if err = g.Create(ctx, job); err != nil {
 		return nil, fmt.Errorf("failed to create code generation job: %w", err)
 	}
 

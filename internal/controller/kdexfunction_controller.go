@@ -54,11 +54,12 @@ type KDexFunctionReconciler struct {
 }
 
 type handlerContext struct {
-	ctx             context.Context
-	faasAdaptorSpec kdexv1alpha1.KDexFaaSAdaptorSpec
-	function        *kdexv1alpha1.KDexFunction
-	host            kdexv1alpha1.KDexInternalHost
-	req             ctrl.Request
+	ctx              context.Context
+	faasAdaptorSpec  kdexv1alpha1.KDexFaaSAdaptorSpec
+	function         *kdexv1alpha1.KDexFunction
+	host             kdexv1alpha1.KDexInternalHost
+	imagePullSecrets []corev1.LocalObjectReference
+	req              ctrl.Request
 }
 
 func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
@@ -99,12 +100,42 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		string(function.Status.State),
 	)
 
-	host, shouldReturn, r1, err := ResolveHost(ctx, r.Client, &function, &function.Status.Conditions, &function.Spec.HostRef, r.RequeueDelay)
+	internalHost, shouldReturn, r1, err := ResolveHost(ctx, r.Client, &function, &function.Status.Conditions, &function.Spec.HostRef, r.RequeueDelay)
 	if shouldReturn {
 		return r1, err
 	}
 
-	faasAdaptorRef := host.Spec.FaaSAdaptorRef
+	secrets, err := ResolveServiceAccountSecrets(ctx, r.Client, internalHost.Namespace, internalHost.Spec.ServiceAccountRef.Name)
+	if err != nil {
+		kdexv1alpha1.SetConditions(
+			&internalHost.Status.Conditions,
+			kdexv1alpha1.ConditionStatuses{
+				Degraded:    metav1.ConditionTrue,
+				Progressing: metav1.ConditionFalse,
+				Ready:       metav1.ConditionFalse,
+			},
+			kdexv1alpha1.ConditionReasonReconcileError,
+			err.Error(),
+		)
+
+		return ctrl.Result{}, err
+	}
+
+	internalHost.Spec.ServiceAccountSecrets = secrets
+
+	imagePullSecretRefs := []corev1.LocalObjectReference{}
+	imagePullSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(
+		func(s corev1.Secret) bool {
+			return s.Type == corev1.SecretTypeDockerConfigJson
+		},
+	)
+	for _, secret := range imagePullSecrets {
+		imagePullSecretRefs = append(imagePullSecretRefs, corev1.LocalObjectReference{
+			Name: secret.Name,
+		})
+	}
+
+	faasAdaptorRef := internalHost.Spec.FaaSAdaptorRef
 	if faasAdaptorRef == nil {
 		faasAdaptorRef = &kdexv1alpha1.KDexObjectReference{
 			Kind: "KDexClusterFaaSAdaptor",
@@ -148,11 +179,12 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	hc := handlerContext{
-		ctx:             ctx,
-		req:             req,
-		function:        &function,
-		host:            *host,
-		faasAdaptorSpec: *faasAdaptorSpec,
+		ctx:              ctx,
+		faasAdaptorSpec:  *faasAdaptorSpec,
+		function:         &function,
+		host:             *internalHost,
+		imagePullSecrets: imagePullSecretRefs,
+		req:              req,
 	}
 
 	// Pick up asynchronous builder updates (e.g. from KPack git polling)
@@ -333,16 +365,9 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 	if hc.function.Spec.Origin.Source != nil {
 		hc.function.Status.Source = hc.function.Spec.Origin.Source
 	} else {
-		gImpl := generate.Generator{
-			Client:         r.Client,
-			Scheme:         r.Scheme,
-			Config:         *hc.function.Status.Generator,
-			ServiceAccount: hc.host.Name,
-		}
-
 		gitSecrets := hc.host.Spec.ServiceAccountSecrets.Filter(
 			func(s corev1.Secret) bool {
-				return s.Type == corev1.SecretTypeDockerConfigJson
+				return s.Annotations["kdex.dev/secret-type"] == "git"
 			},
 		)
 		if len(gitSecrets) == 0 {
@@ -368,7 +393,16 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 			Name: gitSecrets[0].Name,
 		}
 
-		job, err := gImpl.GetOrCreateGenerateJob(hc.ctx, hc.function, gitSecret)
+		generator := generate.Generator{
+			Client:           r.Client,
+			Config:           *hc.function.Status.Generator,
+			GitSecret:        gitSecret,
+			ImagePullSecrets: hc.imagePullSecrets,
+			Scheme:           r.Scheme,
+			ServiceAccount:   hc.host.Spec.ServiceAccountRef.Name,
+		}
+
+		job, err := generator.GetOrCreateGenerateJob(hc.ctx, hc.function)
 		if err != nil {
 			kdexv1alpha1.SetConditions(
 				&hc.function.Status.Conditions,
@@ -485,7 +519,7 @@ func (r *KDexFunctionReconciler) handleBuildValid(hc handlerContext) (ctrl.Resul
 			defaultParts := strings.SplitN(hc.faasAdaptorSpec.DefaultBuilderGenerator, "/", 2)
 			defaultLanguage := defaultParts[1]
 			defaultBuilderName := defaultParts[0]
-			sourceLanguage := gImpl.Config.Language
+			sourceLanguage := generator.Config.Language
 			builderName := ""
 			if sourceLanguage == defaultLanguage {
 				builderName = defaultBuilderName
@@ -531,10 +565,11 @@ func (r *KDexFunctionReconciler) handleSourceAvailable(hc handlerContext) (ctrl.
 		hc.function.Status.Executable = hc.function.Spec.Origin.Executable
 	} else {
 		builder := build.Builder{
-			Client:        r.Client,
-			Scheme:        r.Scheme,
-			Configuration: r.Configuration,
-			Source:        *hc.function.Status.Source,
+			Client:         r.Client,
+			Configuration:  r.Configuration,
+			Scheme:         r.Scheme,
+			ServiceAccount: hc.host.Spec.ServiceAccountRef.Name,
+			Source:         *hc.function.Status.Source,
 		}
 
 		op, imgUnstruct, err := builder.GetOrCreateKPackImage(hc.ctx, hc.function)
@@ -661,11 +696,12 @@ func (r *KDexFunctionReconciler) handleExecutableAvailable(hc handlerContext) (c
 	log := logf.FromContext(hc.ctx)
 
 	deployer := deploy.Deployer{
-		Client:         r.Client,
-		FaaSAdaptor:    hc.faasAdaptorSpec,
-		Host:           hc.host,
-		ServiceAccount: hc.host.Name,
-		Scheme:         r.Scheme,
+		Client:           r.Client,
+		FaaSAdaptor:      hc.faasAdaptorSpec,
+		Host:             hc.host,
+		ImagePullSecrets: hc.imagePullSecrets,
+		Scheme:           r.Scheme,
+		ServiceAccount:   hc.host.Spec.ServiceAccountRef.Name,
 	}
 
 	job, err := deployer.Deploy(hc.ctx, hc.function)
@@ -800,11 +836,12 @@ func (r *KDexFunctionReconciler) handleFunctionDeployed(hc handlerContext) (ctrl
 	log := logf.FromContext(hc.ctx)
 
 	deployer := deploy.Deployer{
-		Client:         r.Client,
-		FaaSAdaptor:    hc.faasAdaptorSpec,
-		Host:           hc.host,
-		ServiceAccount: hc.host.Name,
-		Scheme:         r.Scheme,
+		Client:           r.Client,
+		FaaSAdaptor:      hc.faasAdaptorSpec,
+		Host:             hc.host,
+		ImagePullSecrets: hc.imagePullSecrets,
+		ServiceAccount:   hc.host.Spec.ServiceAccountRef.Name,
+		Scheme:           r.Scheme,
 	}
 
 	_, err := deployer.Observe(hc.ctx, hc.function)
@@ -851,11 +888,12 @@ func (r *KDexFunctionReconciler) handleReady(hc handlerContext) (ctrl.Result, er
 	}
 
 	deployer := deploy.Deployer{
-		Client:         r.Client,
-		FaaSAdaptor:    hc.faasAdaptorSpec,
-		Host:           hc.host,
-		ServiceAccount: hc.host.Name,
-		Scheme:         r.Scheme,
+		Client:           r.Client,
+		FaaSAdaptor:      hc.faasAdaptorSpec,
+		Host:             hc.host,
+		ImagePullSecrets: hc.imagePullSecrets,
+		ServiceAccount:   hc.host.Spec.ServiceAccountRef.Name,
+		Scheme:           r.Scheme,
 	}
 
 	_, err := deployer.Observe(hc.ctx, hc.function)

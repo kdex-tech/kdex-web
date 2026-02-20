@@ -18,11 +18,12 @@ import (
 )
 
 type Deployer struct {
-	Client         client.Client
-	FaaSAdaptor    kdexv1alpha1.KDexFaaSAdaptorSpec
-	Host           kdexv1alpha1.KDexInternalHost
-	Scheme         *runtime.Scheme
-	ServiceAccount string
+	Client           client.Client
+	FaaSAdaptor      kdexv1alpha1.KDexFaaSAdaptorSpec
+	Host             kdexv1alpha1.KDexInternalHost
+	ImagePullSecrets []corev1.LocalObjectReference
+	Scheme           *runtime.Scheme
+	ServiceAccount   string
 }
 
 // Runtime defines the interface for interacting with a FaaS provider.
@@ -218,6 +219,7 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 							Name: "deployer",
 						},
 					},
+					ImagePullSecrets:   d.ImagePullSecrets,
 					RestartPolicy:      corev1.RestartPolicyNever,
 					ServiceAccountName: d.ServiceAccount,
 				},
@@ -225,15 +227,11 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 		},
 	}
 
-	// Add owner reference
-	err = ctrl.SetControllerReference(function, job, d.Scheme)
-	if err != nil {
+	if err = ctrl.SetControllerReference(function, job, d.Scheme); err != nil {
 		return nil, fmt.Errorf("failed to create deployment job: %w", err)
 	}
 
-	// Create the job
-	err = d.Client.Create(ctx, job)
-	if err != nil {
+	if err = d.Client.Create(ctx, job); err != nil {
 		return nil, fmt.Errorf("failed to create deployment job: %w", err)
 	}
 
@@ -317,8 +315,9 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 									Name:    "observer",
 								},
 							},
+							ImagePullSecrets:   d.ImagePullSecrets,
 							RestartPolicy:      corev1.RestartPolicyOnFailure,
-							ServiceAccountName: d.FaaSAdaptor.Observer.ServiceAccountName,
+							ServiceAccountName: d.ServiceAccount,
 						},
 					},
 					TTLSecondsAfterFinished: utils.Ptr(int32(0)),
@@ -334,15 +333,11 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 		cronJob.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName = d.ServiceAccount
 	}
 
-	// Add owner reference
-	err = ctrl.SetControllerReference(function, cronJob, d.Scheme)
-	if err != nil {
+	if err = ctrl.SetControllerReference(function, cronJob, d.Scheme); err != nil {
 		return nil, fmt.Errorf("failed to create observation cronjob: %w", err)
 	}
 
-	// Create the cronjob
-	err = d.Client.Create(ctx, cronJob)
-	if err != nil {
+	if err = d.Client.Create(ctx, cronJob); err != nil {
 		return nil, fmt.Errorf("failed to create observation cronjob: %w", err)
 	}
 

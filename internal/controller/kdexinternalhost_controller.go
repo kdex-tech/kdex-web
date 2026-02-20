@@ -421,7 +421,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	internalPackageReferences := &kdexv1alpha1.KDexInternalPackageReferences{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-packages", internalHost.Name),
+			Name:      internalHost.Name,
 			Namespace: internalHost.Namespace,
 		},
 	}
@@ -1024,6 +1024,13 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 ) (bool, ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
+	npmSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "npm" })
+	pullImageSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Type == corev1.SecretTypeDockerConfigJson })
+	var pullImageSecretRefs []corev1.LocalObjectReference
+	for _, s := range pullImageSecrets {
+		pullImageSecretRefs = append(pullImageSecretRefs, corev1.LocalObjectReference{Name: s.Name})
+	}
+
 	op, err := ctrl.CreateOrUpdate(
 		ctx,
 		r.Client,
@@ -1036,9 +1043,23 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 				maps.Copy(internalPackageReferences.Labels, internalHost.Labels)
 
 				internalPackageReferences.Labels["kdex.dev/packages"] = internalPackageReferences.Name
+
+				internalPackageReferences.Spec.HostRef = corev1.LocalObjectReference{
+					Name: internalHost.Name,
+				}
 			}
 
+			// TODO: make configurable
+			internalPackageReferences.Spec.BuilderImage = "node:25-alpine"
+			internalPackageReferences.Spec.BuilderImagePullSecrets = pullImageSecretRefs
+
+			if len(npmSecrets) > 0 {
+				internalPackageReferences.Spec.NPMSecretRef = &corev1.LocalObjectReference{
+					Name: npmSecrets[0].Name,
+				}
+			}
 			internalPackageReferences.Spec.PackageReferences = packageReferences
+			internalPackageReferences.Spec.ServiceAccountRef = internalHost.Spec.ServiceAccountRef
 
 			return ctrl.SetControllerReference(internalHost, internalPackageReferences, r.Scheme)
 		},

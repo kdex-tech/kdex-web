@@ -17,9 +17,10 @@ import (
 
 type Builder struct {
 	client.Client
-	Scheme        *runtime.Scheme
-	Configuration configuration.NexusConfiguration
-	Source        kdexv1alpha1.Source
+	Configuration  configuration.NexusConfiguration
+	Scheme         *runtime.Scheme
+	ServiceAccount string
+	Source         kdexv1alpha1.Source
 }
 
 func (b *Builder) GetOrCreateKPackImage(
@@ -41,6 +42,7 @@ func (b *Builder) GetOrCreateKPackImage(
 				"kind": b.Source.Builder.BuilderRef.Kind,
 			},
 			"imageTaggingStrategy": "BuildNumber",
+			"serviceAccountName":   b.ServiceAccount,
 			"source": map[string]any{
 				"git": map[string]any{
 					"url":      b.Source.Repository,
