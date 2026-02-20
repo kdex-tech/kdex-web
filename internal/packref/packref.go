@@ -54,7 +54,7 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 
 	builderArgs := []string{
 		"--dockerfile=/scripts/Dockerfile",
-		"--context=dir:///workspace",
+		"--context=dir://" + internal.WORKDIR,
 		"--destination=" + imageURL,
 		"--digest-file=/dev/termination-log",
 	}
@@ -165,7 +165,8 @@ cd ${WORKDIR}
 
 echo "======== package.json ========="
 cat package.json
-echo "==============================="
+echo -e "\n==============================="
+
 npm install
 
 npx esbuild node_modules/**/*.js --allow-overwrite --outdir=node_modules --define:process.env.NODE_ENV=\"production\"
