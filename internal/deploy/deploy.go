@@ -114,59 +114,60 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 			Name:  "ISSUER",
 			Value: issuer,
 		},
-		{
-			Name:  "SCALING_ACTIVATION_SCALE",
-			Value: fmt.Sprintf("%d", *function.Spec.Origin.Executable.Scaling.ActivationScale),
-		},
-		{
-			Name:  "SCALING_INITIAL_SCALE",
-			Value: fmt.Sprintf("%d", *function.Spec.Origin.Executable.Scaling.InitialScale),
-		},
-		{
-			Name:  "SCALING_MAX_SCALE",
-			Value: fmt.Sprintf("%d", function.Spec.Origin.Executable.Scaling.MaxScale),
-		},
-		{
-			Name:  "SCALING_METRIC",
-			Value: fmt.Sprintf("%s", *function.Spec.Origin.Executable.Scaling.Metric),
-		},
-		{
-			Name:  "SCALING_MIN_SCALE",
-			Value: fmt.Sprintf("%d", function.Spec.Origin.Executable.Scaling.MinScale),
-		},
-		{
-			Name:  "SCALING_PANIC_THRESHOLD_PERCENTAGE",
-			Value: fmt.Sprintf("%d", *function.Spec.Origin.Executable.Scaling.PanicThresholdPercentage),
-		},
-		{
-			Name:  "SCALING_PANIC_WINDOW_PERCENTAGE",
-			Value: fmt.Sprintf("%d", *function.Spec.Origin.Executable.Scaling.PanicWindowPercentage),
-		},
-		{
-			Name:  "SCALING_SCALE_DOWN_DELAY",
-			Value: fmt.Sprintf("%d", *function.Spec.Origin.Executable.Scaling.ScaleDownDelay),
-		},
-		{
-			Name:  "SCALING_SCALE_TO_ZERO_POD_RETENTION_PERIOD",
-			Value: fmt.Sprintf("%d", *function.Spec.Origin.Executable.Scaling.ScaleToZeroPodRetentionPeriod),
-		},
-		{
-			Name:  "SCALING_STABLE_WINDOW",
-			Value: fmt.Sprintf("%d", *function.Spec.Origin.Executable.Scaling.StableWindow),
-		},
-		{
-			Name:  "SCALING_TARGET",
-			Value: fmt.Sprintf("%d", *function.Spec.Origin.Executable.Scaling.Target),
-		},
-		{
-			Name:  "SCALING_TARGET_UTILIZATION_PERCENTAGE",
-			Value: fmt.Sprintf("%d", *function.Spec.Origin.Executable.Scaling.TargetUtilizationPercentage),
-		},
-		// {
-		// 	Name:  "CLIENT_ID",
-		// 	Value: d.Host.Spec.Auth.OIDCProvider.ClientID,
-		// },
 	}...)
+
+	if function.Status.Executable.Scaling != nil {
+		env = append(env, []corev1.EnvVar{
+			{
+				Name:  "SCALING_ACTIVATION_SCALE",
+				Value: fmt.Sprintf("%d", *function.Status.Executable.Scaling.ActivationScale),
+			},
+			{
+				Name:  "SCALING_INITIAL_SCALE",
+				Value: fmt.Sprintf("%d", *function.Status.Executable.Scaling.InitialScale),
+			},
+			{
+				Name:  "SCALING_MAX_SCALE",
+				Value: fmt.Sprintf("%d", function.Status.Executable.Scaling.MaxScale),
+			},
+			{
+				Name:  "SCALING_METRIC",
+				Value: fmt.Sprintf("%s", *function.Status.Executable.Scaling.Metric),
+			},
+			{
+				Name:  "SCALING_MIN_SCALE",
+				Value: fmt.Sprintf("%d", function.Status.Executable.Scaling.MinScale),
+			},
+			{
+				Name:  "SCALING_PANIC_THRESHOLD_PERCENTAGE",
+				Value: fmt.Sprintf("%d", *function.Status.Executable.Scaling.PanicThresholdPercentage),
+			},
+			{
+				Name:  "SCALING_PANIC_WINDOW_PERCENTAGE",
+				Value: fmt.Sprintf("%d", *function.Status.Executable.Scaling.PanicWindowPercentage),
+			},
+			{
+				Name:  "SCALING_SCALE_DOWN_DELAY",
+				Value: fmt.Sprintf("%d", *function.Status.Executable.Scaling.ScaleDownDelay),
+			},
+			{
+				Name:  "SCALING_SCALE_TO_ZERO_POD_RETENTION_PERIOD",
+				Value: fmt.Sprintf("%d", *function.Status.Executable.Scaling.ScaleToZeroPodRetentionPeriod),
+			},
+			{
+				Name:  "SCALING_STABLE_WINDOW",
+				Value: fmt.Sprintf("%d", *function.Status.Executable.Scaling.StableWindow),
+			},
+			{
+				Name:  "SCALING_TARGET",
+				Value: fmt.Sprintf("%d", *function.Status.Executable.Scaling.Target),
+			},
+			{
+				Name:  "SCALING_TARGET_UTILIZATION_PERCENTAGE",
+				Value: fmt.Sprintf("%d", *function.Status.Executable.Scaling.TargetUtilizationPercentage),
+			},
+		}...)
+	}
 
 	var forwardedEnvVars strings.Builder
 	sep := ""
