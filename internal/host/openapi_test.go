@@ -17,7 +17,7 @@ import (
 func TestHostHandler_openapiHandler(t *testing.T) {
 	g := G.NewGomegaWithT(t)
 
-	th := NewHostHandler(nil, "test-host", "default", logr.Discard())
+	th := NewHostHandler(nil, "test-host", "default", logr.Discard(), nil)
 	th.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
 		OpenAPI: kdexv1alpha1.OpenAPI{

@@ -40,7 +40,11 @@ type HostHandler struct {
 	Pages        *page.PageStore
 	Translations Translations
 
-	analysisCache             *AnalysisCache
+	analysisCache *AnalysisCache
+	authChecker   interface {
+		CalculateRequirements(string, string, []kdexv1alpha1.SecurityRequirement) ([]kdexv1alpha1.SecurityRequirement, error)
+		CheckAccess(context.Context, string, string, []kdexv1alpha1.SecurityRequirement) (bool, error)
+	}
 	authConfig                *auth.Config
 	authExchanger             *auth.Exchanger
 	client                    client.Client
@@ -54,23 +58,18 @@ type HostHandler struct {
 	openapiBuilder            ko.Builder
 	packageReferences         []kdexv1alpha1.PackageReference
 	pathsCollectedInReconcile map[string]ko.PathInfo
+	reconcileTime             time.Time
 	registeredPaths           map[string]ko.PathInfo
+	renderCache               RenderCache
 	scheme                    string
 	scripts                   []kdexv1alpha1.ScriptDef
-	themeAssets               []kdexv1alpha1.Asset
-	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec
-	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
-	reconcileTime             time.Time
-
-	authChecker interface {
-		CalculateRequirements(string, string, []kdexv1alpha1.SecurityRequirement) ([]kdexv1alpha1.SecurityRequirement, error)
-		CheckAccess(context.Context, string, string, []kdexv1alpha1.SecurityRequirement) (bool, error)
-	}
-
-	sniffer interface {
+	sniffer                   interface {
 		Analyze(*http.Request) (*sniffer.AnalysisResult, error)
 		DocsHandler(http.ResponseWriter, *http.Request)
 	}
+	themeAssets          []kdexv1alpha1.Asset
+	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
+	utilityPages         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 }
 
 type Translations struct {
@@ -206,6 +205,5 @@ func (h *KDexFunctionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 type pageRender struct {
-	ph          page.PageHandler
-	l10nRenders map[string]string
+	ph page.PageHandler
 }

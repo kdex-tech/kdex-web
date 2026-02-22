@@ -204,19 +204,37 @@ func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 	return buffer.String()
 }
 
-func NewHostHandler(c client.Client, name string, namespace string, log logr.Logger) *HostHandler {
+func NewHostHandler(c client.Client, name string, namespace string, log logr.Logger, cache RenderCache) *HostHandler {
+	if cache == nil {
+		cache = NewInMemoryRenderCache()
+	}
 	th := &HostHandler{
-		Name:                      name,
-		Namespace:                 namespace,
+		Mux:          nil,
+		Name:         name,
+		Namespace:    namespace,
+		Pages:        nil,
+		Translations: Translations{},
+
+		analysisCache:             NewAnalysisCache(),
+		authConfig:                nil,
+		authExchanger:             nil,
 		client:                    c,
 		defaultLanguage:           "en",
+		favicon:                   nil,
+		functions:                 []kdexv1alpha1.KDexFunction{},
+		host:                      nil,
+		importmap:                 "",
 		log:                       log,
+		packageReferences:         []kdexv1alpha1.PackageReference{},
+		pathsCollectedInReconcile: map[string]ko.PathInfo{},
+		reconcileTime:             time.Now(),
+		registeredPaths:           map[string]ko.PathInfo{},
+		renderCache:               cache,
+		scheme:                    "",
+		scripts:                   []kdexv1alpha1.ScriptDef{},
+		themeAssets:               []kdexv1alpha1.Asset{},
 		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
 		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
-		registeredPaths:           map[string]ko.PathInfo{},
-		pathsCollectedInReconcile: map[string]ko.PathInfo{},
-		analysisCache:             NewAnalysisCache(),
-		reconcileTime:             time.Now(),
 	}
 
 	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
@@ -269,7 +287,7 @@ func (hh *HostHandler) RebuildMux() {
 				return
 			}
 
-			if hh.applyCachingHeaders(w, r, nil) {
+			if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
 				return
 			}
 
@@ -310,6 +328,8 @@ func (hh *HostHandler) RebuildMux() {
 		return
 	}
 
+	_ = hh.renderCache.Clear(context.Background())
+
 	renderedPages := []pageRender{}
 	for _, ph := range pageHandlers {
 		basePath := ph.BasePath()
@@ -319,8 +339,7 @@ func (hh *HostHandler) RebuildMux() {
 			continue
 		}
 
-		l10nRenders := hh.L10nRenders(ph, nil, newTranslations)
-		renderedPages = append(renderedPages, pageRender{ph: ph, l10nRenders: l10nRenders})
+		renderedPages = append(renderedPages, pageRender{ph: ph})
 	}
 
 	functionHandlers := []functionHandler{}
@@ -339,7 +358,7 @@ func (hh *HostHandler) RebuildMux() {
 	hh.mu.Lock()
 
 	for _, pr := range renderedPages {
-		hh.addHandlerAndRegister(mux, pr, registeredPaths)
+		hh.addHandlerAndRegister(mux, pr, registeredPaths, newTranslations)
 	}
 	for _, fh := range functionHandlers {
 		// Register both the exact path and the prefix path (with trailing slash)
@@ -631,10 +650,24 @@ func (hh *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPag
 		return ""
 	}
 
+	cacheKey := fmt.Sprintf("utility:%s:%s", utilityType, l.String())
+	if len(extraTemplateData) == 0 {
+		rendered, ok, err := hh.renderCache.Get(context.Background(), cacheKey)
+		if err == nil && ok {
+			return rendered
+		}
+	}
+
 	rendered, err := hh.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
 	if err != nil {
 		hh.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
 		return ""
+	}
+
+	if len(extraTemplateData) == 0 {
+		if err := hh.renderCache.Set(context.Background(), cacheKey, rendered); err != nil {
+			hh.log.Error(err, "failed to set utility cache", "page", ph.Name, "language", l)
+		}
 	}
 
 	return rendered

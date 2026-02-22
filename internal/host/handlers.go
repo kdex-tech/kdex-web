@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 	"github.com/kdex-tech/kdex-host/internal/auth"
@@ -11,11 +12,11 @@ import (
 	"github.com/kdex-tech/kdex-host/internal/utils"
 )
 
-func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, registeredPaths map[string]ko.PathInfo) {
+func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, registeredPaths map[string]ko.PathInfo, translations *Translations) {
 	finalPath := toFinalPath(pr.ph.BasePath())
 	label := pr.ph.Label()
 
-	handler := hh.pageHandlerFunc(pr.ph, pr.l10nRenders)
+	handler := hh.pageHandlerFunc(pr.ph, translations)
 
 	regFunc := func(p string, n string, l string, pattern bool, localized bool) {
 		reqs := hh.convertRequirements(pr.ph.Page.Security)
@@ -143,7 +144,7 @@ func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[
 
 	const oauth2path = "/.well-known/oauth-authorization-server"
 	mux.HandleFunc("GET "+oauth2path, func(w http.ResponseWriter, r *http.Request) {
-		if hh.applyCachingHeaders(w, r, nil) {
+		if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
 			return
 		}
 		issuer := hh.serverAddress(r)
@@ -185,7 +186,7 @@ func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[
 
 	const oidcPath = "/.well-known/openid-configuration"
 	mux.HandleFunc("GET "+oidcPath, func(w http.ResponseWriter, r *http.Request) {
-		if hh.applyCachingHeaders(w, r, nil) {
+		if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
 			return
 		}
 		issuer := hh.serverAddress(r)
@@ -271,7 +272,7 @@ func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 
 	const path = "/.well-known/jwks.json"
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
-		if hh.applyCachingHeaders(w, r, nil) {
+		if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
 			return
 		}
 		auth.JWKSHandler(hh.authConfig.KeyPairs)(w, r)

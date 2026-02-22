@@ -16,7 +16,7 @@ import (
 
 func TestHostHandler_SchemaHandler(t *testing.T) {
 	// Setup HostHandler
-	th := NewHostHandler(nil, "test-host", "default", logr.Discard())
+	th := NewHostHandler(nil, "test-host", "default", logr.Discard(), nil)
 
 	// Define some schemas
 	userSchema := &openapi.SchemaRef{

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/kdex-tech/kdex-host/internal/auth"
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
@@ -11,7 +12,7 @@ import (
 )
 
 func (hh *HostHandler) LoginGet(w http.ResponseWriter, r *http.Request) {
-	if hh.applyCachingHeaders(w, r, []kdexv1alpha1.SecurityRequirement{{"authenticated": {}}}) {
+	if hh.applyCachingHeaders(w, r, []kdexv1alpha1.SecurityRequirement{{"authenticated": {}}}, time.Time{}) {
 		return
 	}
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	"golang.org/x/text/language"
@@ -38,7 +39,7 @@ func NewTranslations(defaultLanguage string, translations map[string]kdexv1alpha
 }
 
 func (hh *HostHandler) TranslationGet(w http.ResponseWriter, r *http.Request) {
-	if hh.applyCachingHeaders(w, r, nil) {
+	if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
 		return
 	}
 

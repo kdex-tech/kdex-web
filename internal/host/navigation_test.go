@@ -144,7 +144,7 @@ func TestHostHandler_BuildMenuEntries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			hh := NewHostHandler(fake.NewClientBuilder().Build(), "foo", "foo", logr.Logger{})
+			hh := NewHostHandler(fake.NewClientBuilder().Build(), "foo", "foo", logr.Logger{}, nil)
 			for _, it := range *tt.items {
 				hh.Pages.Set(it)
 			}

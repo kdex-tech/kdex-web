@@ -3,12 +3,13 @@ package host
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 )
 
 func (hh *HostHandler) OpenAPIGet(w http.ResponseWriter, r *http.Request) {
-	if hh.applyCachingHeaders(w, r, nil) {
+	if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
 		return
 	}
 

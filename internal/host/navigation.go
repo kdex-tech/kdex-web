@@ -2,7 +2,9 @@ package host
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/kdex-tech/kdex-host/internal/auth"
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
@@ -71,7 +73,7 @@ func (hh *HostHandler) BuildMenuEntries(
 }
 
 func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
-	if hh.applyCachingHeaders(w, r, []kdexv1alpha1.SecurityRequirement{{"authenticated": {}}}) {
+	if hh.applyCachingHeaders(w, r, []kdexv1alpha1.SecurityRequirement{{"authenticated": {}}}, time.Time{}) {
 		return
 	}
 
@@ -81,6 +83,15 @@ func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
 	basePath := "/" + r.PathValue("basePathMinusLeadingSlash")
 	l10n := r.PathValue("l10n")
 	navKey := r.PathValue("navKey")
+
+	userHash := hh.getUserHash(r)
+	cacheKey := fmt.Sprintf("nav:%s:%s:%s:%s", navKey, basePath, l10n, userHash)
+	rendered, ok, err := hh.renderCache.Get(r.Context(), cacheKey)
+	if err == nil && ok {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(rendered))
+		return
+	}
 
 	hh.log.V(2).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
 
@@ -122,7 +133,10 @@ func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
 
 	rootEntry := &render.PageEntry{}
 	hh.BuildMenuEntries(r.Context(), rootEntry, &l, l.String() == hh.defaultLanguage, nil)
-	pageMap := *rootEntry.Children
+	var pageMap map[string]any
+	if rootEntry.Children != nil {
+		pageMap = *rootEntry.Children
+	}
 
 	authContext, _ := auth.GetAuthContext(r.Context())
 	extra := map[string]any{}
@@ -151,10 +165,14 @@ func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rendered, err := renderer.RenderOne(navKey, nav, templateData)
+	rendered, err = renderer.RenderOne(navKey, nav, templateData)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if err := hh.renderCache.Set(r.Context(), cacheKey, rendered); err != nil {
+		hh.log.Error(err, "failed to cache navigation", "key", cacheKey)
 	}
 
 	w.Header().Set("Content-Type", "text/html")

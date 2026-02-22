@@ -38,6 +38,7 @@ func (hh *HostHandler) applyCachingHeaders(
 	w http.ResponseWriter,
 	r *http.Request,
 	requirements []kdexv1alpha1.SecurityRequirement,
+	lastModified time.Time,
 ) bool {
 	if !hh.authConfig.IsAuthEnabled() {
 		// If auth is disabled, everything is public
@@ -63,7 +64,10 @@ func (hh *HostHandler) applyCachingHeaders(
 		identity = ":" + hh.getUserHash(r)
 	}
 
-	lastModified := hh.reconcileTime.UTC().Truncate(time.Second)
+	if lastModified.IsZero() {
+		lastModified = hh.reconcileTime
+	}
+	lastModified = lastModified.UTC().Truncate(time.Second)
 	etag := fmt.Sprintf(`"%d%s"`, lastModified.Unix(), identity)
 
 	w.Header().Set("Last-Modified", lastModified.Format(http.TimeFormat))

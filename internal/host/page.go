@@ -1,53 +1,66 @@
 package host
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	"github.com/kdex-tech/kdex-host/internal/page"
 )
 
 func (hh *HostHandler) pageHandlerFunc(
-	pageHandler page.PageHandler,
-	l10nRenders map[string]string,
+	ph page.PageHandler,
+	translations *Translations,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		shouldReturn := hh.handleAuth(
 			r,
 			w,
 			"pages",
-			pageHandler.BasePath(),
-			hh.pageRequirements(&pageHandler),
+			ph.BasePath(),
+			hh.pageRequirements(&ph),
 		)
 		if shouldReturn {
 			return
 		}
 
-		if hh.applyCachingHeaders(w, r, hh.pageRequirements(&pageHandler)) {
+		if hh.applyCachingHeaders(w, r, hh.pageRequirements(&ph), time.Time{}) {
 			return
 		}
 
-		l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
+		l, err := kdexhttp.GetLang(r, hh.defaultLanguage, translations.Languages())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		rendered, ok := l10nRenders[l.String()]
-
-		if !ok {
-			http.Error(w, http.StatusText(http.StatusNotFound)+" "+r.URL.Path, http.StatusNotFound)
-			return
+		cacheKey := fmt.Sprintf("render:%s:%s", ph.Name, l.String())
+		rendered, ok, err := hh.renderCache.Get(r.Context(), cacheKey)
+		if err != nil {
+			hh.log.Error(err, "failed to get from cache", "page", ph.Name, "language", l)
 		}
 
-		hh.log.V(1).Info("serving", "page", pageHandler.Name, "basePath", pageHandler.BasePath(), "language", l.String())
+		if !ok {
+			rendered, err = hh.L10nRender(ph, nil, l, map[string]any{}, translations)
+			if err != nil {
+				hh.log.Error(err, "failed to render page", "page", ph.Name, "language", l)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if err := hh.renderCache.Set(r.Context(), cacheKey, rendered); err != nil {
+				hh.log.Error(err, "failed to set cache", "page", ph.Name, "language", l)
+			}
+		}
+
+		hh.log.V(1).Info("serving", "page", ph.Name, "basePath", ph.BasePath(), "language", l.String())
 
 		w.Header().Set("Content-Language", l.String())
 		w.Header().Set("Content-Type", "text/html")
 
 		_, err = w.Write([]byte(rendered))
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			hh.log.Error(err, "failed to write response", "page", ph.Name, "language", l)
 		}
 	}
 }

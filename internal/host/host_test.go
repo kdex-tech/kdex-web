@@ -291,7 +291,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard())
+			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard(), nil)
 			th.SetHost(context.Background(), &tt.host.host, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
@@ -385,7 +385,7 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard())
+			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard(), nil)
 			th.SetHost(context.Background(), &tt.host.host, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
@@ -470,7 +470,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := G.NewGomegaWithT(t)
 
-			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard())
+			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard(), nil)
 			th.SetHost(context.Background(), &tt.host.host, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
