@@ -5,13 +5,14 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 
 	"github.com/kdex-tech/kdex-host/internal/auth"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func (hh *HostHandler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
-	var clientId, code, redirectURI, responseType, scope, subject, state string
+	var clientId, code, codeChallenge, codeChallengeMethod, redirectURI, responseType, scope, state, subject string
 	var callbackURL *url.URL
 	var err error
 
@@ -26,42 +27,63 @@ func (hh *HostHandler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) 
 			"callback_url", callbackURLStr,
 			"client_id", clientId,
 			"code", code,
+			"code_challenge", codeChallenge,
+			"code_challenge_method", codeChallengeMethod,
+			"error", err,
 			"redirect_uri", redirectURI,
 			"response_type", responseType,
 			"scope", scope,
-			"subject", subject,
 			"state", state,
-			"error", err)
+			"subject", subject)
 	}()
 
 	// 1. Validate parameters
 	clientId = r.URL.Query().Get("client_id")
+	codeChallenge = r.URL.Query().Get("code_challenge")
+	codeChallengeMethod = r.URL.Query().Get("code_challenge_method")
 	redirectURI = r.URL.Query().Get("redirect_uri")
 	responseType = r.URL.Query().Get("response_type")
 	scope = r.URL.Query().Get("scope")
 	state = r.URL.Query().Get("state")
 
 	if clientId == "" {
-		err = fmt.Errorf("Missing client_id")
+		err = fmt.Errorf("missing client_id")
 		http.Error(w, "Missing client_id", http.StatusBadRequest)
 		return
 	}
 
 	if responseType != "code" {
-		err = fmt.Errorf("Unsupported response_type")
+		err = fmt.Errorf("unsupported response_type")
 		http.Error(w, "Unsupported response_type", http.StatusBadRequest)
 		return
 	}
 
 	authClient, ok := hh.authExchanger.GetClient(clientId)
 	if !ok {
-		err = fmt.Errorf("Invalid client_id")
+		err = fmt.Errorf("invalid client_id")
 		http.Error(w, "Invalid client_id", http.StatusBadRequest)
 		return
 	}
 
+	if len(authClient.AllowedGrantTypes) > 0 && !slices.Contains(authClient.AllowedGrantTypes, "authorization_code") {
+		err = fmt.Errorf("grant_type authorization_code not allowed for this client")
+		http.Error(w, "Unauthorized grant type", http.StatusUnauthorized)
+		return
+	}
+
+	if len(authClient.AllowedScopes) > 0 && scope != "" {
+		requestedScopes := strings.Split(scope, " ")
+		for _, s := range requestedScopes {
+			if s != "" && !slices.Contains(authClient.AllowedScopes, s) {
+				err = fmt.Errorf("scope %s not allowed for this client", s)
+				http.Error(w, "Unauthorized scope", http.StatusUnauthorized)
+				return
+			}
+		}
+	}
+
 	if !slices.Contains(authClient.RedirectURIs, redirectURI) {
-		err = fmt.Errorf("Invalid redirect_uri")
+		err = fmt.Errorf("invalid redirect_uri")
 		http.Error(w, "Invalid redirect_uri", http.StatusBadRequest)
 		return
 	}
@@ -69,7 +91,7 @@ func (hh *HostHandler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) 
 	// 2. Parse redirect_uri
 	callbackURL, err = url.Parse(redirectURI)
 	if err != nil {
-		err = fmt.Errorf("Invalid redirect_uri")
+		err = fmt.Errorf("invalid redirect_uri")
 		http.Error(w, "Invalid redirect_uri", http.StatusBadRequest)
 		return
 	}
@@ -88,23 +110,25 @@ func (hh *HostHandler) AuthorizeHandler(w http.ResponseWriter, r *http.Request) 
 	// We need the Subject.
 	subject, err = authCtx.GetSubject()
 	if err != nil {
-		err = fmt.Errorf("Failed to get subject from auth context")
+		err = fmt.Errorf("failed to get subject from auth context")
 		http.Error(w, "Invalid session", http.StatusInternalServerError)
 		return
 	}
 
 	// 4. Generate Authorization Code
 	claims := auth.AuthorizationCodeClaims{
-		Subject:     subject,
-		ClientID:    clientId,
-		Scope:       scope,
-		RedirectURI: redirectURI,
-		AuthMethod:  auth.AuthMethodOAuth2,
+		AuthMethod:          auth.AuthMethodOAuth2,
+		ClientID:            clientId,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
+		RedirectURI:         redirectURI,
+		Scope:               scope,
+		Subject:             subject,
 	}
 
 	code, err = hh.authExchanger.CreateAuthorizationCode(r.Context(), claims)
 	if err != nil {
-		err = fmt.Errorf("Failed to create auth code")
+		err = fmt.Errorf("failed to create auth code")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}

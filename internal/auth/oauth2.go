@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -11,7 +13,7 @@ import (
 // OAuth2TokenHandler creates an HTTP handler for the OAuth2 token endpoint.
 func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var clientId, clientSecret, code, idToken, grantedScope, grantType, password, redirectURI, scope, token, username string
+		var clientId, clientSecret, code, codeVerifier, grantedScope, grantType, idToken, password, redirectURI, scope, token, username string
 		var err error
 
 		log := logf.FromContext(r.Context())
@@ -21,13 +23,14 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 				"client_id", clientId,
 				"client_secret", clientSecret,
 				"code", code,
-				"id_token", idToken,
+				"code_verifier", codeVerifier,
+				"error", err,
 				"grant_type", grantType,
+				"id_token", idToken,
 				"password", password,
 				"redirect_uri", redirectURI,
 				"scope", scope,
-				"username", username,
-				"error", err)
+				"username", username)
 		}()
 
 		if r.Method != http.MethodPost {
@@ -80,8 +83,26 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 			}
 		}
 
+		codeVerifier = r.FormValue("code_verifier")
 		grantType = r.FormValue("grant_type")
 		scope = r.FormValue("scope")
+
+		if len(client.AllowedGrantTypes) > 0 && !slices.Contains(client.AllowedGrantTypes, grantType) {
+			err = fmt.Errorf("grant_type %s not allowed for this client", grantType)
+			http.Error(w, "Unauthorized grant type", http.StatusUnauthorized)
+			return
+		}
+
+		if len(client.AllowedScopes) > 0 && scope != "" {
+			requestedScopes := strings.Split(scope, " ")
+			for _, s := range requestedScopes {
+				if s != "" && !slices.Contains(client.AllowedScopes, s) {
+					err = fmt.Errorf("scope %s not allowed for this client", s)
+					http.Error(w, "Unauthorized scope", http.StatusUnauthorized)
+					return
+				}
+			}
+		}
 
 		switch grantType {
 		case "authorization_code":
@@ -97,7 +118,7 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 				http.Error(w, "redirect_uri is required", http.StatusBadRequest)
 				return
 			}
-			token, idToken, grantedScope, err = exchanger.RedeemAuthorizationCode(r.Context(), code, clientId, redirectURI)
+			token, idToken, grantedScope, err = exchanger.RedeemAuthorizationCode(r.Context(), code, clientId, redirectURI, codeVerifier)
 		case "client_credentials":
 			if client.Public {
 				err = fmt.Errorf("client_credentials grant_type is not supported for public clients")
@@ -115,13 +136,13 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 			http.Error(w, "grant_type refresh_token not yet supported for local exchange", http.StatusNotImplemented)
 			return
 		default:
-			err = fmt.Errorf("Unsupported grant_type")
+			err = fmt.Errorf("unsupported grant_type")
 			http.Error(w, "Unsupported grant_type", http.StatusBadRequest)
 			return
 		}
 
 		if err != nil {
-			err = fmt.Errorf("Authentication failed: %w", err)
+			err = fmt.Errorf("authentication failed: %w", err)
 			http.Error(w, "Authentication failed", http.StatusUnauthorized)
 			return
 		}
@@ -136,7 +157,7 @@ func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			err = fmt.Errorf("Failed to encode token response: %w", err)
+			err = fmt.Errorf("failed to encode token response: %w", err)
 			http.Error(w, "Failed to encode token response", http.StatusInternalServerError)
 			return
 		}

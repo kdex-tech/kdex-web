@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -379,12 +380,14 @@ type OIDCProviderClaims struct {
 }
 
 type AuthorizationCodeClaims struct {
-	Subject     string     `json:"sub"`
-	ClientID    string     `json:"cid"`
-	Scope       string     `json:"scp"`
-	RedirectURI string     `json:"uri"`
-	AuthMethod  AuthMethod `json:"auth_method"`
-	Exp         int64      `json:"exp"`
+	AuthMethod          AuthMethod `json:"auth_method"`
+	ClientID            string     `json:"cid"`
+	CodeChallenge       string     `json:"challenge,omitempty"`
+	CodeChallengeMethod string     `json:"challenge_method,omitempty"`
+	Exp                 int64      `json:"exp"`
+	RedirectURI         string     `json:"uri"`
+	Scope               string     `json:"scp"`
+	Subject             string     `json:"sub"`
 }
 
 func (e *Exchanger) CreateAuthorizationCode(ctx context.Context, claims AuthorizationCodeClaims) (string, error) {
@@ -419,7 +422,7 @@ func (e *Exchanger) CreateAuthorizationCode(ctx context.Context, claims Authoriz
 	return object.CompactSerialize()
 }
 
-func (e *Exchanger) RedeemAuthorizationCode(ctx context.Context, code string, clientID string, redirectURI string) (string, string, string, error) {
+func (e *Exchanger) RedeemAuthorizationCode(ctx context.Context, code string, clientID string, redirectURI string, codeVerifier string) (string, string, string, error) {
 	if e == nil {
 		return "", "", "", fmt.Errorf("auth not configured")
 	}
@@ -455,6 +458,37 @@ func (e *Exchanger) RedeemAuthorizationCode(ctx context.Context, code string, cl
 
 	if claims.RedirectURI != redirectURI {
 		return "", "", "", fmt.Errorf("redirect_uri mismatch")
+	}
+
+	client, ok := e.GetClient(clientID)
+	if !ok {
+		return "", "", "", fmt.Errorf("invalid client_id")
+	}
+
+	// PKCE verification
+	if client.RequirePKCE && claims.CodeChallenge == "" {
+		return "", "", "", fmt.Errorf("PKCE is required for this client")
+	}
+
+	if claims.CodeChallenge != "" {
+		if codeVerifier == "" {
+			return "", "", "", fmt.Errorf("code_verifier is required for PKCE")
+		}
+
+		switch claims.CodeChallengeMethod {
+		case "S256":
+			h := sha256.Sum256([]byte(codeVerifier))
+			challenge := base64.RawURLEncoding.EncodeToString(h[:])
+			if challenge != claims.CodeChallenge {
+				return "", "", "", fmt.Errorf("invalid code_verifier")
+			}
+		case "plain", "":
+			if codeVerifier != claims.CodeChallenge {
+				return "", "", "", fmt.Errorf("invalid code_verifier")
+			}
+		default:
+			return "", "", "", fmt.Errorf("unsupported code_challenge_method: %s", claims.CodeChallengeMethod)
+		}
 	}
 
 	// 5. Mint Tokens

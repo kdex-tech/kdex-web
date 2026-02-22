@@ -17,10 +17,15 @@ import (
 )
 
 type AuthClient struct {
-	ClientID     string
-	ClientSecret string
-	Public       bool
-	RedirectURIs []string
+	AllowedGrantTypes []string
+	AllowedScopes     []string
+	ClientID          string
+	ClientSecret      string
+	Description       string
+	Name              string
+	Public            bool
+	RedirectURIs      []string
+	RequirePKCE       bool
 }
 
 type Config struct {
@@ -140,11 +145,42 @@ func NewConfig(
 					redirectURIs = strings.Split(redirectURIsStr, ",")
 				}
 
+				allowedGrantTypesStr := string(secret.Data["allowed_grant_types"])
+				if allowedGrantTypesStr == "" {
+					allowedGrantTypesStr = string(secret.Data["allowed-grant-types"])
+				}
+				allowedGrantTypes := []string{}
+				if allowedGrantTypesStr != "" {
+					allowedGrantTypes = strings.Split(allowedGrantTypesStr, ",")
+				}
+
+				allowedScopesStr := string(secret.Data["allowed_scopes"])
+				if allowedScopesStr == "" {
+					allowedScopesStr = string(secret.Data["allowed-scopes"])
+				}
+				allowedScopes := []string{}
+				if allowedScopesStr != "" {
+					allowedScopes = strings.Split(allowedScopesStr, ",")
+				}
+
+				description := string(secret.Data["description"])
+				name := string(secret.Data["name"])
+
+				requirePKCE := false
+				if string(secret.Data["require_pkce"]) == "true" || string(secret.Data["require-pkce"]) == "true" {
+					requirePKCE = true
+				}
+
 				client := AuthClient{
-					ClientID:     clientID,
-					ClientSecret: clientSecret,
-					Public:       public,
-					RedirectURIs: redirectURIs,
+					AllowedGrantTypes: allowedGrantTypes,
+					AllowedScopes:     allowedScopes,
+					ClientID:          clientID,
+					ClientSecret:      clientSecret,
+					Description:       description,
+					Name:              name,
+					Public:            public,
+					RedirectURIs:      redirectURIs,
+					RequirePKCE:       requirePKCE,
 				}
 
 				cfg.Clients[clientID] = client
