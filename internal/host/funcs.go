@@ -1,6 +1,8 @@
 package host
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"maps"
 	"net/http"
@@ -42,14 +44,27 @@ func (hh *HostHandler) applyCachingHeaders(
 		requirements = []kdexv1alpha1.SecurityRequirement{}
 	}
 
-	lastModified := hh.reconcileTime.UTC().Truncate(time.Second)
-	etag := fmt.Sprintf(`"%d"`, lastModified.Unix())
+	isPrivate := len(requirements) > 0
 
-	if len(requirements) > 0 {
+	if isPrivate {
 		w.Header().Set("Cache-Control", "private, no-cache, must-revalidate")
 	} else {
 		w.Header().Set("Cache-Control", "public, max-age=3600, must-revalidate")
 	}
+
+	vary := "Accept-Language"
+	if isPrivate && hh.authConfig.IsAuthEnabled() {
+		vary += ", Authorization, Cookie"
+	}
+	w.Header().Set("Vary", vary)
+
+	identity := ""
+	if isPrivate && hh.authConfig.IsAuthEnabled() {
+		identity = ":" + hh.getUserHash(r)
+	}
+
+	lastModified := hh.reconcileTime.UTC().Truncate(time.Second)
+	etag := fmt.Sprintf(`"%d%s"`, lastModified.Unix(), identity)
 
 	w.Header().Set("Last-Modified", lastModified.Format(http.TimeFormat))
 	w.Header().Set("ETag", etag)
@@ -68,6 +83,22 @@ func (hh *HostHandler) applyCachingHeaders(
 	}
 
 	return false
+}
+
+func (hh *HostHandler) getUserHash(r *http.Request) string {
+	// Try Authorization header
+	if auth := r.Header.Get("Authorization"); auth != "" {
+		h := sha256.Sum256([]byte(auth))
+		return hex.EncodeToString(h[:8])
+	}
+	// Try Cookie
+	if hh.authConfig != nil && hh.authConfig.CookieName != "" {
+		if cookie, err := r.Cookie(hh.authConfig.CookieName); err == nil {
+			h := sha256.Sum256([]byte(cookie.Value))
+			return hex.EncodeToString(h[:8])
+		}
+	}
+	return "anon"
 }
 
 func (hh *HostHandler) handleAuth(
