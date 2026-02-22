@@ -23,14 +23,17 @@ func WithAuthentication(publicKey crypto.PublicKey, cookieName string) func(http
 
 			var authSource string
 			if authHeader != "" {
-				// Expect "Bearer <token>"
 				parts := strings.Split(authHeader, " ")
-				if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-					http.Error(w, "Invalid Authorization header format", http.StatusUnauthorized)
+				if len(parts) != 2 {
+					log.Info("Invalid Authorization header format")
+					http.Error(w, "Invalid Authorization header format", http.StatusBadRequest)
 					return
 				}
-				tokenString = parts[1]
-				authSource = "header"
+				// We are ignoreing basic auth because it may be used for OAuth2 client_id and client_secret
+				if strings.ToLower(parts[0]) == "bearer" {
+					tokenString = parts[1]
+					authSource = "header"
+				}
 			} else {
 				// Check for cookie
 				cookie, err := r.Cookie(cookieName)
@@ -44,6 +47,12 @@ func WithAuthentication(publicKey crypto.PublicKey, cookieName string) func(http
 			}
 
 			authContext := AuthContext{}
+
+			if tokenString == "" {
+				log.Info("No token found")
+				next.ServeHTTP(w, r)
+				return
+			}
 
 			token, err := jwt.ParseWithClaims(tokenString, &authContext, func(token *jwt.Token) (any, error) {
 				return publicKey, nil

@@ -47,13 +47,11 @@ func (hh *HostHandler) handleAuth(
 
 	if err != nil {
 		hh.log.Error(err, "authorization check failed", resource, resourceName)
-		r.Header.Set("X-KDex-Sniffer-Skip", "true")
 		http.Error(w, http.StatusText(http.StatusNotFound)+" "+r.URL.Path, http.StatusNotFound)
 		return true
 	}
 
 	if !authorized {
-		r.Header.Set("X-KDex-Sniffer-Skip", "true")
 		hh.log.V(1).Info("unauthorized access attempt", resource, resourceName)
 		http.Error(w, http.StatusText(http.StatusNotFound)+" "+r.URL.Path, http.StatusNotFound)
 		return true

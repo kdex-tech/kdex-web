@@ -26,6 +26,8 @@ const (
 var wildcardRegex = regexp.MustCompile(`\.\.\.\}`)
 
 type Builder struct {
+	Contact         *openapi.Contact
+	License         *openapi.License
 	Security        *openapi.SecurityRequirements
 	SecuritySchemes *openapi.SecuritySchemes
 	TypesToInclude  []PathType
@@ -66,8 +68,10 @@ func (b *Builder) buildOpenAPI(
 			Schemas: openapi.Schemas{},
 		},
 		Info: &openapi.Info{
-			Title:       fmt.Sprintf("KDex Host: %s", name),
+			Contact:     b.Contact,
 			Description: "Auto-generated OpenAPI specification for KDex Host",
+			License:     b.License,
+			Title:       fmt.Sprintf("KDex Host - %s", name),
 			Version:     "1.0.0",
 		},
 		OpenAPI: "3.0.0",
@@ -81,7 +85,7 @@ func (b *Builder) buildOpenAPI(
 
 	tags := openapi.Tags{}
 
-	securitySchemesUsed := map[string]bool{}
+	securitySchemesUsed := map[string][]string{}
 
 	basePaths := slices.Collect(maps.Keys(paths))
 
@@ -155,8 +159,12 @@ func (b *Builder) buildOpenAPI(
 				}
 				if op.Security != nil {
 					for _, scheme := range *op.Security {
-						for schemeName := range scheme {
-							securitySchemesUsed[schemeName] = true
+						for schemeName, scopes := range scheme {
+							for _, scope := range scopes {
+								if !slices.Contains(securitySchemesUsed[schemeName], scope) {
+									securitySchemesUsed[schemeName] = append(securitySchemesUsed[schemeName], scope)
+								}
+							}
 						}
 					}
 				}

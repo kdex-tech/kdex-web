@@ -51,7 +51,7 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 	g.Expect(err).NotTo(G.HaveOccurred())
 
 	g.Expect(doc.OpenAPI).To(G.Equal("3.0.0"))
-	g.Expect(doc.Info.Title).To(G.Equal("KDex Host: test-host"))
+	g.Expect(doc.Info.Title).To(G.Equal("KDex Host - test-host"))
 
 	// Check if paths are present
 	// We should see /-/openapi and /-/sniffer/docs at least (sniffer if sniffer != nil)

@@ -338,9 +338,9 @@ func (hh *HostHandler) RebuildMux() {
 	for _, fh := range functionHandlers {
 		// Register both the exact path and the prefix path (with trailing slash)
 		// to ensure all sub-paths are proxied correctly.
-		mux.HandleFunc(fh.basePath, fh.handler)
+		mux.Handle(fh.basePath, fh.handler)
 		if !strings.HasSuffix(fh.basePath, "/") {
-			mux.HandleFunc(fh.basePath+"/", fh.handler)
+			mux.Handle(fh.basePath+"/", fh.handler)
 		}
 	}
 

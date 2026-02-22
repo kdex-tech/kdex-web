@@ -191,7 +191,16 @@ func (ew *errorResponseWriter) WriteHeader(code int) {
 
 type functionHandler struct {
 	basePath string
-	handler  func(http.ResponseWriter, *http.Request)
+	handler  http.Handler
+}
+
+type KDexFunctionHandler struct {
+	Function *kdexv1alpha1.KDexFunction
+	Handler  http.Handler
+}
+
+func (h *KDexFunctionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.Handler.ServeHTTP(w, r)
 }
 
 type pageRender struct {

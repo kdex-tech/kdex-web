@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	"github.com/kdex-tech/kdex-host/internal/sniffer"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -185,39 +186,65 @@ func isCLI(userAgent string) bool {
 
 func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log := logf.FromContext(r.Context())
+
+		h, p := hh.Mux.Handler(r)
+		if h != nil {
+			log.V(2).Info("request match", "url", r.URL.String(), "pattern", p)
+		} else {
+			log.V(2).Info("request did not match", "url", r.URL.String())
+		}
+
+		ew := &errorResponseWriter{ResponseWriter: w}
+		wrapped := wrappedErrorResponseWriter(ew, w)
+
 		// Only intercept if we have a sniffer (checker), it's not an internal path
-		if hh.sniffer == nil || strings.HasPrefix(r.URL.Path, "/-/") {
-			next.ServeHTTP(w, r)
+		if hh.sniffer == nil || (strings.HasPrefix(r.URL.Path, "/-/") && h != nil) {
+			next.ServeHTTP(wrapped, r)
+			hh.unwrap(ew, r, w)
 			return
 		}
 
-		// TODO: There has to be a way we can avoid reading the body here. Maybe we need to somehow determine if the
-		// request will match amount the registeredPaths using a dummy mux and only activate read when we've determined
-		// that it won't match any... i.e. the sniffer model of operation on 404.
+		// We should only invoke the sniffer if:
+		// - there is no handler, OR
+		// - if the handler is a KDexFunctionHandler AND the function is
+		//   mutable AND we have X-KDex-* headers
+		invokeSniffer := false
+		if h != nil {
+			var matchedFunction *kdexv1alpha1.KDexFunction
+			if fh, ok := h.(*KDexFunctionHandler); ok {
+				matchedFunction = fh.Function
+				log.V(2).Info("matched KDexFunction", "name", matchedFunction.Name)
+			}
 
-		// Body Persistence: Read body so we can restore it for the next handler AND the sniffer
-		var bodyBytes []byte
-		if r.Body != nil {
-			bodyBytes, _ = io.ReadAll(r.Body)
-			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			// We don't want to invoke the sniffer on an existing mutable function
+			// when there are no X-KDex-* headers because this allows us to test
+			// the function implementation. The sniffer bypasses the
+			// implementation and directly serves the feedback page.
+			hasKDexHeader := false
+			for k := range r.Header {
+				if strings.HasPrefix(k, "X-KDex-") {
+					hasKDexHeader = true
+					break
+				}
+			}
+
+			if matchedFunction != nil && isMutable(matchedFunction) && hasKDexHeader {
+				invokeSniffer = true
+			}
+		} else {
+			// No handler matched, so we should invoke the sniffer
+			invokeSniffer = true
 		}
 
 		// Create a wrapper to capture the status code
-		ew := &errorResponseWriter{ResponseWriter: w}
-		wrapped := wrappedErrorResponseWriter(ew, w)
-		next.ServeHTTP(wrapped, r)
-
-		skipSniffer := r.Header.Get("X-KDex-Sniffer-Skip") == "true"
-
-		if skipSniffer {
-			log := logf.FromContext(r.Context())
-			log.V(2).Info("sniffer programatically skipped")
-		}
-
-		// If it was a 404, we hijack the response
-		if !skipSniffer && ew.statusCode == http.StatusNotFound {
-			// Restore body for analysis
-			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		if invokeSniffer {
+			// Body Persistence: Read body so we can restore it for the next handler AND the sniffer
+			var bodyBytes []byte
+			if r.Body != nil {
+				bodyBytes, _ = io.ReadAll(r.Body)
+				r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			}
 
 			// Analyze
 			result, err := hh.sniffer.Analyze(r)
@@ -259,37 +286,45 @@ func (hh *HostHandler) DesignMiddleware(next http.Handler) http.Handler {
 			if err != nil {
 				hh.serveError(w, r, http.StatusInternalServerError, err.Error())
 			}
-			return
-		}
-
-		// If we didn't hijack 404, we must ensure the status code from next handler is written if it wasn't already.
-		// Our errorResponseWriter captures WriteHeader(code) for code >= 400.
-		// If code < 400, it passed through immediately.
-		// If code >= 400, it buffered it.
-		if ew.statusCode >= 400 {
-			// Check if the client accepts HTML
-			accept := r.Header.Get("Accept")
-			if strings.Contains(accept, "text/html") {
-				// Important: Clear headers before calling serveError, as previous
-				// handlers (like ReverseProxy) might have set headers (e.g. Content-Length)
-				// based on a response body that we've suppressed.
-				header := w.Header()
-				for k := range header {
-					delete(header, k)
-				}
-
-				// Write the buffered status code structure
-				hh.serveError(w, r, ew.statusCode, ew.statusMsg)
-			} else {
-				// Preserve original Content-Type if set, otherwise fallback to plain text
-				if w.Header().Get("Content-Type") == "" {
-					w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-				}
-				w.WriteHeader(ew.statusCode)
-				_, _ = w.Write([]byte(ew.statusMsg))
-			}
+		} else {
+			next.ServeHTTP(wrapped, r)
+			hh.unwrap(ew, r, w)
 		}
 	})
+}
+
+func (hh *HostHandler) unwrap(ew *errorResponseWriter, r *http.Request, w http.ResponseWriter) {
+	if ew.statusCode >= 400 {
+		// Check if the client accepts HTML
+		accept := r.Header.Get("Accept")
+		if strings.Contains(accept, "text/html") {
+			// Important: Clear headers before calling serveError, as previous
+			// handlers (like ReverseProxy) might have set headers (e.g. Content-Length)
+			// based on a response body that we've suppressed.
+			header := w.Header()
+			for k := range header {
+				delete(header, k)
+			}
+
+			// Write the buffered status code structure
+			hh.serveError(w, r, ew.statusCode, ew.statusMsg)
+		} else {
+			// Preserve original Content-Type if set, otherwise fallback to plain text
+			if w.Header().Get("Content-Type") == "" {
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			}
+			w.WriteHeader(ew.statusCode)
+			_, _ = w.Write([]byte(ew.statusMsg))
+		}
+	}
+}
+
+// A mutable function means that it does not have a spec.origin.executable or
+// spec.origin.source which implies it is relying on code generation and we can
+// influence the spec through the sniffer.
+func isMutable(matchedFunction *kdexv1alpha1.KDexFunction) bool {
+	return matchedFunction.Spec.Origin.Executable == nil ||
+		matchedFunction.Spec.Origin.Source == nil
 }
 
 // InspectHandler serves the feedback UI

@@ -18,23 +18,23 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
-func (hh *HostHandler) reverseProxyHandler(fn *kdexv1alpha1.KDexFunction) http.HandlerFunc {
+func (hh *HostHandler) reverseProxyHandler(fn *kdexv1alpha1.KDexFunction) http.Handler {
 	target, err := url.Parse(fn.Status.URL)
 	if err != nil {
-		return func(w http.ResponseWriter, r *http.Request) {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			hh.log.Error(err, "failed to parse function URL", "url", fn.Status.URL)
 			http.Error(w, "invalid function URL", http.StatusInternalServerError)
-		}
+		})
 	}
 
 	var mapper *dmapper.Mapper
 	if fn.Spec.ClaimMappings != nil {
 		mapper, err = dmapper.NewMapper(fn.Spec.ClaimMappings)
 		if err != nil {
-			return func(w http.ResponseWriter, r *http.Request) {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				hh.log.Error(err, "failed to create mapper", "mapper", fn.Spec.ClaimMappings)
 				http.Error(w, "invalid mapper", http.StatusInternalServerError)
-			}
+			})
 		}
 	}
 
@@ -136,7 +136,7 @@ func (hh *HostHandler) reverseProxyHandler(fn *kdexv1alpha1.KDexFunction) http.H
 	}
 
 	// Capture the start time and log the completion
-	return func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		defer func() {
 			code := http.StatusOK
@@ -172,7 +172,10 @@ func (hh *HostHandler) reverseProxyHandler(fn *kdexv1alpha1.KDexFunction) http.H
 
 		// Execute the proxy
 		proxy.ServeHTTP(w, r)
+	})
 
-		r.Header.Set("X-KDex-Sniffer-Skip", "true")
+	return &KDexFunctionHandler{
+		Function: fn,
+		Handler:  handler,
 	}
 }

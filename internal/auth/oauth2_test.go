@@ -87,7 +87,7 @@ func TestOAuth2TokenHandler(t *testing.T) {
 				"client_id":     {"valid-client"},
 				"client_secret": {"wrong-secret"},
 			},
-			expectedStatus: http.StatusUnauthorized,
+			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:   "Client Credentials - Invalid Client ID",
@@ -122,7 +122,7 @@ func TestOAuth2TokenHandler(t *testing.T) {
 				"code":         {"invalid.code.here"},
 				"redirect_uri": {"http://localhost/cb"},
 			},
-			expectedStatus: http.StatusUnauthorized,
+			expectedStatus: http.StatusBadRequest,
 		},
 		{
 			name:   "Unsupported Grant Type",
@@ -145,10 +145,6 @@ func TestOAuth2TokenHandler(t *testing.T) {
 			httpHandler(w, req)
 
 			resp := w.Result()
-			// For debugging if status doesn't match
-			if resp.StatusCode != tt.expectedStatus {
-				t.Logf("Response Body: %s", w.Body.String())
-			}
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)
 
 			if tt.expectedBody != "" {

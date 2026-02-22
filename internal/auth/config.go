@@ -19,6 +19,7 @@ import (
 type AuthClient struct {
 	ClientID     string
 	ClientSecret string
+	Public       bool
 	RedirectURIs []string
 }
 
@@ -110,21 +111,23 @@ func NewConfig(
 		if len(authClientSecrets) > 0 {
 			cfg.Clients = make(map[string]AuthClient)
 			for _, secret := range authClientSecrets {
-				// Assuming secret has one key-value pair for clientID:clientSecret
-				// or maybe specific keys "client-id" and "client-secret"?
-				// The previous implementation used LoadMapFromSecret which took all data.
-				// "The secret should contain clientID: clientSecret pairs in its data map."
-				// So we should iterate over data.
-				client := AuthClient{}
+				clientID := string(secret.Data["client_id"])
+				if clientID == "" {
+					clientID = string(secret.Data["client-id"])
+				}
 
 				clientSecret := string(secret.Data["client_secret"])
 				if clientSecret == "" {
 					clientSecret = string(secret.Data["client-secret"])
 				}
 
-				clientID := string(secret.Data["client_id"])
-				if clientID == "" {
-					clientID = string(secret.Data["client-id"])
+				public := false
+				if string(secret.Data["public"]) == "true" {
+					public = true
+				}
+
+				if !public && clientSecret == "" {
+					return nil, fmt.Errorf("client %s is not public but has no client secret", clientID)
 				}
 
 				redirectURIsStr := string(secret.Data["redirect_uris"])
@@ -137,9 +140,10 @@ func NewConfig(
 					redirectURIs = strings.Split(redirectURIsStr, ",")
 				}
 
-				client = AuthClient{
+				client := AuthClient{
 					ClientID:     clientID,
 					ClientSecret: clientSecret,
+					Public:       public,
 					RedirectURIs: redirectURIs,
 				}
 
