@@ -101,10 +101,6 @@ func (hh *HostHandler) LoginPost(w http.ResponseWriter, r *http.Request) {
 
 func (hh *HostHandler) LogoutPost(w http.ResponseWriter, r *http.Request) {
 	returnURL := "/"
-	refURL, _ := url.Parse(r.Header.Get("Referer"))
-	if refURL.Host == r.Host {
-		returnURL = refURL.Path
-	}
 
 	// Clear local cookies
 	http.SetCookie(w, &http.Cookie{
