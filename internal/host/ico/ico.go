@@ -7,6 +7,8 @@ import (
 	"sync"
 	"text/template"
 
+	"time"
+
 	"github.com/Masterminds/sprig/v3"
 	"kdex.dev/crds/render"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -29,8 +31,9 @@ const svgTemplateDefault = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
 </svg>`
 
 type Ico struct {
-	data     render.TemplateData
-	template *template.Template
+	data          render.TemplateData
+	template      *template.Template
+	reconcileTime time.Time
 }
 
 func NewICO(svgTemplate string, data render.TemplateData) *Ico {
@@ -39,15 +42,20 @@ func NewICO(svgTemplate string, data render.TemplateData) *Ico {
 	}
 
 	return &Ico{
-		data:     data,
-		template: template.Must(template.New("favicon").Funcs(sprig.FuncMap()).Parse(svgTemplate)),
+		data:          data,
+		template:      template.Must(template.New("favicon").Funcs(sprig.FuncMap()).Parse(svgTemplate)),
+		reconcileTime: time.Now(),
 	}
+}
+
+func (i *Ico) SetReconcileTime(t time.Time) {
+	i.reconcileTime = t
 }
 
 func (i *Ico) FaviconHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Check Cache
 	if val, ok := faviconCache.Load("favicon"); ok {
-		serveSVG(w, val.([]byte))
+		serveSVG(w, r, val.([]byte), i.reconcileTime)
 		return
 	}
 
@@ -63,15 +71,35 @@ func (i *Ico) FaviconHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Store and Serve
 	faviconCache.Store("favicon", svgContent)
-	serveSVG(w, svgContent)
+	serveSVG(w, r, svgContent, i.reconcileTime)
 }
 
-func serveSVG(w http.ResponseWriter, data []byte) {
+func serveSVG(w http.ResponseWriter, r *http.Request, data []byte, reconcileTime time.Time) {
+	lastModified := reconcileTime.UTC().Truncate(time.Second)
+	etag := fmt.Sprintf(`"%d"`, lastModified.Unix())
+
 	// Note: We serve image/svg+xml even for the .ico path
 	w.Header().Set("Content-Type", "image/svg+xml")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Cache-Control", "public, max-age=86400, must-revalidate")
+	w.Header().Set("Last-Modified", lastModified.Format(http.TimeFormat))
+	w.Header().Set("ETag", etag)
+
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	if ifModifiedSince := r.Header.Get("If-Modified-Since"); ifModifiedSince != "" {
+		t, err := http.ParseTime(ifModifiedSince)
+		if err == nil && !lastModified.After(t) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
+
 	_, err := w.Write(data)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log := logf.FromContext(r.Context())
+		log.Error(err, "failed to write favicon response")
 	}
 }

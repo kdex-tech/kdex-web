@@ -3,13 +3,13 @@ package host
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/kdex-tech/kdex-host/internal/auth"
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	"github.com/kdex-tech/kdex-host/internal/page"
 	"golang.org/x/text/language"
 	"k8s.io/apimachinery/pkg/api/resource"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
 )
 
@@ -71,6 +71,10 @@ func (hh *HostHandler) BuildMenuEntries(
 }
 
 func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
+	if hh.applyCachingHeaders(w, r, []kdexv1alpha1.SecurityRequirement{{"authenticated": {}}}) {
+		return
+	}
+
 	hh.mu.RLock()
 	defer hh.mu.RUnlock()
 
@@ -133,7 +137,7 @@ func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
 		Extra:           extra,
 		Language:        l.String(),
 		Languages:       hh.availableLanguages(&hh.Translations),
-		LastModified:    time.Now(),
+		LastModified:    hh.reconcileTime,
 		MessagePrinter:  hh.messagePrinter(&hh.Translations, l),
 		Organization:    hh.host.Organization,
 		PageMap:         pageMap,

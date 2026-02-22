@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	openapi "github.com/getkin/kin-openapi/openapi3"
@@ -85,6 +86,7 @@ type RequestSniffer struct {
 	ItemPathRegex   regexp.Regexp
 	Namespace       string
 	OpenAPIBuilder  ko.Builder
+	ReconcileTime   time.Time
 	SecuritySchemes *openapi.SecuritySchemes
 }
 
@@ -142,7 +144,27 @@ func (s *RequestSniffer) Analyze(r *http.Request) (*AnalysisResult, error) {
 }
 
 func (s *RequestSniffer) DocsHandler(w http.ResponseWriter, r *http.Request) {
+	lastModified := s.ReconcileTime.UTC().Truncate(time.Second)
+	etag := fmt.Sprintf(`"%d"`, lastModified.Unix())
+
 	w.Header().Set("Content-Type", "text/markdown")
+	w.Header().Set("Cache-Control", "public, max-age=3600, must-revalidate")
+	w.Header().Set("Last-Modified", lastModified.Format(http.TimeFormat))
+	w.Header().Set("ETag", etag)
+
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	if ifModifiedSince := r.Header.Get("If-Modified-Since"); ifModifiedSince != "" {
+		t, err := http.ParseTime(ifModifiedSince)
+		if err == nil && !lastModified.After(t) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
+
 	_, err := w.Write([]byte(docs))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

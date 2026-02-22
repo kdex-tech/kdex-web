@@ -23,6 +23,10 @@ func (hh *HostHandler) pageHandlerFunc(
 			return
 		}
 
+		if hh.applyCachingHeaders(w, r, hh.pageRequirements(&pageHandler)) {
+			return
+		}
+
 		l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)

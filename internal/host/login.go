@@ -11,6 +11,10 @@ import (
 )
 
 func (hh *HostHandler) LoginGet(w http.ResponseWriter, r *http.Request) {
+	if hh.applyCachingHeaders(w, r, []kdexv1alpha1.SecurityRequirement{{"authenticated": {}}}) {
+		return
+	}
+
 	query := r.URL.Query()
 	returnURL := query.Get("return")
 	if returnURL == "" {

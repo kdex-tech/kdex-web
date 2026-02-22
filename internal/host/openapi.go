@@ -8,7 +8,12 @@ import (
 )
 
 func (hh *HostHandler) OpenAPIGet(w http.ResponseWriter, r *http.Request) {
+	if hh.applyCachingHeaders(w, r, nil) {
+		return
+	}
+
 	hh.mu.RLock()
+
 	defer hh.mu.RUnlock()
 
 	query := r.URL.Query()

@@ -140,7 +140,7 @@ func (hh *HostHandler) L10nRender(
 		HeadScript:      hh.HeadScriptToHTML(handler),
 		Language:        l.String(),
 		Languages:       hh.availableLanguages(translations),
-		LastModified:    time.Now(),
+		LastModified:    hh.reconcileTime,
 		MessagePrinter:  hh.messagePrinter(translations, l),
 		Meta:            hh.MetaToString(handler, l),
 		Navigations:     handler.NavigationToHTMLMap(),
@@ -216,6 +216,7 @@ func NewHostHandler(c client.Client, name string, namespace string, log logr.Log
 		registeredPaths:           map[string]ko.PathInfo{},
 		pathsCollectedInReconcile: map[string]ko.PathInfo{},
 		analysisCache:             NewAnalysisCache(),
+		reconcileTime:             time.Now(),
 	}
 
 	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
@@ -268,7 +269,12 @@ func (hh *HostHandler) RebuildMux() {
 				return
 			}
 
+			if hh.applyCachingHeaders(w, r, nil) {
+				return
+			}
+
 			rendered := hh.renderUtilityPage(
+
 				kdexv1alpha1.AnnouncementUtilityPageType,
 				l,
 				map[string]any{},
@@ -473,7 +479,9 @@ func (hh *HostHandler) SetHost(
 		DefaultLanguage: host.DefaultLang,
 		Organization:    host.Organization,
 	})
+	hh.favicon.SetReconcileTime(hh.reconcileTime)
 	hh.packageReferences = packageReferences
+
 	hh.pathsCollectedInReconcile = paths
 	hh.themeAssets = themeAssets
 	hh.scripts = scripts
@@ -488,11 +496,13 @@ func (hh *HostHandler) SetHost(
 			ItemPathRegex:   (&kdexv1alpha1.API{}).ItemPathRegex(),
 			OpenAPIBuilder:  hh.openapiBuilder,
 			Namespace:       hh.Namespace,
+			ReconcileTime:   hh.reconcileTime,
 			SecuritySchemes: hh.SecuritySchemes(),
 		}
 	}
 
 	hh.sniffer = snif
+	hh.reconcileTime = time.Now()
 	hh.importmap = importmap
 
 	if authConfig != nil {

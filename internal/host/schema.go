@@ -15,6 +15,10 @@ type schemaEntry struct {
 }
 
 func (hh *HostHandler) SchemaGet(w http.ResponseWriter, r *http.Request) {
+	if hh.applyCachingHeaders(w, r, nil) {
+		return
+	}
+
 	requested := r.PathValue("path")
 
 	hh.mu.RLock()

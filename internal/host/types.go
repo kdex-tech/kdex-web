@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/kdex-tech/kdex-host/internal/auth"
@@ -59,6 +60,7 @@ type HostHandler struct {
 	themeAssets               []kdexv1alpha1.Asset
 	translationResources      map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
+	reconcileTime             time.Time
 
 	authChecker interface {
 		CalculateRequirements(string, string, []kdexv1alpha1.SecurityRequirement) ([]kdexv1alpha1.SecurityRequirement, error)

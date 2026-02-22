@@ -38,6 +38,10 @@ func NewTranslations(defaultLanguage string, translations map[string]kdexv1alpha
 }
 
 func (hh *HostHandler) TranslationGet(w http.ResponseWriter, r *http.Request) {
+	if hh.applyCachingHeaders(w, r, nil) {
+		return
+	}
+
 	hh.mu.RLock()
 	defer hh.mu.RUnlock()
 

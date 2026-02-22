@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 	kh "github.com/kdex-tech/kdex-host/internal/http"
@@ -31,7 +32,46 @@ func (hh *HostHandler) convertRequirements(in *[]kdexv1alpha1.SecurityRequiremen
 	return out
 }
 
+func (hh *HostHandler) applyCachingHeaders(
+	w http.ResponseWriter,
+	r *http.Request,
+	requirements []kdexv1alpha1.SecurityRequirement,
+) bool {
+	if !hh.authConfig.IsAuthEnabled() {
+		// If auth is disabled, everything is public
+		requirements = []kdexv1alpha1.SecurityRequirement{}
+	}
+
+	lastModified := hh.reconcileTime.UTC().Truncate(time.Second)
+	etag := fmt.Sprintf(`"%d"`, lastModified.Unix())
+
+	if len(requirements) > 0 {
+		w.Header().Set("Cache-Control", "private, no-cache, must-revalidate")
+	} else {
+		w.Header().Set("Cache-Control", "public, max-age=3600, must-revalidate")
+	}
+
+	w.Header().Set("Last-Modified", lastModified.Format(http.TimeFormat))
+	w.Header().Set("ETag", etag)
+
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return true
+	}
+
+	if ifModifiedSince := r.Header.Get("If-Modified-Since"); ifModifiedSince != "" {
+		t, err := http.ParseTime(ifModifiedSince)
+		if err == nil && !lastModified.After(t) {
+			w.WriteHeader(http.StatusNotModified)
+			return true
+		}
+	}
+
+	return false
+}
+
 func (hh *HostHandler) handleAuth(
+
 	r *http.Request,
 	w http.ResponseWriter,
 	resource string,

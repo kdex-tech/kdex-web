@@ -143,6 +143,9 @@ func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[
 
 	const oauth2path = "/.well-known/oauth-authorization-server"
 	mux.HandleFunc("GET "+oauth2path, func(w http.ResponseWriter, r *http.Request) {
+		if hh.applyCachingHeaders(w, r, nil) {
+			return
+		}
 		issuer := hh.serverAddress(r)
 		auth.DiscoveryHandler(issuer)(w, r)
 	})
@@ -182,6 +185,9 @@ func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[
 
 	const oidcPath = "/.well-known/openid-configuration"
 	mux.HandleFunc("GET "+oidcPath, func(w http.ResponseWriter, r *http.Request) {
+		if hh.applyCachingHeaders(w, r, nil) {
+			return
+		}
 		issuer := hh.serverAddress(r)
 		auth.DiscoveryHandler(issuer)(w, r)
 	})
@@ -264,7 +270,12 @@ func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 	}
 
 	const path = "/.well-known/jwks.json"
-	mux.HandleFunc("GET "+path, auth.JWKSHandler(hh.authConfig.KeyPairs))
+	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
+		if hh.applyCachingHeaders(w, r, nil) {
+			return
+		}
+		auth.JWKSHandler(hh.authConfig.KeyPairs)(w, r)
+	})
 	registeredPaths[path] = ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,
