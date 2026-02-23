@@ -11,7 +11,6 @@ import (
 	"time"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
-	"github.com/go-logr/logr"
 	"github.com/kdex-tech/kdex-host/internal/auth"
 	"github.com/kdex-tech/kdex-host/internal/host/ico"
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
@@ -23,7 +22,6 @@ import (
 	"golang.org/x/text/message"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (hh *HostHandler) AddOrUpdateTranslation(name string, translation *kdexv1alpha1.KDexTranslationSpec) {
@@ -204,54 +202,6 @@ func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 	return buffer.String()
 }
 
-func NewHostHandler(c client.Client, name string, namespace string, log logr.Logger, cache RenderCache) *HostHandler {
-	if cache == nil {
-		cache = NewInMemoryRenderCache()
-	}
-	th := &HostHandler{
-		Mux:          nil,
-		Name:         name,
-		Namespace:    namespace,
-		Pages:        nil,
-		Translations: Translations{},
-
-		analysisCache:             NewAnalysisCache(),
-		authConfig:                nil,
-		authExchanger:             nil,
-		client:                    c,
-		defaultLanguage:           "en",
-		favicon:                   nil,
-		functions:                 []kdexv1alpha1.KDexFunction{},
-		host:                      nil,
-		importmap:                 "",
-		log:                       log,
-		packageReferences:         []kdexv1alpha1.PackageReference{},
-		pathsCollectedInReconcile: map[string]ko.PathInfo{},
-		reconcileTime:             time.Now(),
-		registeredPaths:           map[string]ko.PathInfo{},
-		renderCache:               cache,
-		scheme:                    "",
-		scripts:                   []kdexv1alpha1.ScriptDef{},
-		themeAssets:               []kdexv1alpha1.Asset{},
-		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
-		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
-	}
-
-	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
-	if err != nil {
-		panic(err)
-	}
-
-	th.Translations = *translations
-	th.Pages = page.NewPageStore(
-		name,
-		th.RebuildMux,
-		th.log.WithName("pages"),
-	)
-	th.RebuildMux()
-	return th
-}
-
 func (hh *HostHandler) RebuildMux() {
 	hh.log.V(3).Info("rebuilding mux")
 	hh.mu.RLock()
@@ -328,8 +278,6 @@ func (hh *HostHandler) RebuildMux() {
 		return
 	}
 
-	_ = hh.renderCache.Clear(context.Background())
-
 	renderedPages := []pageRender{}
 	for _, ph := range pageHandlers {
 		basePath := ph.BasePath()
@@ -343,14 +291,16 @@ func (hh *HostHandler) RebuildMux() {
 	}
 
 	functionHandlers := []functionHandler{}
-	for _, f := range hh.functions {
-		if f.Status.State != kdexv1alpha1.KDexFunctionStateReady {
-			continue
+	if hh.issuerAddress() != "" {
+		for _, f := range hh.functions {
+			if f.Status.State != kdexv1alpha1.KDexFunctionStateReady {
+				continue
+			}
+			functionHandlers = append(functionHandlers, functionHandler{
+				basePath: f.Spec.API.BasePath,
+				handler:  hh.reverseProxyHandler(&f, hh.issuerAddress()),
+			})
 		}
-		functionHandlers = append(functionHandlers, functionHandler{
-			basePath: f.Spec.API.BasePath,
-			handler:  hh.reverseProxyHandler(&f),
-		})
 	}
 
 	hh.mu.RUnlock()
@@ -478,6 +428,7 @@ func (hh *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (hh *HostHandler) SetHost(
 	ctx context.Context,
 	host *kdexv1alpha1.KDexHostSpec,
+	generation int64,
 	packageReferences []kdexv1alpha1.PackageReference,
 	themeAssets []kdexv1alpha1.Asset,
 	scripts []kdexv1alpha1.ScriptDef,
@@ -490,6 +441,7 @@ func (hh *HostHandler) SetHost(
 ) {
 	hh.mu.Lock()
 	hh.host = host
+	hh.cacheManager.Cycle(generation, true)
 	hh.defaultLanguage = host.DefaultLang
 	hh.functions = functions
 	hh.scheme = scheme
@@ -575,11 +527,14 @@ func (hh *HostHandler) availableLanguages(translations *Translations) []string {
 	return availableLangs
 }
 
-func (hh *HostHandler) isSecure(r *http.Request) bool {
-	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+func (hh *HostHandler) isSecure() bool {
+	return hh.scheme == "https"
 }
 
 func (hh *HostHandler) issuerAddress() string {
+	if len(hh.host.Routing.Domains) == 0 {
+		return ""
+	}
 	return fmt.Sprintf("%s://%s", hh.scheme, hh.host.Routing.Domains[0])
 }
 
@@ -650,14 +605,35 @@ func (hh *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPag
 		return ""
 	}
 
-	cacheKey := fmt.Sprintf("utility:%s:%s", utilityType, l.String())
+	utilityCache := hh.cacheManager.GetCache("utility")
+	cacheKey := fmt.Sprintf("%s:%s", utilityType, l.String())
+
+	// Only attempt cache logic if there's no dynamic extra data
 	if len(extraTemplateData) == 0 {
-		rendered, ok, err := hh.renderCache.Get(context.Background(), cacheKey)
+		rendered, ok, isCurrent, err := utilityCache.Get(context.Background(), cacheKey)
 		if err == nil && ok {
+			if isCurrent {
+				return rendered // Perfect hit
+			}
+
+			// Stale Hit (vN-1): Serve fast, but migrate in background
+			hh.log.Info("stale cache hit, triggering background migration", "key", cacheKey)
+			go func() {
+				// Background context to ensure it lives past the request
+				bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+
+				// Re-render to ensure any CRD changes are reflected in vN
+				newRender, err := hh.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
+				if err == nil {
+					_ = utilityCache.Set(bgCtx, cacheKey, newRender)
+				}
+			}()
 			return rendered
 		}
 	}
 
+	// Standard Render Path (Cache Miss or Extra Data)
 	rendered, err := hh.L10nRender(ph, map[string]any{}, l, extraTemplateData, translations)
 	if err != nil {
 		hh.log.Error(err, "failed to render utility page", "page", ph.Name, "language", l)
@@ -665,7 +641,7 @@ func (hh *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPag
 	}
 
 	if len(extraTemplateData) == 0 {
-		if err := hh.renderCache.Set(context.Background(), cacheKey, rendered); err != nil {
+		if err := utilityCache.Set(context.Background(), cacheKey, rendered); err != nil {
 			hh.log.Error(err, "failed to set utility cache", "page", ph.Name, "language", l)
 		}
 	}

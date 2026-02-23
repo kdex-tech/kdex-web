@@ -93,7 +93,7 @@ func (hh *HostHandler) LoginPost(w http.ResponseWriter, r *http.Request) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   hh.isSecure(r),
+		Secure:   hh.isSecure(),
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -110,7 +110,7 @@ func (hh *HostHandler) LogoutPost(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1, // Tells browser to delete immediately
 		HttpOnly: true,
-		Secure:   hh.isSecure(r),
+		Secure:   hh.isSecure(),
 		SameSite: http.SameSiteLaxMode,
 	})
 

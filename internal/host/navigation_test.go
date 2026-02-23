@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	"github.com/kdex-tech/kdex-host/internal/page"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/language"
@@ -144,7 +145,8 @@ func TestHostHandler_BuildMenuEntries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			hh := NewHostHandler(fake.NewClientBuilder().Build(), "foo", "foo", logr.Logger{}, nil)
+			cacheManager, _ := cache.NewCacheManager("", "", nil)
+			hh := NewHostHandler(fake.NewClientBuilder().Build(), "foo", "foo", logr.Logger{}, cacheManager)
 			for _, it := range *tt.items {
 				hh.Pages.Set(it)
 			}

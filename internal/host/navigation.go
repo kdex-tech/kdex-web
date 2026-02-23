@@ -78,67 +78,133 @@ func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hh.mu.RLock()
-	defer hh.mu.RUnlock()
-
 	basePath := "/" + r.PathValue("basePathMinusLeadingSlash")
-	l10n := r.PathValue("l10n")
 	navKey := r.PathValue("navKey")
-
-	userHash := hh.getUserHash(r)
-	cacheKey := fmt.Sprintf("nav:%s:%s:%s:%s", navKey, basePath, l10n, userHash)
-	rendered, ok, err := hh.renderCache.Get(r.Context(), cacheKey)
-	if err == nil && ok {
-		w.Header().Set("Content-Type", "text/html")
-		_, _ = w.Write([]byte(rendered))
-		return
-	}
-
-	hh.log.V(2).Info("generating navigation", "basePath", basePath, "l10n", l10n, "navKey", navKey)
+	defaultLang := hh.defaultLanguage
+	translations := hh.Translations
+	reconcileTime := hh.reconcileTime
+	brandName := hh.host.BrandName
+	org := hh.host.Organization
 
 	var pageHandler *page.PageHandler
-
 	for _, ph := range hh.Pages.List() {
 		if ph.BasePath() == basePath {
 			pageHandler = &ph
 			break
 		}
 	}
+	defer hh.mu.RUnlock()
 
 	if pageHandler == nil {
 		http.Error(w, "page not found", http.StatusNotFound)
 		return
 	}
 
-	var nav string
+	l, err := kdexhttp.GetLang(r, defaultLang, translations.Languages())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
+	navCache := hh.cacheManager.GetCache("nav")
+	userHash := hh.getUserHash(r)
+	cacheKey := fmt.Sprintf("%s:%s:%s:%s", navKey, basePath, l.String(), userHash)
+
+	rendered, ok, isCurrent, err := navCache.Get(r.Context(), cacheKey)
+	if err == nil && ok {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(rendered))
+
+		if isCurrent {
+			return // Perfect hit
+		}
+
+		// 2. Stale Hit (vN-1): Serve fast, migrate in background
+		hh.log.V(2).Info("stale navigation hit, migrating in background", "key", cacheKey)
+
+		// Clone necessary request context or data for the goroutine
+		// Note: we don't pass r.Context() because it cancels when the request ends
+		go func() {
+			bgCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
+			newRender, err := hh.performNavigationRender(
+				bgCtx,
+				l,
+				pageHandler,
+				navKey,
+				translations,
+				defaultLang,
+				brandName,
+				org,
+				reconcileTime,
+			)
+			if err == nil {
+				_ = navCache.Set(bgCtx, cacheKey, newRender)
+			}
+		}()
+		return
+	}
+
+	// 3. Cache Miss: Perform Synchronous Render
+	hh.log.V(2).Info("generating navigation", "basePath", basePath, "lang", l.String(), "navKey", navKey)
+	rendered, err = hh.performNavigationRender(
+		r.Context(),
+		l,
+		pageHandler,
+		navKey,
+		translations,
+		defaultLang,
+		brandName,
+		org,
+		reconcileTime,
+	)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := navCache.Set(r.Context(), cacheKey, rendered); err != nil {
+		hh.log.Error(err, "failed to cache navigation", "key", cacheKey)
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	if _, err = w.Write([]byte(rendered)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// Helper method to encapsulate the rendering logic for both Sync and Async paths
+func (hh *HostHandler) performNavigationRender(
+	ctx context.Context,
+	l language.Tag,
+	pageHandler *page.PageHandler,
+	navKey string,
+	translations Translations,
+	defaultLang string,
+	brandName string,
+	org string,
+	reconcileTime time.Time,
+) (string, error) {
+	var nav string
 	for key, n := range pageHandler.Navigations {
 		if key == navKey {
 			nav = n
 			break
 		}
 	}
-
 	if nav == "" {
-		http.Error(w, "navigation not found", http.StatusNotFound)
-		return
+		return "", fmt.Errorf("navigation not found")
 	}
-
-	l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Filter navigation by page access checks
 
 	rootEntry := &render.PageEntry{}
-	hh.BuildMenuEntries(r.Context(), rootEntry, &l, l.String() == hh.defaultLanguage, nil)
+	hh.BuildMenuEntries(ctx, rootEntry, &l, l.String() == defaultLang, nil)
 	var pageMap map[string]any
 	if rootEntry.Children != nil {
 		pageMap = *rootEntry.Children
 	}
 
-	authContext, _ := auth.GetAuthContext(r.Context())
+	authContext, _ := auth.GetAuthContext(ctx)
 	extra := map[string]any{}
 	if authContext != nil {
 		extra["Identity"] = authContext
@@ -146,14 +212,14 @@ func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
 
 	renderer := render.Renderer{
 		BasePath:        pageHandler.Page.BasePath,
-		BrandName:       hh.host.BrandName,
-		DefaultLanguage: hh.defaultLanguage,
+		BrandName:       brandName,
+		DefaultLanguage: defaultLang,
 		Extra:           extra,
 		Language:        l.String(),
-		Languages:       hh.availableLanguages(&hh.Translations),
-		LastModified:    hh.reconcileTime,
-		MessagePrinter:  hh.messagePrinter(&hh.Translations, l),
-		Organization:    hh.host.Organization,
+		Languages:       hh.availableLanguages(&translations),
+		LastModified:    reconcileTime,
+		MessagePrinter:  hh.messagePrinter(&translations, l),
+		Organization:    org,
 		PageMap:         pageMap,
 		PatternPath:     pageHandler.PatternPath(),
 		Title:           pageHandler.Label(),
@@ -161,23 +227,8 @@ func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
 
 	templateData, err := renderer.TemplateData()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return "", err
 	}
 
-	rendered, err = renderer.RenderOne(navKey, nav, templateData)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := hh.renderCache.Set(r.Context(), cacheKey, rendered); err != nil {
-		hh.log.Error(err, "failed to cache navigation", "key", cacheKey)
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	_, err = w.Write([]byte(rendered))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	return renderer.RenderOne(navKey, nav, templateData)
 }

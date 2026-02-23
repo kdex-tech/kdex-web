@@ -50,6 +50,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	"github.com/kdex-tech/kdex-host/internal/controller"
 	"github.com/kdex-tech/kdex-host/internal/host"
 	"github.com/kdex-tech/kdex-host/internal/web/server"
@@ -75,6 +76,7 @@ func init() {
 
 // nolint:gocyclo
 func main() {
+	var cacheAddr string
 	var configFile string
 	var focalHost string
 	namedLogLevels := make(kdexlog.NamedLogLevelPairs)
@@ -83,14 +85,15 @@ func main() {
 	var serviceName string
 	var webserverAddr string
 
+	var enableHTTP2 bool
 	var metricsAddr string
-	var metricsCertPath, metricsCertName, metricsCertKey string
-	var webhookCertPath, webhookCertName, webhookCertKey string
+	var metricsCertKey, metricsCertName, metricsCertPath string
 	var probeAddr string
 	var secureMetrics bool
-	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	var webhookCertKey, webhookCertName, webhookCertPath string
 
+	flag.StringVar(&cacheAddr, "cache-address", os.Getenv("CACHE_ADDRESS"), "The address of the Redis/Valkey cache.")
 	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file.")
 	flag.StringVar(&focalHost, "focal-host", "", "The name of a KDexHost resource to focus the controller instance's "+
 		"attention on.")
@@ -102,20 +105,20 @@ func main() {
 		"ingress/httproute with itself as backend.")
 	flag.StringVar(&webserverAddr, "webserver-bind-address", ":8090", "The address the webserver binds to.")
 
-	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
-		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", true,
-		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
-	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
-	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
-	flag.StringVar(&webhookCertKey, "webhook-cert-key", "tls.key", "The name of the webhook key file.")
-	flag.StringVar(&metricsCertPath, "metrics-cert-path", "",
-		"The directory that contains the metrics server certificate.")
-	flag.StringVar(&metricsCertName, "metrics-cert-name", "tls.crt", "The name of the metrics server certificate file.")
-	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
+		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", true,
+		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&metricsCertKey, "metrics-cert-key", "tls.key", "The name of the metrics server key file.")
+	flag.StringVar(&metricsCertName, "metrics-cert-name", "tls.crt", "The name of the metrics server certificate file.")
+	flag.StringVar(&metricsCertPath, "metrics-cert-path", "",
+		"The directory that contains the metrics server certificate.")
+	flag.StringVar(&webhookCertKey, "webhook-cert-key", "tls.key", "The name of the webhook key file.")
+	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
+	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
 
 	opts := zap.Options{
 		Development: true,
@@ -220,7 +223,20 @@ func main() {
 
 	conf := configuration.LoadConfiguration(configFile, scheme)
 
-	hostHandler := host.NewHostHandler(mgr.GetClient(), focalHost, controllerNamespace, logger.WithName("host"), nil)
+	var cacheManager cache.CacheManager
+	if cacheAddr != "" {
+		var err error
+		cacheManager, err = cache.NewCacheManager(cacheAddr, focalHost, nil)
+		if err != nil {
+			setupLog.Error(err, "unable to create cache")
+			os.Exit(1)
+		}
+		setupLog.Info("Using cache service", "cache-address", cacheAddr)
+	} else {
+		cacheManager, _ = cache.NewCacheManager("", "", nil)
+	}
+
+	hostHandler := host.NewHostHandler(mgr.GetClient(), focalHost, controllerNamespace, logger.WithName("host"), cacheManager)
 	requeueDelay := time.Duration(requeueDelaySeconds) * time.Second
 
 	if err := (&controller.KDexInternalHostReconciler{

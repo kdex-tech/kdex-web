@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kdex-tech/kdex-host/internal/auth"
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	"github.com/kdex-tech/kdex-host/internal/host/ico"
 	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	"github.com/kdex-tech/kdex-host/internal/page"
@@ -47,6 +48,7 @@ type HostHandler struct {
 	}
 	authConfig                *auth.Config
 	authExchanger             *auth.Exchanger
+	cacheManager              cache.CacheManager
 	client                    client.Client
 	defaultLanguage           string
 	favicon                   *ico.Ico
@@ -60,7 +62,6 @@ type HostHandler struct {
 	pathsCollectedInReconcile map[string]ko.PathInfo
 	reconcileTime             time.Time
 	registeredPaths           map[string]ko.PathInfo
-	renderCache               RenderCache
 	scheme                    string
 	scripts                   []kdexv1alpha1.ScriptDef
 	sniffer                   interface {
@@ -70,6 +71,51 @@ type HostHandler struct {
 	themeAssets          []kdexv1alpha1.Asset
 	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
+}
+
+func NewHostHandler(c client.Client, name string, namespace string, log logr.Logger, cacheManager cache.CacheManager) *HostHandler {
+	th := &HostHandler{
+		Mux:          nil,
+		Name:         name,
+		Namespace:    namespace,
+		Pages:        nil,
+		Translations: Translations{},
+
+		analysisCache:             NewAnalysisCache(),
+		authConfig:                nil,
+		authExchanger:             nil,
+		cacheManager:              cacheManager,
+		client:                    c,
+		defaultLanguage:           "en",
+		favicon:                   nil,
+		functions:                 []kdexv1alpha1.KDexFunction{},
+		host:                      nil,
+		importmap:                 "",
+		log:                       log,
+		packageReferences:         []kdexv1alpha1.PackageReference{},
+		pathsCollectedInReconcile: map[string]ko.PathInfo{},
+		reconcileTime:             time.Now(),
+		registeredPaths:           map[string]ko.PathInfo{},
+		scheme:                    "",
+		scripts:                   []kdexv1alpha1.ScriptDef{},
+		themeAssets:               []kdexv1alpha1.Asset{},
+		translationResources:      map[string]kdexv1alpha1.KDexTranslationSpec{},
+		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
+	}
+
+	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
+	if err != nil {
+		panic(err)
+	}
+
+	th.Translations = *translations
+	th.Pages = page.NewPageStore(
+		name,
+		th.RebuildMux,
+		th.log.WithName("pages"),
+	)
+	th.RebuildMux()
+	return th
 }
 
 type Translations struct {

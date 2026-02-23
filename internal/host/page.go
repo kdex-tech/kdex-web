@@ -1,12 +1,14 @@
 package host
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	"github.com/kdex-tech/kdex-host/internal/page"
+	"golang.org/x/text/language"
 )
 
 func (hh *HostHandler) pageHandlerFunc(
@@ -35,32 +37,61 @@ func (hh *HostHandler) pageHandlerFunc(
 			return
 		}
 
-		cacheKey := fmt.Sprintf("render:%s:%s", ph.Name, l.String())
-		rendered, ok, err := hh.renderCache.Get(r.Context(), cacheKey)
+		pageCache := hh.cacheManager.GetCache("page")
+		cacheKey := fmt.Sprintf("%s:%s", ph.Name, l.String())
+
+		rendered, ok, isCurrent, err := pageCache.Get(r.Context(), cacheKey)
 		if err != nil {
 			hh.log.Error(err, "failed to get from cache", "page", ph.Name, "language", l)
 		}
 
-		if !ok {
-			rendered, err = hh.L10nRender(ph, nil, l, map[string]any{}, translations)
-			if err != nil {
-				hh.log.Error(err, "failed to render page", "page", ph.Name, "language", l)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+		if ok {
+			// Check if we need to migrate this stale entry to the current generation
+			if !isCurrent {
+				hh.log.V(1).Info("serving stale page, migrating in background", "page", ph.Name, "lang", l.String())
+
+				// Background Migration
+				go func(p page.PageHandler, lang language.Tag, trans *Translations) {
+					bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+					defer cancel()
+
+					newRender, err := hh.L10nRender(p, nil, lang, map[string]any{}, trans)
+					if err == nil {
+						_ = pageCache.Set(bgCtx, cacheKey, newRender)
+					} else {
+						hh.log.Error(err, "background migration failed", "page", p.Name)
+					}
+				}(ph, l, translations)
 			}
-			if err := hh.renderCache.Set(r.Context(), cacheKey, rendered); err != nil {
-				hh.log.Error(err, "failed to set cache", "page", ph.Name, "language", l)
-			}
+
+			// Serve the cached content (Current or Stale)
+			hh.serveRendered(w, l, ph.Name, rendered)
+			return
 		}
 
-		hh.log.V(1).Info("serving", "page", ph.Name, "basePath", ph.BasePath(), "language", l.String())
-
-		w.Header().Set("Content-Language", l.String())
-		w.Header().Set("Content-Type", "text/html")
-
-		_, err = w.Write([]byte(rendered))
+		// 2. Cache Miss: Synchronous Render
+		rendered, err = hh.L10nRender(ph, nil, l, map[string]any{}, translations)
 		if err != nil {
-			hh.log.Error(err, "failed to write response", "page", ph.Name, "language", l)
+			hh.log.Error(err, "failed to render page", "page", ph.Name, "language", l)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
+
+		// Store the fresh render
+		if err := pageCache.Set(r.Context(), cacheKey, rendered); err != nil {
+			hh.log.Error(err, "failed to set cache", "page", ph.Name, "language", l)
+		}
+
+		hh.serveRendered(w, l, ph.Name, rendered)
+	}
+}
+
+// Small helper to keep the main handler clean
+func (hh *HostHandler) serveRendered(w http.ResponseWriter, l language.Tag, name string, rendered string) {
+	hh.log.V(1).Info("serving", "page", name, "language", l.String())
+	w.Header().Set("Content-Language", l.String())
+	w.Header().Set("Content-Type", "text/html")
+	if _, err := w.Write([]byte(rendered)); err != nil {
+		hh.log.Error(err, "failed to write response", "page", name, "language", l)
 	}
 }

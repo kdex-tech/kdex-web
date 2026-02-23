@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kdex-tech/kdex-host/internal/auth"
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	"github.com/kdex-tech/kdex-host/internal/page"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -18,8 +19,8 @@ import (
 func TestHostHandler_PageCaching(t *testing.T) {
 	// Setup
 	log := logr.Discard()
-	cache := NewInMemoryRenderCache()
-	hh := NewHostHandler(nil, "test-host", "default", log, cache)
+	cacheManager, _ := cache.NewCacheManager("", "foo", nil)
+	hh := NewHostHandler(nil, "test-host", "default", log, cacheManager)
 
 	// Mock Page
 	ph := page.PageHandler{
@@ -38,7 +39,7 @@ func TestHostHandler_PageCaching(t *testing.T) {
 	hh.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
 		BrandName:   "KDex",
-	}, nil, nil, nil, "", nil, nil, &auth.Exchanger{}, &auth.Config{}, "http")
+	}, 0, nil, nil, nil, "", nil, nil, &auth.Exchanger{}, &auth.Config{}, "http")
 
 	// 1. Initial Request
 	req := httptest.NewRequest("GET", "/test/", nil)
@@ -54,9 +55,10 @@ func TestHostHandler_PageCaching(t *testing.T) {
 	assert.Contains(t, body1, "Test Page")
 
 	// Verify it's in cache
-	cacheVal, found, err := cache.Get(context.Background(), "render:test-page:en")
+	cacheVal, found, isCurrent, err := cacheManager.GetCache("page").Get(context.Background(), "test-page:en")
 	require.NoError(t, err)
 	assert.True(t, found)
+	assert.True(t, isCurrent)
 	assert.Equal(t, body1, cacheVal)
 
 	// 2. Test 304 logic
@@ -79,8 +81,8 @@ func TestHostHandler_PageCaching(t *testing.T) {
 func TestHostHandler_NavigationCaching(t *testing.T) {
 	// Setup
 	log := logr.Discard()
-	cache := NewInMemoryRenderCache()
-	hh := NewHostHandler(nil, "test-host", "default", log, cache)
+	cacheManager, _ := cache.NewCacheManager("", "foo", nil)
+	hh := NewHostHandler(nil, "test-host", "default", log, cacheManager)
 
 	// Mock Page with Navigation
 	ph := page.PageHandler{
@@ -100,7 +102,7 @@ func TestHostHandler_NavigationCaching(t *testing.T) {
 	hh.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
 		BrandName:   "KDex",
-	}, nil, nil, nil, "", nil, nil, &auth.Exchanger{}, &auth.Config{}, "http")
+	}, 0, nil, nil, nil, "", nil, nil, &auth.Exchanger{}, &auth.Config{}, "http")
 
 	// 1. Initial Request
 	req := httptest.NewRequest("GET", "/-/navigation/main/en/test", nil)
@@ -113,10 +115,11 @@ func TestHostHandler_NavigationCaching(t *testing.T) {
 
 	// Verify it's in cache
 	// Key format: nav:main:/test:en:anon (since no auth)
-	cacheKey := "nav:main:/test:en:anon"
-	cacheVal, found, err := cache.Get(context.Background(), cacheKey)
+	cacheKey := "main:/test:en:anon"
+	cacheVal, found, isCurrent, err := cacheManager.GetCache("nav").Get(context.Background(), cacheKey)
 	require.NoError(t, err)
 	assert.True(t, found)
+	assert.True(t, isCurrent)
 	assert.Equal(t, body1, cacheVal)
 
 	// 2. Test RBAC/Identity Separation
@@ -135,8 +138,9 @@ func TestHostHandler_NavigationCaching(t *testing.T) {
 	// Verify different cache key is used
 	userHash := hh.getUserHash(req2)
 	assert.NotEqual(t, "anon", userHash)
-	cacheKey2 := fmt.Sprintf("nav:main:/test:en:%s", userHash)
+	cacheKey2 := fmt.Sprintf("main:/test:en:%s", userHash)
 
-	_, found2, _ := cache.Get(context.Background(), cacheKey2)
+	_, found2, _, err2 := cacheManager.GetCache("nav").Get(context.Background(), cacheKey2)
+	assert.NoError(t, err2)
 	assert.True(t, found2)
 }

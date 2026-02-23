@@ -33,7 +33,7 @@ func (hh *HostHandler) OAuthGet(w http.ResponseWriter, r *http.Request) {
 	options := &http.Cookie{
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   hh.isSecure(r),
+		Secure:   hh.isSecure(),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   3600, // 1 hour
 	}
@@ -50,7 +50,7 @@ func (hh *HostHandler) OAuthGet(w http.ResponseWriter, r *http.Request) {
 		Value:    localToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   hh.isSecure(r),
+		Secure:   hh.isSecure(),
 		SameSite: http.SameSiteLaxMode,
 	})
 

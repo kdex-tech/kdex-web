@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	"github.com/kdex-tech/kdex-host/internal/host"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -167,7 +168,8 @@ var _ = BeforeSuite(func() {
 	configuration := configuration.LoadConfiguration("/config.yaml", scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	hostHandler = host.NewHostHandler(k8sClient, focalHost, namespace, logger, nil)
+	cacheManager, _ := cache.NewCacheManager("", "", nil)
+	hostHandler = host.NewHostHandler(k8sClient, focalHost, namespace, logger, cacheManager)
 	requeueDelay := 2 * time.Second
 
 	mockPageArchetypeReconciler := &MockPageArchetypeReconciler{

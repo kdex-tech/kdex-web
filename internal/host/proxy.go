@@ -18,7 +18,7 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
-func (hh *HostHandler) reverseProxyHandler(fn *kdexv1alpha1.KDexFunction) http.Handler {
+func (hh *HostHandler) reverseProxyHandler(fn *kdexv1alpha1.KDexFunction, issuer string) http.Handler {
 	target, err := url.Parse(fn.Status.URL)
 	if err != nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +41,7 @@ func (hh *HostHandler) reverseProxyHandler(fn *kdexv1alpha1.KDexFunction) http.H
 	signer, err := sign.NewSigner(
 		fn.Status.URL,
 		5*time.Minute,
-		hh.issuerAddress(),
+		issuer,
 		&hh.authConfig.ActivePair.Private,
 		hh.authConfig.ActivePair.KeyId,
 		mapper,

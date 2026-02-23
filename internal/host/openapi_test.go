@@ -9,6 +9,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-logr/logr"
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	G "github.com/onsi/gomega"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
@@ -17,7 +18,8 @@ import (
 func TestHostHandler_openapiHandler(t *testing.T) {
 	g := G.NewGomegaWithT(t)
 
-	th := NewHostHandler(nil, "test-host", "default", logr.Discard(), nil)
+	cacheManager, _ := cache.NewCacheManager("", "", nil)
+	th := NewHostHandler(nil, "test-host", "default", logr.Discard(), cacheManager)
 	th.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
 		OpenAPI: kdexv1alpha1.OpenAPI{
@@ -31,7 +33,7 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 		Routing: kdexv1alpha1.Routing{
 			Domains: []string{"test.example.com"},
 		},
-	}, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
+	}, 0, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
 
 	mux := th.muxWithDefaultsLocked(th.registeredPaths) // registeredPaths is empty, but muxWithDefaultsLocked populates it for defaults
 

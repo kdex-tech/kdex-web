@@ -9,6 +9,7 @@ import (
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-logr/logr"
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	"github.com/stretchr/testify/assert"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
@@ -16,7 +17,8 @@ import (
 
 func TestHostHandler_SchemaHandler(t *testing.T) {
 	// Setup HostHandler
-	th := NewHostHandler(nil, "test-host", "default", logr.Discard(), nil)
+	cacheManager, _ := cache.NewCacheManager("", "", nil)
+	th := NewHostHandler(nil, "test-host", "default", logr.Discard(), cacheManager)
 
 	// Define some schemas
 	userSchema := &openapi.SchemaRef{
@@ -70,7 +72,7 @@ func TestHostHandler_SchemaHandler(t *testing.T) {
 
 	th.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
-	}, nil, nil, nil, "", registeredPaths, nil, nil, nil, "http")
+	}, 0, nil, nil, nil, "", registeredPaths, nil, nil, nil, "http")
 
 	tests := []struct {
 		name       string

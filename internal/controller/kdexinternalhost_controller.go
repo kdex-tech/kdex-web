@@ -664,6 +664,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	r.HostHandler.SetHost(
 		ctx,
 		&internalHost.Spec.KDexHostSpec,
+		internalHost.Generation,
 		uniquePackageRefs,
 		themeAssets,
 		uniqueScriptDefs,
