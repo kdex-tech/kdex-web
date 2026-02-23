@@ -346,7 +346,7 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
+	if err = json.NewEncoder(w).Encode(resp); err != nil {
 		err = fmt.Errorf("failed to encode token response: %w", err)
 		http.Error(w, "Failed to encode token response", http.StatusInternalServerError)
 		return

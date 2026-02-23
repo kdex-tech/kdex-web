@@ -135,28 +135,36 @@ func main() {
 	if zapEncoderEnv := os.Getenv("ZAP_ENCODER"); zapEncoderEnv != "" {
 		enc := flag.CommandLine.Lookup("zap-encoder")
 		if enc != nil {
-			enc.Value.Set(zapEncoderEnv)
+			if err := enc.Value.Set(zapEncoderEnv); err != nil {
+				panic(err)
+			}
 		}
 	}
 
 	if zapLogLevelEnv := os.Getenv("ZAP_LOG_LEVEL"); zapLogLevelEnv != "" {
 		enc := flag.CommandLine.Lookup("zap-log-level")
 		if enc != nil {
-			enc.Value.Set(zapLogLevelEnv)
+			if err := enc.Value.Set(zapLogLevelEnv); err != nil {
+				panic(err)
+			}
 		}
 	}
 
 	if zapStacktraceLevelEnv := os.Getenv("ZAP_STACKTRACE_LEVEL"); zapStacktraceLevelEnv != "" {
 		enc := flag.CommandLine.Lookup("zap-stacktrace-level")
 		if enc != nil {
-			enc.Value.Set(zapStacktraceLevelEnv)
+			if err := enc.Value.Set(zapStacktraceLevelEnv); err != nil {
+				panic(err)
+			}
 		}
 	}
 
 	if zapTimeEncodingEnv := os.Getenv("ZAP_TIME_ENCODING"); zapTimeEncodingEnv != "" {
 		enc := flag.CommandLine.Lookup("zap-time-encoding")
 		if enc != nil {
-			enc.Value.Set(zapTimeEncodingEnv)
+			if err := enc.Value.Set(zapTimeEncodingEnv); err != nil {
+				panic(err)
+			}
 		}
 	}
 

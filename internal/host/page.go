@@ -28,7 +28,7 @@ func (hh *HostHandler) pageHandlerFunc(
 			return
 		}
 
-		if hh.applyCachingHeaders(w, r, hh.pageRequirements(&ph), time.Time{}) {
+		if hh.applyCachingHeaders(w, r, hh.pageRequirements(&ph), hh.reconcileTime) {
 			return
 		}
 

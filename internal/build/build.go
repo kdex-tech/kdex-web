@@ -56,8 +56,13 @@ func (b *Builder) GetOrCreateKPackImage(
 			},
 		}
 
-		unstructured.SetNestedMap(kImage.Object, spec, "spec")
-		unstructured.SetNestedSlice(kImage.Object, convert(b.Source.Builder.Env), "spec", "build", "env")
+		if err := unstructured.SetNestedMap(kImage.Object, spec, "spec"); err != nil {
+			return err
+		}
+
+		if err := unstructured.SetNestedSlice(kImage.Object, convert(b.Source.Builder.Env), "spec", "build", "env"); err != nil {
+			return err
+		}
 
 		kImage.SetLabels(map[string]string{
 			"app":           "builder",
@@ -76,7 +81,7 @@ func (b *Builder) GetOrCreateKPackImage(
 }
 
 func convert(envVar []v1.EnvVar) []any {
-	var result []any
+	result := make([]any, 0, len(envVar))
 	for _, env := range envVar {
 		result = append(result, map[string]any{
 			"name":  env.Name,

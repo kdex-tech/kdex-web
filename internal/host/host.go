@@ -242,7 +242,7 @@ func (hh *HostHandler) RebuildMux() {
 				return
 			}
 
-			if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
+			if hh.applyCachingHeaders(w, r, nil, hh.reconcileTime) {
 				return
 			}
 
@@ -444,7 +444,9 @@ func (hh *HostHandler) SetHost(
 ) {
 	hh.mu.Lock()
 	hh.host = host
-	hh.cacheManager.Cycle(generation, true)
+	if err := hh.cacheManager.Cycle(generation, true); err != nil {
+		hh.log.Error(err, "failed to cycle cache manager")
+	}
 	hh.defaultLanguage = host.DefaultLang
 	hh.functions = functions
 	hh.scheme = scheme

@@ -204,7 +204,7 @@ func NewLDAPLookup(secret corev1.Secret) *ldapLookup {
 		"email_verified": "email_verified",
 		"memberOf":       "roles",
 	}
-	if string(secret.Data["active-directory"]) == "true" {
+	if string(secret.Data["active-directory"]) == TRUE {
 		attributes = map[string]string{
 			// default Active Directory attribute mappings
 			"objectGUID":     "sub",
@@ -244,7 +244,11 @@ func (ll *ldapLookup) FindInternal(subject string, password string) (bool, jwt.M
 	if err != nil {
 		return false, nil, fmt.Errorf("connection error: %w", err)
 	}
-	defer l.Close()
+	defer func() {
+		if err := l.Close(); err != nil {
+			fmt.Printf("connection error: %v\n", err)
+		}
+	}()
 
 	// 2. Bind with the pre-configured Service Account
 	if err := l.Bind(ll.bindUser, ll.bindPass); err != nil {

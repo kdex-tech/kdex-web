@@ -64,6 +64,7 @@ type handlerContext struct {
 	req              ctrl.Request
 }
 
+//nolint:gocyclo
 func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (res ctrl.Result, err error) {
 	log := logf.FromContext(ctx)
 
@@ -207,7 +208,7 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	switch function.Status.State {
 	case kdexv1alpha1.KDexFunctionStatePending:
-		return r.handlePending(hc)
+		return r.handlePending(hc), nil
 	case kdexv1alpha1.KDexFunctionStateOpenAPIValid:
 		return r.handleOpenAPIValid(hc)
 	case kdexv1alpha1.KDexFunctionStateBuildValid:
@@ -240,13 +241,13 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *KDexFunctionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	unstructured := &unstructured.Unstructured{}
-	unstructured.SetGroupVersionKind(internal.KPackImageGVK)
+	kPackUn := &unstructured.Unstructured{}
+	kPackUn.SetGroupVersionKind(internal.KPackImageGVK)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kdexv1alpha1.KDexFunction{}).
 		Owns(&batchv1.Job{}).
 		Owns(&batchv1.CronJob{}).
-		Owns(unstructured).
+		Owns(kPackUn).
 		Watches(
 			&kdexv1alpha1.KDexInternalHost{},
 			MakeHandlerByReferencePath(r.Client, r.Scheme, &kdexv1alpha1.KDexFunction{}, &kdexv1alpha1.KDexFunctionList{}, "{.Spec.HostRef}")).
@@ -257,7 +258,7 @@ func (r *KDexFunctionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *KDexFunctionReconciler) handlePending(hc handlerContext) (ctrl.Result, error) {
+func (r *KDexFunctionReconciler) handlePending(hc handlerContext) ctrl.Result {
 	log := logf.FromContext(hc.ctx)
 
 	scheme := hc.host.Spec.Routing.Scheme
@@ -287,7 +288,7 @@ func (r *KDexFunctionReconciler) handlePending(hc handlerContext) (ctrl.Result, 
 
 	log.V(2).Info(hc.function.Status.Detail)
 
-	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+	return ctrl.Result{RequeueAfter: r.RequeueDelay}
 }
 
 func (r *KDexFunctionReconciler) handleOpenAPIValid(hc handlerContext) (ctrl.Result, error) {
@@ -304,7 +305,7 @@ func (r *KDexFunctionReconciler) handleOpenAPIValid(hc handlerContext) (ctrl.Res
 	if hc.function.Spec.Origin.Generator != nil {
 		hc.function.Status.Generator = hc.function.Spec.Origin.Generator
 	} else {
-		g := &kdexv1alpha1.Generator{}
+		var g *kdexv1alpha1.Generator
 
 		parts := strings.SplitN(hc.faasAdaptorSpec.DefaultBuilderGenerator, "/", 2)
 		for _, generator := range hc.faasAdaptorSpec.Generators {
@@ -316,7 +317,7 @@ func (r *KDexFunctionReconciler) handleOpenAPIValid(hc handlerContext) (ctrl.Res
 
 		if g == nil {
 			err := fmt.Errorf(
-				"Generator %s not found for function %s/%s",
+				"generator %s not found for function %s/%s",
 				parts[1],
 				hc.function.Namespace,
 				hc.function.Name,
@@ -581,7 +582,7 @@ func (r *KDexFunctionReconciler) handleSourceAvailable(hc handlerContext) (ctrl.
 			if strings.Contains(err.Error(), "Immutable field changed") {
 				log.V(2).Info("Immutable field changed, deleting image builder", "image builder", imgUnstruct)
 
-				if err := r.Client.Delete(hc.ctx, imgUnstruct); err != nil {
+				if err := r.Delete(hc.ctx, imgUnstruct); err != nil {
 					return ctrl.Result{}, err
 				}
 

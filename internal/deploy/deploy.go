@@ -132,7 +132,7 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 			},
 			{
 				Name:  "SCALING_METRIC",
-				Value: fmt.Sprintf("%s", *function.Status.Executable.Scaling.Metric),
+				Value: *function.Status.Executable.Scaling.Metric,
 			},
 			{
 				Name:  "SCALING_MIN_SCALE",

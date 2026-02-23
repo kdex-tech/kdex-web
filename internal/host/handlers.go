@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 	"github.com/kdex-tech/kdex-host/internal/auth"
@@ -148,7 +147,7 @@ func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[
 
 	const oauth2path = "/.well-known/oauth-authorization-server"
 	mux.HandleFunc("GET "+oauth2path, func(w http.ResponseWriter, r *http.Request) {
-		if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
+		if hh.applyCachingHeaders(w, r, nil, hh.reconcileTime) {
 			return
 		}
 		issuer := hh.serverAddress(r)
@@ -190,7 +189,7 @@ func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[
 
 	const oidcPath = "/.well-known/openid-configuration"
 	mux.HandleFunc("GET "+oidcPath, func(w http.ResponseWriter, r *http.Request) {
-		if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
+		if hh.applyCachingHeaders(w, r, nil, hh.reconcileTime) {
 			return
 		}
 		issuer := hh.serverAddress(r)
@@ -276,7 +275,7 @@ func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 
 	const path = "/.well-known/jwks.json"
 	mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
-		if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
+		if hh.applyCachingHeaders(w, r, nil, hh.reconcileTime) {
 			return
 		}
 		auth.JWKSHandler(hh.authConfig.KeyPairs)(w, r)

@@ -141,7 +141,7 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, rawIDToken string) (strin
 		return "", err
 	}
 
-	oidcRoles, _ := signingContext["roles"]
+	oidcRoles := signingContext["roles"]
 	switch v := oidcRoles.(type) {
 	case []string:
 		oidcRoles = append(v, roles...)
@@ -152,7 +152,7 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, rawIDToken string) (strin
 	}
 	signingContext["roles"] = oidcRoles
 
-	oidcEntitlements, _ := signingContext["entitlements"]
+	oidcEntitlements := signingContext["entitlements"]
 	switch v := oidcEntitlements.(type) {
 	case []string:
 		oidcEntitlements = append(v, entitlements...)

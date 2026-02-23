@@ -74,7 +74,7 @@ func (hh *HostHandler) BuildMenuEntries(
 }
 
 func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
-	if hh.applyCachingHeaders(w, r, []kdexv1alpha1.SecurityRequirement{{"authenticated": {}}}, time.Time{}) {
+	if hh.applyCachingHeaders(w, r, []kdexv1alpha1.SecurityRequirement{{"authenticated": {}}}, hh.reconcileTime) {
 		return
 	}
 

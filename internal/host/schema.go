@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
-	"time"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 )
@@ -16,7 +15,7 @@ type schemaEntry struct {
 }
 
 func (hh *HostHandler) SchemaGet(w http.ResponseWriter, r *http.Request) {
-	if hh.applyCachingHeaders(w, r, nil, time.Time{}) {
+	if hh.applyCachingHeaders(w, r, nil, hh.reconcileTime) {
 		return
 	}
 

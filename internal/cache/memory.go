@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -12,8 +11,6 @@ type InMemoryCache struct {
 	currentGeneration int64
 	host              string
 	mu                sync.RWMutex
-	prefix            string // e.g. "{host:class:generation}:"
-	prevPrefix        string // e.g. "{host:class:generation-1}:"
 	segments          map[int64]map[string]memoryCacheEntry
 	ttl               time.Duration
 	uncycled          bool
@@ -219,7 +216,6 @@ func (m *InMemoryCacheManager) GetCache(class string, opts CacheOptions) Cache {
 		host:              m.host,
 		uncycled:          opts.Uncycled,
 		segments:          make(map[int64]map[string]memoryCacheEntry),
-		prefix:            fmt.Sprintf("{%s:%s:%d}:", m.host, class, m.currentGeneration),
 		ttl:               ttl,
 	}
 	go cache.(*InMemoryCache).startReaper(ttl)
@@ -228,7 +224,6 @@ func (m *InMemoryCacheManager) GetCache(class string, opts CacheOptions) Cache {
 }
 
 type memoryCacheEntry struct {
-	expiry     time.Time
-	generation int64
-	value      string
+	expiry time.Time
+	value  string
 }

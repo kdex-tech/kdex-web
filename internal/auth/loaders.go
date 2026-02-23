@@ -25,7 +25,7 @@ func AuthClientLoader(secrets kdexv1alpha1.ServiceAccountSecrets) (map[string]Au
 		}
 
 		public := false
-		if string(secret.Data["public"]) == "true" {
+		if string(secret.Data["public"]) == TRUE {
 			public = true
 		}
 
@@ -65,7 +65,7 @@ func AuthClientLoader(secrets kdexv1alpha1.ServiceAccountSecrets) (map[string]Au
 		name := string(secret.Data["name"])
 
 		requirePKCE := false
-		if string(secret.Data["require_pkce"]) == "true" || string(secret.Data["require-pkce"]) == "true" {
+		if string(secret.Data["require_pkce"]) == TRUE || string(secret.Data["require-pkce"]) == TRUE {
 			requirePKCE = true
 		}
 

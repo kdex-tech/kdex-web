@@ -255,16 +255,16 @@ func marshall(function *kdexv1alpha1.KDexFunction) string {
 	}
 
 	copy.Status = kdexv1alpha1.KDexFunctionStatus{}
-	copy.ObjectMeta.ManagedFields = nil
-	copy.ObjectMeta.ResourceVersion = "0"
-	copy.ObjectMeta.UID = "0"
-	copy.ObjectMeta.CreationTimestamp = metav1.Time{}
-	copy.ObjectMeta.DeletionTimestamp = nil
-	copy.ObjectMeta.DeletionGracePeriodSeconds = nil
-	copy.ObjectMeta.OwnerReferences = nil
-	copy.ObjectMeta.Finalizers = nil
-	copy.ObjectMeta.GenerateName = ""
-	copy.ObjectMeta.Generation = 0
+	copy.ManagedFields = nil
+	copy.ResourceVersion = "0"
+	copy.UID = "0"
+	copy.CreationTimestamp = metav1.Time{}
+	copy.DeletionTimestamp = nil
+	copy.DeletionGracePeriodSeconds = nil
+	copy.OwnerReferences = nil
+	copy.Finalizers = nil
+	copy.GenerateName = ""
+	copy.Generation = 0
 	yamlBytes, _ := yaml.Marshal(&copy)
 	return string(yamlBytes)
 }

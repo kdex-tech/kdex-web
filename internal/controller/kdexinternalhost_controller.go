@@ -467,8 +467,8 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			StaticImagePullPolicy: corev1.PullIfNotPresent,
 		}
 
-		if internalHost.Spec.Backend.Env != nil {
-			be.Env = append(be.Env, internalHost.Spec.Backend.Env...)
+		if internalHost.Spec.Env != nil {
+			be.Env = append(be.Env, internalHost.Spec.Env...)
 		}
 
 		// Synthetic Backend for the packages
@@ -1024,7 +1024,7 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 
 	npmSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "npm" })
 	pullImageSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Type == corev1.SecretTypeDockerConfigJson })
-	var pullImageSecretRefs []corev1.LocalObjectReference
+	pullImageSecretRefs := []corev1.LocalObjectReference{}
 	for _, s := range pullImageSecrets {
 		pullImageSecretRefs = append(pullImageSecretRefs, corev1.LocalObjectReference{Name: s.Name})
 	}
