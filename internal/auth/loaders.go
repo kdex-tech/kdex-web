@@ -1,0 +1,127 @@
+package auth
+
+import (
+	"fmt"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+)
+
+func AuthClientLoader(secrets kdexv1alpha1.ServiceAccountSecrets) (map[string]AuthClient, error) {
+	clients := make(map[string]AuthClient)
+
+	authClientSecrets := secrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "auth-client" })
+
+	for _, secret := range authClientSecrets {
+		clientID := string(secret.Data["client_id"])
+		if clientID == "" {
+			clientID = string(secret.Data["client-id"])
+		}
+
+		clientSecret := string(secret.Data["client_secret"])
+		if clientSecret == "" {
+			clientSecret = string(secret.Data["client-secret"])
+		}
+
+		public := false
+		if string(secret.Data["public"]) == "true" {
+			public = true
+		}
+
+		if !public && clientSecret == "" {
+			return nil, fmt.Errorf("client %s is not public but has no client secret", clientID)
+		}
+
+		redirectURIsStr := string(secret.Data["redirect_uris"])
+		if redirectURIsStr == "" {
+			redirectURIsStr = string(secret.Data["redirect-uris"])
+		}
+
+		redirectURIs := []string{}
+		if redirectURIsStr != "" {
+			redirectURIs = strings.Split(redirectURIsStr, ",")
+		}
+
+		allowedGrantTypesStr := string(secret.Data["allowed_grant_types"])
+		if allowedGrantTypesStr == "" {
+			allowedGrantTypesStr = string(secret.Data["allowed-grant-types"])
+		}
+		allowedGrantTypes := []string{}
+		if allowedGrantTypesStr != "" {
+			allowedGrantTypes = strings.Split(allowedGrantTypesStr, ",")
+		}
+
+		allowedScopesStr := string(secret.Data["allowed_scopes"])
+		if allowedScopesStr == "" {
+			allowedScopesStr = string(secret.Data["allowed-scopes"])
+		}
+		allowedScopes := []string{}
+		if allowedScopesStr != "" {
+			allowedScopes = strings.Split(allowedScopesStr, ",")
+		}
+
+		description := string(secret.Data["description"])
+		name := string(secret.Data["name"])
+
+		requirePKCE := false
+		if string(secret.Data["require_pkce"]) == "true" || string(secret.Data["require-pkce"]) == "true" {
+			requirePKCE = true
+		}
+
+		client := AuthClient{
+			AllowedGrantTypes: allowedGrantTypes,
+			AllowedScopes:     allowedScopes,
+			ClientID:          clientID,
+			ClientSecret:      clientSecret,
+			Description:       description,
+			Name:              name,
+			Public:            public,
+			RedirectURIs:      redirectURIs,
+			RequirePKCE:       requirePKCE,
+		}
+
+		clients[clientID] = client
+	}
+
+	return clients, nil
+}
+
+func OIDCConfigLoader(secrets kdexv1alpha1.ServiceAccountSecrets, devMode bool) (string, string, string, error) {
+	oidcSecrets := secrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "oidc-client" })
+	if len(oidcSecrets) == 0 {
+		return "", "", "", fmt.Errorf("missing secret of type 'oidc-client' required for OIDC provider")
+	}
+
+	// Use the first one found
+	oidcSecret := oidcSecrets[0]
+
+	clientSecret := string(oidcSecret.Data["client_secret"])
+	if clientSecret == "" {
+		clientSecret = string(oidcSecret.Data["client-secret"])
+	}
+
+	if clientSecret == "" {
+		return "", "", "", fmt.Errorf("OIDC secret does not contain 'client_secret' or 'client-secret'")
+	}
+
+	clientID := string(oidcSecret.Data["client_id"])
+	if clientID == "" {
+		clientID = string(oidcSecret.Data["client-id"])
+	}
+
+	if clientID == "" {
+		return "", "", "", fmt.Errorf("OIDC secret does not contain 'client_id' or 'client-id'")
+	}
+
+	blockKey := string(oidcSecret.Data["block_key"])
+	if blockKey == "" {
+		blockKey = string(oidcSecret.Data["block-key"])
+	}
+
+	if blockKey == "" && !devMode {
+		return "", "", "", fmt.Errorf("a 'block_key' or 'block-key' was not found in the OIDC secret, generating a new one is not supported in production")
+	}
+
+	return clientID, clientSecret, blockKey, nil
+}

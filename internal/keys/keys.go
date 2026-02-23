@@ -1,7 +1,6 @@
 package keys
 
 import (
-	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -15,8 +14,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 const (
@@ -55,11 +52,7 @@ func (p *KeyPairs) ActiveKey() *KeyPair {
 // LoadOrGenerateKeyPair loads an RSA key pair from a Kubernetes Secret.
 // If the secret doesn't exist or is invalid, it generates a new key pair.
 func LoadOrGenerateKeyPair(
-	ctx context.Context,
-	c client.Client,
-	namespace string,
 	secrets []corev1.Secret,
-	ttlSeconds int, // Unused? Kept for signature compatibility if needed, or remove.
 	devMode bool,
 ) (*KeyPairs, error) {
 	pairs := &KeyPairs{}
@@ -89,12 +82,6 @@ func LoadOrGenerateKeyPair(
 
 	if found {
 		if len(*pairs) > 1 && pairs.ActiveKey() == nil {
-			// get a logger from context
-			log := logf.FromContext(ctx)
-
-			log.Info("Multiple keys exist but none are specified as the active key via annotation kdex.dev/active-key='true'. Defaulting to the newest key.")
-
-			// set the newest key as active
 			(*pairs)[len(*pairs)-1].ActiveKey = true
 		}
 

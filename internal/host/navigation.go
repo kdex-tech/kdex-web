@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kdex-tech/kdex-host/internal/auth"
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	"github.com/kdex-tech/kdex-host/internal/page"
 	"golang.org/x/text/language"
@@ -106,7 +107,7 @@ func (hh *HostHandler) NavigationGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	navCache := hh.cacheManager.GetCache("nav")
+	navCache := hh.cacheManager.GetCache("nav", cache.CacheOptions{})
 	userHash := hh.getUserHash(r)
 	cacheKey := fmt.Sprintf("%s:%s:%s:%s", navKey, basePath, l.String(), userHash)
 

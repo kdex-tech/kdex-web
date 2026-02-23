@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	"github.com/kdex-tech/kdex-host/internal/page"
 	"golang.org/x/text/language"
@@ -37,7 +38,7 @@ func (hh *HostHandler) pageHandlerFunc(
 			return
 		}
 
-		pageCache := hh.cacheManager.GetCache("page")
+		pageCache := hh.cacheManager.GetCache("page", cache.CacheOptions{})
 		cacheKey := fmt.Sprintf("%s:%s", ph.Name, l.String())
 
 		rendered, ok, isCurrent, err := pageCache.Get(r.Context(), cacheKey)

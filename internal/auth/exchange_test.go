@@ -8,16 +8,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kdex-tech/dmapper"
+	"github.com/kdex-tech/kdex-host/internal/cache"
+	"github.com/kdex-tech/kdex-host/internal/keys"
+	"github.com/kdex-tech/kdex-host/internal/utils"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"kdex.dev/crds/api/v1alpha1"
-	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 type IH struct {
@@ -313,12 +313,22 @@ func TestNewExchanger(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			objects := make([]client.Object, len(tt.secrets))
-			for i := range tt.secrets {
-				objects[i] = &tt.secrets[i]
-			}
-			client := fake.NewClientBuilder().WithObjects(objects...).Build()
-			cfg, err := NewConfig(ctx, client, tt.authConfig, "audience", "issuer", tt.namespace, tt.devMode, nil)
+			cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+			cfg, err := NewConfig(
+				tt.authConfig,
+				func() (map[string]AuthClient, error) {
+					return map[string]AuthClient{}, nil
+				},
+				func() (*keys.KeyPairs, error) {
+					return keys.GenerateECDSAKeyPair(), nil
+				},
+				func() (string, string, string, error) {
+					return "", "", "", nil
+				},
+				"audience",
+				"issuer",
+				tt.devMode,
+				cacheManager)
 			if err != nil && tt.authConfig != nil { // If authConfig is nil, NewConfig will return an error, which is expected for some tests
 				assert.Nil(t, err)
 			}
@@ -375,34 +385,26 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects().Build()
+				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
 				cfg, gotErr := NewConfig(
-					ctx,
-					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
 							OIDCProviderURL: "http://bad",
 						},
 					},
+					func() (map[string]AuthClient, error) {
+						return map[string]AuthClient{}, nil
+					},
+					func() (*keys.KeyPairs, error) {
+						return keys.GenerateECDSAKeyPair(), nil
+					},
+					func() (string, string, string, error) {
+						return "foo", "bar", "", nil
+					},
 					"foo",
 					"http://bad",
-					"foo",
 					true,
-					kdexv1alpha1.ServiceAccountSecrets{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "foo",
-								Namespace: "foo",
-								Annotations: map[string]string{
-									"kdex.dev/secret-type": "oidc-client",
-								},
-							},
-							Data: map[string][]byte{
-								"client_secret": []byte("bar"),
-								"client_id":     []byte("foo"),
-							},
-						},
-					},
+					cacheManager,
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -418,34 +420,26 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects().Build()
+				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
 				cfg, gotErr := NewConfig(
-					ctx,
-					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
 							OIDCProviderURL: serverURL,
 						},
 					},
+					func() (map[string]AuthClient, error) {
+						return map[string]AuthClient{}, nil
+					},
+					func() (*keys.KeyPairs, error) {
+						return keys.GenerateECDSAKeyPair(), nil
+					},
+					func() (string, string, string, error) {
+						return "foo", "bar", "", nil
+					},
 					"foo",
 					serverURL,
-					"foo",
 					true,
-					kdexv1alpha1.ServiceAccountSecrets{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "foo",
-								Namespace: "foo",
-								Annotations: map[string]string{
-									"kdex.dev/secret-type": "oidc-client",
-								},
-							},
-							Data: map[string][]byte{
-								"client_secret": []byte("bar"),
-								"client_id":     []byte("foo"),
-							},
-						},
-					},
+					cacheManager,
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -460,34 +454,26 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects().Build()
+				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
 				cfg, gotErr := NewConfig(
-					ctx,
-					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
 							OIDCProviderURL: serverURL,
 						},
 					},
+					func() (map[string]AuthClient, error) {
+						return map[string]AuthClient{}, nil
+					},
+					func() (*keys.KeyPairs, error) {
+						return keys.GenerateECDSAKeyPair(), nil
+					},
+					func() (string, string, string, error) {
+						return "foo", "bar", "", nil
+					},
 					"foo",
 					serverURL,
-					"foo",
 					true,
-					kdexv1alpha1.ServiceAccountSecrets{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "foo",
-								Namespace: "foo",
-								Annotations: map[string]string{
-									"kdex.dev/secret-type": "oidc-client",
-								},
-							},
-							Data: map[string][]byte{
-								"client_secret": []byte("bar"),
-								"client_id":     []byte("foo"),
-							},
-						},
-					},
+					cacheManager,
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -504,35 +490,27 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects().Build()
+				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
 				cfg, gotErr := NewConfig(
-					ctx,
-					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
 							OIDCProviderURL: serverURL,
 							Scopes:          []string{"job"},
 						},
 					},
+					func() (map[string]AuthClient, error) {
+						return map[string]AuthClient{}, nil
+					},
+					func() (*keys.KeyPairs, error) {
+						return keys.GenerateECDSAKeyPair(), nil
+					},
+					func() (string, string, string, error) {
+						return "foo", "bar", "", nil
+					},
 					"foo",
 					serverURL,
-					"foo",
 					true,
-					kdexv1alpha1.ServiceAccountSecrets{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "foo",
-								Namespace: "foo",
-								Annotations: map[string]string{
-									"kdex.dev/secret-type": "oidc-client",
-								},
-							},
-							Data: map[string][]byte{
-								"client_secret": []byte("bar"),
-								"client_id":     []byte("foo"),
-							},
-						},
-					},
+					cacheManager,
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -549,34 +527,26 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects().Build()
+				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
 				cfg, gotErr := NewConfig(
-					ctx,
-					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
 							OIDCProviderURL: serverURL,
 						},
 					},
+					func() (map[string]AuthClient, error) {
+						return map[string]AuthClient{}, nil
+					},
+					func() (*keys.KeyPairs, error) {
+						return keys.GenerateECDSAKeyPair(), nil
+					},
+					func() (string, string, string, error) {
+						return "foo", "bar", "", nil
+					},
 					"foo",
 					serverURL,
-					"foo",
 					true,
-					kdexv1alpha1.ServiceAccountSecrets{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "foo",
-								Namespace: "foo",
-								Annotations: map[string]string{
-									"kdex.dev/secret-type": "oidc-client",
-								},
-							},
-							Data: map[string][]byte{
-								"client_secret": []byte("bar"),
-								"client_id":     []byte("foo"),
-							},
-						},
-					},
+					cacheManager,
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -601,34 +571,26 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects().Build()
+				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
 				cfg, gotErr := NewConfig(
-					ctx,
-					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
 							OIDCProviderURL: serverURL,
 						},
 					},
+					func() (map[string]AuthClient, error) {
+						return map[string]AuthClient{}, nil
+					},
+					func() (*keys.KeyPairs, error) {
+						return keys.GenerateECDSAKeyPair(), nil
+					},
+					func() (string, string, string, error) {
+						return "foo", "bar", "", nil
+					},
 					"foo",
 					serverURL,
-					"foo",
 					true,
-					kdexv1alpha1.ServiceAccountSecrets{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "foo",
-								Namespace: "foo",
-								Annotations: map[string]string{
-									"kdex.dev/secret-type": "oidc-client",
-								},
-							},
-							Data: map[string][]byte{
-								"client_secret": []byte("bar"),
-								"client_id":     []byte("foo"),
-							},
-						},
-					},
+					cacheManager,
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -646,34 +608,26 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects().Build()
+				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
 				cfg, gotErr := NewConfig(
-					ctx,
-					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
 							OIDCProviderURL: serverURL,
 						},
 					},
+					func() (map[string]AuthClient, error) {
+						return map[string]AuthClient{}, nil
+					},
+					func() (*keys.KeyPairs, error) {
+						return keys.GenerateECDSAKeyPair(), nil
+					},
+					func() (string, string, string, error) {
+						return "foo", "bar", "", nil
+					},
 					"foo",
 					serverURL,
-					"foo",
 					true,
-					kdexv1alpha1.ServiceAccountSecrets{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "foo",
-								Namespace: "foo",
-								Annotations: map[string]string{
-									"kdex.dev/secret-type": "oidc-client",
-								},
-							},
-							Data: map[string][]byte{
-								"client_secret": []byte("bar"),
-								"client_id":     []byte("foo"),
-							},
-						},
-					},
+					cacheManager,
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -691,34 +645,26 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects().Build()
+				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
 				cfg, gotErr := NewConfig(
-					ctx,
-					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
 							OIDCProviderURL: serverURL,
 						},
 					},
+					func() (map[string]AuthClient, error) {
+						return map[string]AuthClient{}, nil
+					},
+					func() (*keys.KeyPairs, error) {
+						return keys.GenerateECDSAKeyPair(), nil
+					},
+					func() (string, string, string, error) {
+						return "foo", "bar", "", nil
+					},
 					"foo",
 					serverURL,
-					"foo",
 					true,
-					kdexv1alpha1.ServiceAccountSecrets{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "foo",
-								Namespace: "foo",
-								Annotations: map[string]string{
-									"kdex.dev/secret-type": "oidc-client",
-								},
-							},
-							Data: map[string][]byte{
-								"client_secret": []byte("bar"),
-								"client_id":     []byte("foo"),
-							},
-						},
-					},
+					cacheManager,
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
@@ -739,34 +685,26 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				client := fake.NewClientBuilder().WithObjects().Build()
+				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
 				cfg, gotErr := NewConfig(
-					ctx,
-					client,
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
 							OIDCProviderURL: serverURL,
 						},
 					},
+					func() (map[string]AuthClient, error) {
+						return map[string]AuthClient{}, nil
+					},
+					func() (*keys.KeyPairs, error) {
+						return keys.GenerateECDSAKeyPair(), nil
+					},
+					func() (string, string, string, error) {
+						return "foo", "bar", "", nil
+					},
 					"foo",
 					serverURL,
-					"foo",
 					true,
-					kdexv1alpha1.ServiceAccountSecrets{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name:      "foo",
-								Namespace: "foo",
-								Annotations: map[string]string{
-									"kdex.dev/secret-type": "oidc-client",
-								},
-							},
-							Data: map[string][]byte{
-								"client_secret": []byte("bar"),
-								"client_id":     []byte("foo"),
-							},
-						},
-					},
+					cacheManager,
 				)
 				assert.Nil(t, gotErr)
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)

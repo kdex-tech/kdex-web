@@ -30,16 +30,10 @@ func (hh *HostHandler) OAuthGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	options := &http.Cookie{
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   hh.isSecure(),
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   3600, // 1 hour
-	}
+	store := hh.authConfig.OIDC.IDTokenStore
 
-	if err := hh.encryptAndSplit(w, r, "oidc_hint", rawIDToken, options); err != nil {
-		hh.log.Error(err, "failed to encrypt and split oidc token")
+	if err := store.Set(w, r, rawIDToken); err != nil {
+		hh.log.Error(err, "failed to store session hint")
 		http.Error(w, "Failed to store session hint", http.StatusInternalServerError)
 		return
 	}

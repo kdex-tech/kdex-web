@@ -406,7 +406,7 @@ func (e *Exchanger) CreateAuthorizationCode(ctx context.Context, claims Authoriz
 	}
 
 	// 2. Derive Key
-	key := sha256.Sum256([]byte(e.config.BlockKey))
+	key := sha256.Sum256([]byte(e.config.OIDC.BlockKey))
 
 	// 3. Encrypt
 	encrypter, err := jose.NewEncrypter(jose.A256GCM, jose.Recipient{Algorithm: jose.DIRECT, Key: key[:]}, nil)
@@ -434,7 +434,7 @@ func (e *Exchanger) RedeemAuthorizationCode(ctx context.Context, code string, cl
 	}
 
 	// 2. Derive Key
-	key := sha256.Sum256([]byte(e.config.BlockKey))
+	key := sha256.Sum256([]byte(e.config.OIDC.BlockKey))
 
 	// 3. Decrypt
 	decrypted, err := object.Decrypt(key[:])

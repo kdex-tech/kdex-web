@@ -12,6 +12,7 @@ import (
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 	"github.com/kdex-tech/kdex-host/internal/auth"
+	"github.com/kdex-tech/kdex-host/internal/cache"
 	"github.com/kdex-tech/kdex-host/internal/host/ico"
 	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	ko "github.com/kdex-tech/kdex-host/internal/openapi"
@@ -44,6 +45,10 @@ func (hh *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
 	hh.utilityPages[ph.UtilityPage.Type] = ph
 	hh.mu.Unlock()
 	hh.RebuildMux()
+}
+
+func (hh *HostHandler) GetCacheManager() cache.CacheManager {
+	return hh.cacheManager
 }
 
 func (hh *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
@@ -605,7 +610,7 @@ func (hh *HostHandler) renderUtilityPage(utilityType kdexv1alpha1.KDexUtilityPag
 		return ""
 	}
 
-	utilityCache := hh.cacheManager.GetCache("utility")
+	utilityCache := hh.cacheManager.GetCache("utility", cache.CacheOptions{})
 	cacheKey := fmt.Sprintf("%s:%s", utilityType, l.String())
 
 	// Only attempt cache logic if there's no dynamic extra data

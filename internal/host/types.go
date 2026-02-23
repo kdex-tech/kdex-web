@@ -74,7 +74,7 @@ type HostHandler struct {
 }
 
 func NewHostHandler(c client.Client, name string, namespace string, log logr.Logger, cacheManager cache.CacheManager) *HostHandler {
-	th := &HostHandler{
+	hh := &HostHandler{
 		Mux:          nil,
 		Name:         name,
 		Namespace:    namespace,
@@ -103,19 +103,19 @@ func NewHostHandler(c client.Client, name string, namespace string, log logr.Log
 		utilityPages:              map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler{},
 	}
 
-	translations, err := NewTranslations(th.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
+	translations, err := NewTranslations(hh.defaultLanguage, map[string]kdexv1alpha1.KDexTranslationSpec{})
 	if err != nil {
 		panic(err)
 	}
 
-	th.Translations = *translations
-	th.Pages = page.NewPageStore(
+	hh.Translations = *translations
+	hh.Pages = page.NewPageStore(
 		name,
-		th.RebuildMux,
-		th.log.WithName("pages"),
+		hh.RebuildMux,
+		hh.log.WithName("pages"),
 	)
-	th.RebuildMux()
-	return th
+	hh.RebuildMux()
+	return hh
 }
 
 type Translations struct {

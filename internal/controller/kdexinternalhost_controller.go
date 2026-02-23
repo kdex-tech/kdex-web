@@ -28,6 +28,7 @@ import (
 	"github.com/kdex-tech/kdex-host/internal"
 	"github.com/kdex-tech/kdex-host/internal/auth"
 	"github.com/kdex-tech/kdex-host/internal/host"
+	"github.com/kdex-tech/kdex-host/internal/keys"
 	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -575,26 +576,26 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 	}
 
-	useTLS := false
-	tlsSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Type == corev1.SecretTypeTLS })
-	if len(tlsSecrets) > 0 {
-		useTLS = true
-	}
-
-	issuer := fmt.Sprintf("http://%s", internalHost.Spec.Routing.Domains[0])
-	if useTLS {
-		issuer = fmt.Sprintf("https://%s", internalHost.Spec.Routing.Domains[0])
-	}
+	issuer := fmt.Sprintf("%s://%s", internalHost.Spec.Routing.Scheme, internalHost.Spec.Routing.Domains[0])
 
 	authConfig, err := auth.NewConfig(
-		ctx,
-		r.Client,
 		internalHost.Spec.Auth,
+		func() (map[string]auth.AuthClient, error) {
+			return auth.AuthClientLoader(internalHost.Spec.ServiceAccountSecrets)
+		},
+		func() (*keys.KeyPairs, error) {
+			return keys.LoadOrGenerateKeyPair(
+				internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "jwt-keys" }),
+				internalHost.Spec.DevMode,
+			)
+		},
+		func() (string, string, string, error) {
+			return auth.OIDCConfigLoader(internalHost.Spec.ServiceAccountSecrets, internalHost.Spec.DevMode)
+		},
 		issuer,
 		issuer,
-		internalHost.Namespace,
 		internalHost.Spec.DevMode,
-		internalHost.Spec.ServiceAccountSecrets,
+		r.HostHandler.GetCacheManager(),
 	)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
@@ -656,11 +657,6 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	scheme := "http"
-	if useTLS {
-		scheme = "https"
-	}
-
 	r.HostHandler.SetHost(
 		ctx,
 		&internalHost.Spec.KDexHostSpec,
@@ -673,7 +669,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		functions.Items,
 		authExchanger,
 		authConfig,
-		scheme,
+		internalHost.Spec.Routing.Scheme,
 	)
 
 	kdexv1alpha1.SetConditions(

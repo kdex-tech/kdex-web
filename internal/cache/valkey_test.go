@@ -5,53 +5,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/kdex-tech/kdex-host/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCacheLifecycle(t *testing.T) {
-	// 1. Setup
-	ttl := 10 * time.Millisecond
-	mgr, err := NewCacheManager("", "", &ttl)
-	assert.NoError(t, err)
-	c := mgr.GetCache("html", CacheOptions{})
+func TestValkeyCacheManager_GetCache(t *testing.T) {
+	s, err := miniredis.Run()
+	if err != nil {
+		t.Error(err)
+	}
 
-	ctx := context.Background()
-
-	// 2. Set Generation 1
-	mgr.Cycle(1, false)
-	c.Set(ctx, "page1", "content-v1")
-
-	// 3. Update to Generation 2 (The Cycle)
-	mgr.Cycle(2, false)
-
-	// 4. Verify Fallback (N-1)
-	val, ok, isCurrent, err := c.Get(ctx, "page1")
-	assert.NoError(t, err)
-	assert.True(t, ok)
-	assert.False(t, isCurrent)
-	assert.Equal(t, "content-v1", val)
-
-	// Trigger migration as discussed
-	c.Set(ctx, "page1", val)
-
-	// 5. Test TTL
-	time.Sleep(100 * time.Millisecond) // Wait for reaper
-	_, ok, _, err = c.Get(ctx, "page1")
-	assert.NoError(t, err)
-	assert.False(t, ok)
-}
-
-func TestInMemoryCacheManager_GetCache(t *testing.T) {
 	tests := []struct {
 		name       string
-		args       func(t *testing.T) (class string, opts CacheOptions)
+		args       func(t *testing.T) (addr, host, class string, opts CacheOptions)
 		assertions func(t *testing.T, got Cache, cacheManager CacheManager)
 	}{
 		{
-			name: "memory",
-			args: func(t *testing.T) (string, CacheOptions) {
-				return "test", CacheOptions{}
+			name: "valkey",
+			args: func(t *testing.T) (string, string, string, CacheOptions) {
+				return s.Addr(), "foo", "test", CacheOptions{}
 			},
 			assertions: func(t *testing.T, got Cache, cacheManager CacheManager) {
 				assert.NotNil(t, got)
@@ -64,8 +37,8 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 		},
 		{
 			name: "cycle - generation updates",
-			args: func(t *testing.T) (string, CacheOptions) {
-				return "test", CacheOptions{}
+			args: func(t *testing.T) (string, string, string, CacheOptions) {
+				return s.Addr(), "foo", "test", CacheOptions{}
 			},
 			assertions: func(t *testing.T, got Cache, cacheManager CacheManager) {
 				assert.NotNil(t, got)
@@ -82,8 +55,8 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 		},
 		{
 			name: "cycle - with fallback",
-			args: func(t *testing.T) (string, CacheOptions) {
-				return "test", CacheOptions{}
+			args: func(t *testing.T) (string, string, string, CacheOptions) {
+				return s.Addr(), "foo", "test", CacheOptions{}
 			},
 			assertions: func(t *testing.T, got Cache, cacheManager CacheManager) {
 				assert.NotNil(t, got)
@@ -96,7 +69,8 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 				ctx := context.Background()
 
 				// Set an item in the cache
-				got.Set(ctx, "test", "test")
+				err := got.Set(ctx, "test", "test")
+				assert.NoError(t, err)
 				val, ok, isCurrent, err := got.Get(ctx, "test")
 				assert.NoError(t, err)
 				assert.True(t, ok)
@@ -124,8 +98,8 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 		},
 		{
 			name: "cycle - force - no fallback",
-			args: func(t *testing.T) (string, CacheOptions) {
-				return "test", CacheOptions{}
+			args: func(t *testing.T) (string, string, string, CacheOptions) {
+				return s.Addr(), "foo", "test", CacheOptions{}
 			},
 			assertions: func(t *testing.T, got Cache, cacheManager CacheManager) {
 				assert.NotNil(t, got)
@@ -157,8 +131,8 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 		},
 		{
 			name: "uncycled",
-			args: func(t *testing.T) (string, CacheOptions) {
-				return "test", CacheOptions{Uncycled: true}
+			args: func(t *testing.T) (string, string, string, CacheOptions) {
+				return s.Addr(), "foo", "test", CacheOptions{Uncycled: true}
 			},
 			assertions: func(t *testing.T, got Cache, cacheManager CacheManager) {
 				assert.NotNil(t, got)
@@ -190,8 +164,8 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 		},
 		{
 			name: "uncycled - force",
-			args: func(t *testing.T) (string, CacheOptions) {
-				return "test", CacheOptions{Uncycled: true}
+			args: func(t *testing.T) (string, string, string, CacheOptions) {
+				return s.Addr(), "foo", "test", CacheOptions{Uncycled: true}
 			},
 			assertions: func(t *testing.T, got Cache, cacheManager CacheManager) {
 				assert.NotNil(t, got)
@@ -223,8 +197,8 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 		},
 		{
 			name: "update ttl",
-			args: func(t *testing.T) (string, CacheOptions) {
-				return "test", CacheOptions{TTL: utils.Ptr(100 * time.Millisecond)}
+			args: func(t *testing.T) (string, string, string, CacheOptions) {
+				return s.Addr(), "foo", "test", CacheOptions{TTL: utils.Ptr(100 * time.Millisecond)}
 			},
 			assertions: func(t *testing.T, got Cache, cacheManager CacheManager) {
 				assert.NotNil(t, got)
@@ -245,8 +219,8 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 				assert.Equal(t, "test", val)
 
 				// Update TTL
-				got = cacheManager.GetCache("test", CacheOptions{TTL: utils.Ptr(1 * time.Millisecond)})
-				assert.Equal(t, time.Duration(1*time.Millisecond), got.TTL())
+				got = cacheManager.GetCache("test", CacheOptions{TTL: utils.Ptr(10 * time.Millisecond)})
+				assert.Equal(t, time.Duration(10*time.Millisecond), got.TTL())
 
 				// preexisting items in the cache still have the old expiry based on previous TTL
 				val, ok, isCurrent, err = got.Get(ctx, "test")
@@ -256,10 +230,11 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 				assert.Equal(t, "test", val)
 
 				// a new item will have the new expiry
-				got.Set(ctx, "foo", "foo")
-				time.Sleep(10 * time.Millisecond)
+				err = got.Set(ctx, "foo", "foo")
+				assert.NoError(t, err)
+				s.FastForward(20 * time.Millisecond)
 
-				// check it new item should be expired
+				// new item should be expired
 				val, ok, isCurrent, err = got.Get(ctx, "foo")
 				assert.NoError(t, err)
 				assert.False(t, ok)
@@ -270,9 +245,9 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cacheManager, err := NewCacheManager("", "foo", utils.Ptr(100*time.Millisecond))
+			attr, host, class, opts := tt.args(t)
+			cacheManager, err := NewCacheManager(attr, host, utils.Ptr(100*time.Millisecond))
 			assert.NoError(t, err)
-			class, opts := tt.args(t)
 			got := cacheManager.GetCache(class, opts)
 			tt.assertions(t, got, cacheManager)
 			t.Cleanup(func() {

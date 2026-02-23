@@ -10,15 +10,40 @@ import (
 )
 
 type ValkeyCache struct {
-	client     valkey.Client
-	class      string
-	mu         sync.RWMutex
-	prefix     string // e.g. "{host:class:generation}:"
-	prevPrefix string // e.g. "{host:class:generation-1}:"
-	ttl        time.Duration
+	client            valkey.Client
+	class             string
+	currentGeneration int64
+	host              string
+	uncycled          bool
+	mu                sync.RWMutex
+	prefix            string // e.g. "{host:class:generation}:"
+	prevPrefix        string // e.g. "{host:class:generation-1}:"
+	ttl               time.Duration
 }
 
 var _ Cache = (*ValkeyCache)(nil)
+
+func (s *ValkeyCache) Class() string {
+	return s.class
+}
+
+func (s *ValkeyCache) Generation() int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.currentGeneration
+}
+
+func (s *ValkeyCache) Host() string {
+	return s.host
+}
+
+func (s *ValkeyCache) TTL() time.Duration {
+	return s.ttl
+}
+
+func (s *ValkeyCache) Uncycled() bool {
+	return s.uncycled
+}
 
 func (s *ValkeyCache) Get(ctx context.Context, key string) (string, bool, bool, error) {
 	s.mu.RLock()
@@ -40,14 +65,15 @@ func (s *ValkeyCache) Get(ctx context.Context, key string) (string, bool, bool, 
 		}
 	}
 
-	return "", false, false, nil
+	return "", false, true, nil // Not found in either version
 }
 
 func (s *ValkeyCache) Set(ctx context.Context, key string, value string) error {
 	s.mu.RLock()
 	prefix := s.prefix
 	s.mu.RUnlock()
-	cmd := s.client.B().Set().Key(prefix + key).Value(value).Ex(s.ttl).Build()
+	cmd := s.client.B().Set().Key(prefix + key).Value(value).Px(s.ttl).Build()
+	defer fmt.Print("TTL:", s.TTL())
 	return s.client.Do(ctx, cmd).Error()
 }
 
@@ -79,12 +105,16 @@ func (m *ValkeyCacheManager) Cycle(generation int64, force bool) error {
 
 	for _, cache := range m.caches {
 		if vCache, ok := cache.(*ValkeyCache); ok {
+			if vCache.uncycled && !force {
+				continue
+			}
 			vCache.mu.Lock()
 			if force {
 				vCache.prevPrefix = ""
 			} else {
 				vCache.prevPrefix = vCache.prefix
 			}
+			vCache.currentGeneration = generation
 			vCache.prefix = fmt.Sprintf("{%s:%s:%d}:", m.host, vCache.class, generation)
 			vCache.mu.Unlock()
 		}
@@ -92,20 +122,34 @@ func (m *ValkeyCacheManager) Cycle(generation int64, force bool) error {
 	return nil
 }
 
-func (m *ValkeyCacheManager) GetCache(class string) Cache {
+func (m *ValkeyCacheManager) GetCache(class string, opts CacheOptions) Cache {
 	m.mu.RLock()
 	if cache, ok := m.caches[class]; ok {
+		vCache := cache.(*ValkeyCache)
+		vCache.mu.Lock()
+		vCache.uncycled = opts.Uncycled
+		if opts.TTL != nil && vCache.ttl != *opts.TTL {
+			vCache.ttl = *opts.TTL
+		}
+		vCache.mu.Unlock()
 		m.mu.RUnlock()
 		return cache
 	}
 	m.mu.RUnlock()
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	ttl := m.ttl
+	if opts.TTL != nil {
+		ttl = *opts.TTL
+	}
 	cache := &ValkeyCache{
-		client: m.client,
-		class:  class,
-		prefix: fmt.Sprintf("{%s:%s:%d}:", m.host, class, m.currentGeneration),
-		ttl:    m.ttl,
+		client:            m.client,
+		class:             class,
+		currentGeneration: m.currentGeneration,
+		host:              m.host,
+		uncycled:          opts.Uncycled,
+		prefix:            fmt.Sprintf("{%s:%s:%d}:", m.host, class, m.currentGeneration),
+		ttl:               ttl,
 	}
 	m.caches[class] = cache
 	return cache

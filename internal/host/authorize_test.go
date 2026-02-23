@@ -14,6 +14,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/kdex-tech/kdex-host/internal/auth"
+	"github.com/kdex-tech/kdex-host/internal/host/idtoken"
 	"github.com/kdex-tech/kdex-host/internal/keys"
 	"github.com/kdex-tech/kdex-host/internal/sign"
 	G "github.com/onsi/gomega"
@@ -107,8 +108,18 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 			// Current implementation creates a dummy Exchanger with configured Clients
 
 			cfg := &auth.Config{
-				Clients:    tt.clients,
-				BlockKey:   "01234567890123456789012345678901", // 32 bytes
+				Clients: tt.clients,
+				OIDC: struct {
+					BlockKey     string
+					ClientID     string
+					ClientSecret string
+					IDTokenStore idtoken.IDTokenStore
+					ProviderURL  string
+					RedirectURL  string
+					Scopes       []string
+				}{
+					BlockKey: "01234567890123456789012345678901", // 32 bytes
+				},
 				CookieName: "kdex-auth",
 				ActivePair: &keys.KeyPair{
 					ActiveKey: true,

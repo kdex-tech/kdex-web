@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/kdex-tech/kdex-host/internal/utils"
@@ -9,15 +10,23 @@ import (
 )
 
 type Cache interface {
-	// Get retrieves a cached render by its key.
+	Class() string
+	Generation() int64
 	Get(ctx context.Context, key string) (string, bool, bool, error)
-	// Set stores a rendered page in the cache.
+	Host() string
 	Set(ctx context.Context, key string, value string) error
+	TTL() time.Duration
+	Uncycled() bool
+}
+
+type CacheOptions struct {
+	TTL      *time.Duration
+	Uncycled bool
 }
 
 type CacheManager interface {
 	Cycle(generation int64, force bool) error
-	GetCache(class string) Cache
+	GetCache(class string, opts CacheOptions) Cache
 }
 
 func NewCacheManager(addr, host string, ttl *time.Duration) (CacheManager, error) {
@@ -34,7 +43,10 @@ func NewCacheManager(addr, host string, ttl *time.Duration) (CacheManager, error
 		}, nil
 	}
 
-	client, err := valkey.NewClient(valkey.ClientOption{InitAddress: []string{addr}})
+	client, err := valkey.NewClient(valkey.ClientOption{
+		DisableCache: strings.Contains(addr, "127.0.0.1") || strings.Contains(addr, "localhost"),
+		InitAddress:  []string{addr},
+	})
 	if err != nil {
 		return nil, err
 	}

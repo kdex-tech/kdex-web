@@ -55,7 +55,7 @@ func TestHostHandler_PageCaching(t *testing.T) {
 	assert.Contains(t, body1, "Test Page")
 
 	// Verify it's in cache
-	cacheVal, found, isCurrent, err := cacheManager.GetCache("page").Get(context.Background(), "test-page:en")
+	cacheVal, found, isCurrent, err := cacheManager.GetCache("page", cache.CacheOptions{}).Get(context.Background(), "test-page:en")
 	require.NoError(t, err)
 	assert.True(t, found)
 	assert.True(t, isCurrent)
@@ -116,7 +116,7 @@ func TestHostHandler_NavigationCaching(t *testing.T) {
 	// Verify it's in cache
 	// Key format: nav:main:/test:en:anon (since no auth)
 	cacheKey := "main:/test:en:anon"
-	cacheVal, found, isCurrent, err := cacheManager.GetCache("nav").Get(context.Background(), cacheKey)
+	cacheVal, found, isCurrent, err := cacheManager.GetCache("nav", cache.CacheOptions{}).Get(context.Background(), cacheKey)
 	require.NoError(t, err)
 	assert.True(t, found)
 	assert.True(t, isCurrent)
@@ -140,7 +140,7 @@ func TestHostHandler_NavigationCaching(t *testing.T) {
 	assert.NotEqual(t, "anon", userHash)
 	cacheKey2 := fmt.Sprintf("main:/test:en:%s", userHash)
 
-	_, found2, _, err2 := cacheManager.GetCache("nav").Get(context.Background(), cacheKey2)
+	_, found2, _, err2 := cacheManager.GetCache("nav", cache.CacheOptions{}).Get(context.Background(), cacheKey2)
 	assert.NoError(t, err2)
 	assert.True(t, found2)
 }

@@ -6,6 +6,7 @@ replace kdex.dev/crds => github.com/kdex-tech/kdex-crds v0.14.143
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
+	github.com/alicebob/miniredis/v2 v2.36.1
 	github.com/coreos/go-oidc/v3 v3.17.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/getkin/kin-openapi v0.133.0
@@ -114,6 +115,7 @@ require (
 	github.com/woodsbury/decimal128 v1.4.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yuin/goldmark v1.7.16 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.65.0 // indirect
 	go.opentelemetry.io/otel v1.40.0 // indirect

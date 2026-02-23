@@ -1,4 +1,4 @@
-package host
+package idtoken
 
 import (
 	"crypto/aes"
@@ -10,11 +10,42 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
-func (hh *HostHandler) encryptAndSplit(w http.ResponseWriter, r *http.Request, name string, token string, options *http.Cookie) error {
+type CookieIDTokenStore struct {
+	BlockKey string
+	TTL      time.Duration
+}
+
+var _ IDTokenStore = (*CookieIDTokenStore)(nil)
+
+func (c *CookieIDTokenStore) Set(w http.ResponseWriter, r *http.Request, rawIDToken string) error {
+	options := &http.Cookie{
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   r.URL.Scheme == "https",
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int(c.TTL.Seconds()),
+	}
+
+	return c.encryptAndSplit(w, r, hintName, rawIDToken, options)
+}
+
+func (c *CookieIDTokenStore) Get(r *http.Request) (string, error) {
+	return c.getAndDecryptToken(r, hintName)
+}
+
+func NewCookieIDTokenStore(blockKey string, ttl time.Duration) IDTokenStore {
+	return &CookieIDTokenStore{
+		BlockKey: blockKey,
+		TTL:      ttl,
+	}
+}
+
+func (c *CookieIDTokenStore) encryptAndSplit(w http.ResponseWriter, r *http.Request, name string, token string, options *http.Cookie) error {
 	// 1. Encrypt the whole string first
-	block, err := aes.NewCipher([]byte(hh.authConfig.BlockKey))
+	block, err := aes.NewCipher([]byte(c.BlockKey))
 	if err != nil {
 		return fmt.Errorf("failed to create cipher: %w", err)
 	}
@@ -34,13 +65,13 @@ func (hh *HostHandler) encryptAndSplit(w http.ResponseWriter, r *http.Request, n
 	encoded := base64.StdEncoding.EncodeToString(ciphertext)
 
 	// 3. Use your splitter logic on the 'encoded' string
-	hh.setSplitCookies(w, r, name, encoded, options)
+	c.setSplitCookies(w, r, name, encoded, options)
 	return nil
 }
 
-func (hh *HostHandler) getAndDecryptToken(r *http.Request, name string) (string, error) {
+func (c *CookieIDTokenStore) getAndDecryptToken(r *http.Request, name string) (string, error) {
 	// 1. Reassemble Base64 string from chunks
-	encoded := hh.getIDTokenFromSplitCookies(r, name)
+	encoded := c.getIDTokenFromSplitCookies(r, name)
 	if encoded == "" {
 		return "", errors.New("no token found")
 	}
@@ -52,7 +83,7 @@ func (hh *HostHandler) getAndDecryptToken(r *http.Request, name string) (string,
 	}
 
 	// 3. Decrypt
-	block, err := aes.NewCipher([]byte(hh.authConfig.BlockKey))
+	block, err := aes.NewCipher([]byte(c.BlockKey))
 	if err != nil {
 		return "", fmt.Errorf("failed to create cipher: %w", err)
 	}
@@ -75,7 +106,7 @@ func (hh *HostHandler) getAndDecryptToken(r *http.Request, name string) (string,
 	return string(plaintext), nil
 }
 
-func (hh *HostHandler) getIDTokenFromSplitCookies(r *http.Request, name string) string {
+func (c *CookieIDTokenStore) getIDTokenFromSplitCookies(r *http.Request, name string) string {
 	var fullToken strings.Builder
 
 	// Start from index 0 and keep looking for the next numbered chunk
@@ -95,7 +126,7 @@ func (hh *HostHandler) getIDTokenFromSplitCookies(r *http.Request, name string) 
 	return fullToken.String()
 }
 
-func (hh *HostHandler) setSplitCookies(w http.ResponseWriter, r *http.Request, name string, value string, options *http.Cookie) {
+func (c *CookieIDTokenStore) setSplitCookies(w http.ResponseWriter, r *http.Request, name string, value string, options *http.Cookie) {
 	// 1. Define the safe chunk size.
 	// We use 3000 to leave plenty of room for the cookie name, metadata,
 	// and overhead in the HTTP header limit.

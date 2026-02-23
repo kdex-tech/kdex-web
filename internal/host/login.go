@@ -122,8 +122,10 @@ func (hh *HostHandler) LogoutPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if logoutURLString != "" {
+		store := hh.authConfig.OIDC.IDTokenStore
+
 		// Get the ID Token from the user's session
-		idToken, err := hh.getAndDecryptToken(r, "oidc_hint")
+		idToken, err := store.Get(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
