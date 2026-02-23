@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/kdex-tech/dmapper"
+	"github.com/kdex-tech/kdex-host/internal/auth/idtoken"
 	"github.com/kdex-tech/kdex-host/internal/cache"
-	"github.com/kdex-tech/kdex-host/internal/host/idtoken"
 	"github.com/kdex-tech/kdex-host/internal/keys"
 	"github.com/kdex-tech/kdex-host/internal/sign"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"

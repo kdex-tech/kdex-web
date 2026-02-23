@@ -141,7 +141,10 @@ func TestOAuth2TokenHandler(t *testing.T) {
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			w := httptest.NewRecorder()
 
-			httpHandler := OAuth2TokenHandler(ex)
+			oauth2 := &OAuth2{
+				AuthExchanger: ex,
+			}
+			httpHandler := oauth2.OAuth2TokenHandler
 			httpHandler(w, req)
 
 			resp := w.Result()

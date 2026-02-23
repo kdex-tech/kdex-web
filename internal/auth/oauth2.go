@@ -4,163 +4,352 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// OAuth2TokenHandler creates an HTTP handler for the OAuth2 token endpoint.
-func OAuth2TokenHandler(exchanger *Exchanger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var clientId, clientSecret, code, codeVerifier, grantedScope, grantType, idToken, password, redirectURI, scope, token, username string
-		var err error
+type OAuth2 struct {
+	AuthConfig    *Config
+	AuthExchanger *Exchanger
+}
 
-		log := logf.FromContext(r.Context())
-		defer func() {
-			log.Info(
-				"OAuth2 token exchange",
-				"client_id", clientId,
-				"client_secret", clientSecret,
-				"code", code,
-				"code_verifier", codeVerifier,
-				"error", err,
-				"grant_type", grantType,
-				"id_token", idToken,
-				"password", password,
-				"redirect_uri", redirectURI,
-				"scope", scope,
-				"username", username)
-		}()
+func (o *OAuth2) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
+	var clientId, code, codeChallenge, codeChallengeMethod, redirectURI, responseType, scope, state, subject string
+	var callbackURL *url.URL
+	var err error
 
-		if r.Method != http.MethodPost {
-			err = fmt.Errorf("method not allowed")
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
+	log := logf.FromContext(r.Context())
+	defer func() {
+		callbackURLStr := ""
+		if callbackURL != nil {
+			callbackURLStr = callbackURL.String()
 		}
+		log.Info(
+			"OAuth2 authorization",
+			"callback_url", callbackURLStr,
+			"client_id", clientId,
+			"code", code,
+			"code_challenge", codeChallenge,
+			"code_challenge_method", codeChallengeMethod,
+			"error", err,
+			"redirect_uri", redirectURI,
+			"response_type", responseType,
+			"scope", scope,
+			"state", state,
+			"subject", subject)
+	}()
 
-		if err = r.ParseForm(); err != nil {
-			err = fmt.Errorf("failed to parse form: %w", err)
-			http.Error(w, "Failed to parse form", http.StatusBadRequest)
-			return
-		}
+	// 1. Validate parameters
+	clientId = r.URL.Query().Get("client_id")
+	codeChallenge = r.URL.Query().Get("code_challenge")
+	codeChallengeMethod = r.URL.Query().Get("code_challenge_method")
+	redirectURI = r.URL.Query().Get("redirect_uri")
+	responseType = r.URL.Query().Get("response_type")
+	scope = r.URL.Query().Get("scope")
+	state = r.URL.Query().Get("state")
 
-		// client_id and client_secret may arrive through basic auth
-		clientId, clientSecret, _ = r.BasicAuth()
+	if clientId == "" {
+		err = fmt.Errorf("missing client_id")
+		http.Error(w, "Missing client_id", http.StatusBadRequest)
+		return
+	}
 
-		/*
-			grant_type			|Client Type	|Required Parameters								|Optional Parameters
-			====================|===============|===================================================|===================
-			authorization_code	|Private		|code, redirect_uri, client_id, client_secret		|state
-								|Public			|code, redirect_uri, client_id, code_verifier		|state
-			client_credentials	|Private		|client_id, client_secret							|scope
-			password			|Private		|username, password, client_id, client_secret		|scope
-								|Public			|username, password, client_id						|scope
-			refresh_token		|Private		|refresh_token, client_id, client_secret			|scope
-								|Public			|refresh_token, client_id							|scope
-		*/
+	if responseType != "code" {
+		err = fmt.Errorf("unsupported response_type")
+		http.Error(w, "Unsupported response_type", http.StatusBadRequest)
+		return
+	}
 
-		if clientId == "" {
-			clientId = r.FormValue("client_id")
-		}
+	authClient, ok := o.AuthExchanger.GetClient(clientId)
+	if !ok {
+		err = fmt.Errorf("invalid client_id")
+		http.Error(w, "Invalid client_id", http.StatusBadRequest)
+		return
+	}
 
-		client, ok := exchanger.GetClient(clientId)
+	if len(authClient.AllowedGrantTypes) > 0 && !slices.Contains(authClient.AllowedGrantTypes, "authorization_code") {
+		err = fmt.Errorf("grant_type authorization_code not allowed for this client")
+		http.Error(w, "Unauthorized grant type", http.StatusUnauthorized)
+		return
+	}
 
-		if !ok {
-			err = fmt.Errorf("invalid client_id")
-			http.Error(w, "Invalid client_id", http.StatusBadRequest)
-			return
-		}
-
-		if !client.Public {
-			if clientSecret == "" {
-				clientSecret = r.FormValue("client_secret")
-			}
-			if clientSecret != client.ClientSecret {
-				err = fmt.Errorf("invalid client_secret")
-				http.Error(w, "Invalid client_secret", http.StatusBadRequest)
+	if len(authClient.AllowedScopes) > 0 && scope != "" {
+		requestedScopes := strings.Split(scope, " ")
+		for _, s := range requestedScopes {
+			if s != "" && !slices.Contains(authClient.AllowedScopes, s) {
+				err = fmt.Errorf("scope %s not allowed for this client", s)
+				http.Error(w, "Unauthorized scope", http.StatusUnauthorized)
 				return
 			}
 		}
+	}
 
-		codeVerifier = r.FormValue("code_verifier")
-		grantType = r.FormValue("grant_type")
-		scope = r.FormValue("scope")
+	if !slices.Contains(authClient.RedirectURIs, redirectURI) {
+		err = fmt.Errorf("invalid redirect_uri")
+		http.Error(w, "Invalid redirect_uri", http.StatusBadRequest)
+		return
+	}
 
-		if len(client.AllowedGrantTypes) > 0 && !slices.Contains(client.AllowedGrantTypes, grantType) {
-			err = fmt.Errorf("grant_type %s not allowed for this client", grantType)
-			http.Error(w, "Unauthorized grant type", http.StatusUnauthorized)
+	// 2. Parse redirect_uri
+	callbackURL, err = url.Parse(redirectURI)
+	if err != nil {
+		err = fmt.Errorf("invalid redirect_uri")
+		http.Error(w, "Invalid redirect_uri", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Check Authentication
+	ctx := r.Context()
+	authCtx, ok := GetAuthContext(ctx)
+	if !ok {
+		// Not logged in -> Redirect to Login
+		// Encode current URL as return URL
+		returnURL := r.URL.String()
+		http.Redirect(w, r, "/-/login?return="+url.QueryEscape(returnURL), http.StatusSeeOther)
+		return
+	}
+
+	// We need the Subject.
+	subject, err = authCtx.GetSubject()
+	if err != nil {
+		err = fmt.Errorf("failed to get subject from auth context")
+		http.Error(w, "Invalid session", http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Generate Authorization Code
+	claims := AuthorizationCodeClaims{
+		AuthMethod:          AuthMethodOAuth2,
+		ClientID:            clientId,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
+		RedirectURI:         redirectURI,
+		Scope:               scope,
+		Subject:             subject,
+	}
+
+	code, err = o.AuthExchanger.CreateAuthorizationCode(r.Context(), claims)
+	if err != nil {
+		err = fmt.Errorf("failed to create auth code")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	q := callbackURL.Query()
+	q.Set("code", code)
+	if state != "" {
+		q.Set("state", state)
+	}
+	callbackURL.RawQuery = q.Encode()
+
+	http.Redirect(w, r, callbackURL.String(), http.StatusFound)
+}
+
+func (o *OAuth2) OAuthGet(w http.ResponseWriter, r *http.Request) {
+	log := logf.FromContext(r.Context())
+
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+
+	if code == "" {
+		http.Error(w, "No code in request", http.StatusBadRequest)
+		return
+	}
+
+	// Exchange code for ID Token
+	rawIDToken, err := o.AuthExchanger.ExchangeCode(r.Context(), code)
+	if err != nil {
+		log.Error(err, "failed to exchange oauth code")
+		http.Error(w, "Failed to exchange token", http.StatusUnauthorized)
+		return
+	}
+
+	// Exchange ID Token for Local Token
+	localToken, err := o.AuthExchanger.ExchangeToken(r.Context(), rawIDToken)
+	if err != nil {
+		log.Error(err, "failed to exchange for local token")
+		http.Error(w, "Failed to exchange for local token", http.StatusUnauthorized)
+		return
+	}
+
+	store := o.AuthConfig.OIDC.IDTokenStore
+
+	if err := store.Set(w, r, rawIDToken); err != nil {
+		log.Error(err, "failed to store session hint")
+		http.Error(w, "Failed to store session hint", http.StatusInternalServerError)
+		return
+	}
+
+	// Set Cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     o.AuthConfig.CookieName,
+		Value:    localToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   r.URL.Scheme == "https",
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Validate state/redirect
+	redirectURL := state
+	if redirectURL == "" || !strings.HasPrefix(redirectURL, "/") {
+		redirectURL = "/"
+	}
+
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+}
+
+func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
+	var clientId, clientSecret, code, codeVerifier, grantedScope, grantType, idToken, password, redirectURI, scope, token, username string
+	var err error
+
+	log := logf.FromContext(r.Context())
+	defer func() {
+		log.Info(
+			"OAuth2 token exchange",
+			"client_id", clientId,
+			"client_secret", clientSecret,
+			"code", code,
+			"code_verifier", codeVerifier,
+			"error", err,
+			"grant_type", grantType,
+			"id_token", idToken,
+			"password", password,
+			"redirect_uri", redirectURI,
+			"scope", scope,
+			"username", username)
+	}()
+
+	if r.Method != http.MethodPost {
+		err = fmt.Errorf("method not allowed")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err = r.ParseForm(); err != nil {
+		err = fmt.Errorf("failed to parse form: %w", err)
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	// client_id and client_secret may arrive through basic auth
+	clientId, clientSecret, _ = r.BasicAuth()
+
+	/*
+		grant_type			|Client Type	|Required Parameters								|Optional Parameters
+		====================|===============|===================================================|===================
+		authorization_code	|Private		|code, redirect_uri, client_id, client_secret		|state
+							|Public			|code, redirect_uri, client_id, code_verifier		|state
+		client_credentials	|Private		|client_id, client_secret							|scope
+		password			|Private		|username, password, client_id, client_secret		|scope
+							|Public			|username, password, client_id						|scope
+		refresh_token		|Private		|refresh_token, client_id, client_secret			|scope
+							|Public			|refresh_token, client_id							|scope
+	*/
+
+	if clientId == "" {
+		clientId = r.FormValue("client_id")
+	}
+
+	client, ok := o.AuthExchanger.GetClient(clientId)
+
+	if !ok {
+		err = fmt.Errorf("invalid client_id")
+		http.Error(w, "Invalid client_id", http.StatusBadRequest)
+		return
+	}
+
+	if !client.Public {
+		if clientSecret == "" {
+			clientSecret = r.FormValue("client_secret")
+		}
+		if clientSecret != client.ClientSecret {
+			err = fmt.Errorf("invalid client_secret")
+			http.Error(w, "Invalid client_secret", http.StatusBadRequest)
 			return
 		}
+	}
 
-		if len(client.AllowedScopes) > 0 && scope != "" {
-			requestedScopes := strings.Split(scope, " ")
-			for _, s := range requestedScopes {
-				if s != "" && !slices.Contains(client.AllowedScopes, s) {
-					err = fmt.Errorf("scope %s not allowed for this client", s)
-					http.Error(w, "Unauthorized scope", http.StatusUnauthorized)
-					return
-				}
-			}
-		}
+	codeVerifier = r.FormValue("code_verifier")
+	grantType = r.FormValue("grant_type")
+	scope = r.FormValue("scope")
 
-		switch grantType {
-		case "authorization_code":
-			code = r.FormValue("code")
-			if code == "" {
-				err = fmt.Errorf("code is required")
-				http.Error(w, "code is required", http.StatusBadRequest)
+	if len(client.AllowedGrantTypes) > 0 && !slices.Contains(client.AllowedGrantTypes, grantType) {
+		err = fmt.Errorf("grant_type %s not allowed for this client", grantType)
+		http.Error(w, "Unauthorized grant type", http.StatusUnauthorized)
+		return
+	}
+
+	if len(client.AllowedScopes) > 0 && scope != "" {
+		requestedScopes := strings.Split(scope, " ")
+		for _, s := range requestedScopes {
+			if s != "" && !slices.Contains(client.AllowedScopes, s) {
+				err = fmt.Errorf("scope %s not allowed for this client", s)
+				http.Error(w, "Unauthorized scope", http.StatusUnauthorized)
 				return
 			}
-			redirectURI = r.FormValue("redirect_uri")
-			if redirectURI == "" {
-				err = fmt.Errorf("redirect_uri is required")
-				http.Error(w, "redirect_uri is required", http.StatusBadRequest)
-				return
-			}
-			token, idToken, grantedScope, err = exchanger.RedeemAuthorizationCode(r.Context(), code, clientId, redirectURI, codeVerifier)
-		case "client_credentials":
-			if client.Public {
-				err = fmt.Errorf("client_credentials grant_type is not supported for public clients")
-				http.Error(w, "client_credentials grant_type is not supported for public clients", http.StatusBadRequest)
-				return
-			}
-			token, idToken, grantedScope, err = exchanger.LoginClient(r.Context(), clientId, clientSecret, scope)
-		case "password":
-			username = r.FormValue("username")
-			password = r.FormValue("password")
-			token, idToken, grantedScope, err = exchanger.LoginLocal(r.Context(), username, password, scope, clientId, AuthMethodOAuth2)
-		case "refresh_token":
-			// TODO: Implement refresh_token exchange once refresh token storage is added
-			err = fmt.Errorf("grant_type refresh_token not yet supported for local exchange")
-			http.Error(w, "grant_type refresh_token not yet supported for local exchange", http.StatusNotImplemented)
-			return
-		default:
-			err = fmt.Errorf("unsupported grant_type")
-			http.Error(w, "Unsupported grant_type", http.StatusBadRequest)
-			return
 		}
+	}
 
-		if err != nil {
-			err = fmt.Errorf("authentication failed: %w", err)
-			http.Error(w, "Authentication failed", http.StatusUnauthorized)
+	switch grantType {
+	case "authorization_code":
+		code = r.FormValue("code")
+		if code == "" {
+			err = fmt.Errorf("code is required")
+			http.Error(w, "code is required", http.StatusBadRequest)
 			return
 		}
-
-		resp := TokenResponse{
-			AccessToken: token,
-			ExpiresIn:   int(exchanger.GetTokenTTL().Seconds()), // Matching default TTL in seconds
-			IDToken:     idToken,
-			Scope:       grantedScope,
-			TokenType:   "Bearer",
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			err = fmt.Errorf("failed to encode token response: %w", err)
-			http.Error(w, "Failed to encode token response", http.StatusInternalServerError)
+		redirectURI = r.FormValue("redirect_uri")
+		if redirectURI == "" {
+			err = fmt.Errorf("redirect_uri is required")
+			http.Error(w, "redirect_uri is required", http.StatusBadRequest)
 			return
 		}
+		token, idToken, grantedScope, err = o.AuthExchanger.RedeemAuthorizationCode(r.Context(), code, clientId, redirectURI, codeVerifier)
+	case "client_credentials":
+		if client.Public {
+			err = fmt.Errorf("client_credentials grant_type is not supported for public clients")
+			http.Error(w, "client_credentials grant_type is not supported for public clients", http.StatusBadRequest)
+			return
+		}
+		token, idToken, grantedScope, err = o.AuthExchanger.LoginClient(r.Context(), clientId, clientSecret, scope)
+	case "password":
+		username = r.FormValue("username")
+		password = r.FormValue("password")
+		token, idToken, grantedScope, err = o.AuthExchanger.LoginLocal(r.Context(), username, password, scope, clientId, AuthMethodOAuth2)
+	case "refresh_token":
+		// TODO: Implement refresh_token exchange once refresh token storage is added
+		err = fmt.Errorf("grant_type refresh_token not yet supported for local exchange")
+		http.Error(w, "grant_type refresh_token not yet supported for local exchange", http.StatusNotImplemented)
+		return
+	default:
+		err = fmt.Errorf("unsupported grant_type")
+		http.Error(w, "Unsupported grant_type", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		err = fmt.Errorf("authentication failed: %w", err)
+		http.Error(w, "Authentication failed", http.StatusUnauthorized)
+		return
+	}
+
+	resp := TokenResponse{
+		AccessToken: token,
+		ExpiresIn:   int(o.AuthExchanger.GetTokenTTL().Seconds()), // Matching default TTL in seconds
+		IDToken:     idToken,
+		Scope:       grantedScope,
+		TokenType:   "Bearer",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		err = fmt.Errorf("failed to encode token response: %w", err)
+		http.Error(w, "Failed to encode token response", http.StatusInternalServerError)
+		return
 	}
 }
 

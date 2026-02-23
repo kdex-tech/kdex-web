@@ -1,4 +1,4 @@
-package host
+package auth
 
 import (
 	"context"
@@ -11,10 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kdex-tech/kdex-host/internal/auth"
-	"github.com/kdex-tech/kdex-host/internal/host/idtoken"
+	"github.com/kdex-tech/kdex-host/internal/auth/idtoken"
 	"github.com/kdex-tech/kdex-host/internal/keys"
 	"github.com/kdex-tech/kdex-host/internal/sign"
 	G "github.com/onsi/gomega"
@@ -26,7 +24,7 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 		name           string
 		queryParams    map[string]string
 		cookie         *http.Cookie
-		clients        map[string]auth.AuthClient
+		clients        map[string]AuthClient
 		expectedStatus int
 		expectedLoc    string // Substring check for Location header
 	}{
@@ -58,7 +56,7 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 				"response_type": "code",
 				"redirect_uri":  "http://localhost/cb",
 			},
-			clients: map[string]auth.AuthClient{
+			clients: map[string]AuthClient{
 				"client-1": {
 					ClientID:     "test-client",
 					ClientSecret: "test-secret",
@@ -76,7 +74,7 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 				"redirect_uri":  "http://localhost/cb",
 				"state":         "xyz",
 			},
-			clients: map[string]auth.AuthClient{
+			clients: map[string]AuthClient{
 				"client-1": {
 					ClientID:     "test-client",
 					ClientSecret: "test-secret",
@@ -107,7 +105,7 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 			// But for cookie verification, AuthorizeHandler uses helper or middleware.
 			// Current implementation creates a dummy Exchanger with configured Clients
 
-			cfg := &auth.Config{
+			cfg := &Config{
 				Clients: tt.clients,
 				OIDC: struct {
 					BlockKey     string
@@ -138,13 +136,12 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 			g.Expect(err).NotTo(G.HaveOccurred())
 			cfg.Signer = *signer
 
-			exchanger, err := auth.NewExchanger(context.Background(), *cfg, nil)
+			exchanger, err := NewExchanger(context.Background(), *cfg, nil)
 			g.Expect(err).NotTo(G.HaveOccurred())
 
-			hh := &HostHandler{
-				authConfig:    cfg,
-				authExchanger: exchanger,
-				log:           logr.Discard(),
+			o := &OAuth2{
+				AuthConfig:    cfg,
+				AuthExchanger: exchanger,
 			}
 
 			// Prepare request
@@ -164,17 +161,16 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 				// Current AuthorizeHandler impl checks context first, then cookie fallback.
 				// Let's inject context to simulate middleware success.
 				ctx := req.Context()
-				authCtx := auth.AuthContext(jwt.MapClaims{
+				authCtx := AuthContext(jwt.MapClaims{
 					"sub": "user-1",
 				})
-				ctx = auth.SetAuthContext(ctx, authCtx)
+				ctx = SetAuthContext(ctx, authCtx)
 				req = req.WithContext(ctx)
 			}
 
 			w := httptest.NewRecorder()
 
-			// Call handler directly
-			hh.AuthorizeHandler(w, req)
+			o.AuthorizeHandler(w, req)
 
 			resp := w.Result()
 			g.Expect(resp.StatusCode).To(G.Equal(tt.expectedStatus))

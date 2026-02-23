@@ -94,9 +94,13 @@ func (hh *HostHandler) authorizeHandler(mux *http.ServeMux, registeredPaths map[
 		return
 	}
 
+	oauth2 := &auth.OAuth2{
+		AuthConfig:    hh.authConfig,
+		AuthExchanger: hh.authExchanger,
+	}
 	const path = "/-/oauth/authorize"
 	// Apply Authentication Middleware
-	handler := hh.authConfig.AddAuthentication(http.HandlerFunc(hh.AuthorizeHandler))
+	handler := hh.authConfig.AddAuthentication(http.HandlerFunc(oauth2.AuthorizeHandler))
 	mux.Handle("GET "+path, handler)
 
 	hh.registerPath(path, ko.PathInfo{
@@ -467,8 +471,12 @@ func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[stri
 		return
 	}
 
+	oauth2 := &auth.OAuth2{
+		AuthConfig:    hh.authConfig,
+		AuthExchanger: hh.authExchanger,
+	}
 	const path = "/-/oauth/callback"
-	mux.HandleFunc("GET "+path, hh.OAuthGet)
+	mux.HandleFunc("GET "+path, oauth2.OAuthGet)
 
 	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
@@ -757,10 +765,12 @@ func (hh *HostHandler) tokenHandler(mux *http.ServeMux, registeredPaths map[stri
 		return
 	}
 
+	oauth2 := &auth.OAuth2{
+		AuthConfig:    hh.authConfig,
+		AuthExchanger: hh.authExchanger,
+	}
 	const path = "/-/token"
-	mux.HandleFunc("POST "+path, func(w http.ResponseWriter, r *http.Request) {
-		auth.OAuth2TokenHandler(hh.authExchanger)(w, r)
-	})
+	mux.HandleFunc("POST "+path, oauth2.OAuth2TokenHandler)
 	hh.registerPath(path, ko.PathInfo{
 		API: ko.OpenAPI{
 			BasePath: path,

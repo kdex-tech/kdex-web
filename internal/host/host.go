@@ -402,14 +402,12 @@ func (hh *HostHandler) SecuritySchemes() *openapi.SecuritySchemes {
 		},
 	}
 
-	if hh.authConfig.IsOIDCEnabled() {
-		(*req)["oidc"] = &openapi.SecuritySchemeRef{
-			Value: &openapi.SecurityScheme{
-				Description:      "OpenID Connect discovery",
-				OpenIdConnectUrl: "/.well-known/openid-configuration",
-				Type:             "openIdConnect",
-			},
-		}
+	(*req)["oidc"] = &openapi.SecuritySchemeRef{
+		Value: &openapi.SecurityScheme{
+			Description:      "OpenID Connect discovery",
+			OpenIdConnectUrl: "/.well-known/openid-configuration",
+			Type:             "openIdConnect",
+		},
 	}
 
 	return req
