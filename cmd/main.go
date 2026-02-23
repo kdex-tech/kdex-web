@@ -93,13 +93,15 @@ func main() {
 	var tlsOpts []func(*tls.Config)
 	var webhookCertKey, webhookCertName, webhookCertPath string
 
-	flag.StringVar(&cacheAddr, "cache-address", os.Getenv("CACHE_ADDRESS"), "The address of the Redis/Valkey cache.")
+	flag.StringVar(&cacheAddr, "cache-address", os.Getenv("CACHE_ADDRESS"), "The address of the Redis/Valkey cache. "+
+		"Or set CACHE_ADDRESS env var.")
 	flag.StringVar(&configFile, "config-file", "/config.yaml", "The path to a configuration yaml file.")
 	flag.StringVar(&focalHost, "focal-host", "", "The name of a KDexHost resource to focus the controller instance's "+
 		"attention on.")
 	flag.Var(&namedLogLevels, "named-log-level", "Specify a named log level pair (format: NAME=LEVEL) (can be used "+
-		"multiple times)")
-	flag.StringVar(&pprofAddr, "pprof-bind-address", "", "The address the pprof endpoint binds to. If not set, the pprof endpoint is disabled.")
+		"multiple times). Or set NAMED_LOG_LEVELS env var with space delimited pairs with the same format.")
+	flag.StringVar(&pprofAddr, "pprof-bind-address", os.Getenv("PPROF_BIND_ADDRESS"), "The address the pprof endpoint "+
+		"binds to. If not set, the pprof endpoint is disabled. Or set PPROF_BIND_ADDRESS env var.")
 	flag.IntVar(&requeueDelaySeconds, "requeue-delay-seconds", 15, "Set the delay for requeuing reconciliation loops")
 	flag.StringVar(&serviceName, "service-name", "", "The name of the controller service so it can self configure an "+
 		"ingress/httproute with itself as backend.")
@@ -125,6 +127,38 @@ func main() {
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
+
+	if err := loadLogLevelsFromEnv(&namedLogLevels); err != nil {
+		panic(err)
+	}
+
+	if zapEncoderEnv := os.Getenv("ZAP_ENCODER"); zapEncoderEnv != "" {
+		enc := flag.CommandLine.Lookup("zap-encoder")
+		if enc != nil {
+			enc.Value.Set(zapEncoderEnv)
+		}
+	}
+
+	if zapLogLevelEnv := os.Getenv("ZAP_LOG_LEVEL"); zapLogLevelEnv != "" {
+		enc := flag.CommandLine.Lookup("zap-log-level")
+		if enc != nil {
+			enc.Value.Set(zapLogLevelEnv)
+		}
+	}
+
+	if zapStacktraceLevelEnv := os.Getenv("ZAP_STACKTRACE_LEVEL"); zapStacktraceLevelEnv != "" {
+		enc := flag.CommandLine.Lookup("zap-stacktrace-level")
+		if enc != nil {
+			enc.Value.Set(zapStacktraceLevelEnv)
+		}
+	}
+
+	if zapTimeEncodingEnv := os.Getenv("ZAP_TIME_ENCODING"); zapTimeEncodingEnv != "" {
+		enc := flag.CommandLine.Lookup("zap-time-encoding")
+		if enc != nil {
+			enc.Value.Set(zapTimeEncodingEnv)
+		}
+	}
 
 	logger, err := kdexlog.New(&opts, namedLogLevels)
 	if err != nil {
@@ -354,6 +388,18 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func loadLogLevelsFromEnv(namedLogLevelPairs *kdexlog.NamedLogLevelPairs) error {
+	blob := os.Getenv("NAMED_LOG_LEVELS")
+
+	for part := range strings.FieldsSeq(blob) {
+		if err := namedLogLevelPairs.Set(part); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func webserverPort(address string) int32 {
