@@ -45,9 +45,8 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 		},
 	}
 
-	imageRepo := p.ImageRegistry.Host
 	imageTag := fmt.Sprintf("%d", ipr.Generation)
-	imageURL := fmt.Sprintf("%s/%s:%s", imageRepo, ipr.Name, imageTag)
+	imageURL := fmt.Sprintf("%s/%s:%s", p.ImageRegistry.Host, ipr.Name, imageTag)
 
 	builderArgs := []string{
 		"--dockerfile=/scripts/Dockerfile",

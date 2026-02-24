@@ -49,9 +49,9 @@ func (b *Builder) GetOrCreateKPackImage(
 				},
 				"subPath": b.Source.Path,
 			},
-			"tag": fmt.Sprintf("%s/%s/%s:latest", b.ImageRegistry, function.Spec.HostRef.Name, function.Name),
+			"tag": fmt.Sprintf("%s/%s/%s:latest", b.ImageRegistry.Host, function.Spec.HostRef.Name, function.Name),
 			"additionalTags": []any{
-				fmt.Sprintf("%s/%s/%s:%d", b.ImageRegistry, function.Spec.HostRef.Name, function.Name, function.GetGeneration()),
+				fmt.Sprintf("%s/%s/%s:%d", b.ImageRegistry.Host, function.Spec.HostRef.Name, function.Name, function.GetGeneration()),
 			},
 		}
 
