@@ -642,7 +642,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
-	authExchanger, err := auth.NewExchanger(ctx, *authConfig, rp)
+	authExchanger, err := auth.NewExchanger(ctx, *authConfig, r.HostHandler.GetCacheManager(), rp)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&internalHost.Status.Conditions,

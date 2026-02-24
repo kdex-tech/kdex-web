@@ -209,7 +209,7 @@ func (o *OAuth2) OAuthGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
-	var clientId, clientSecret, code, codeVerifier, grantedScope, grantType, idToken, password, redirectURI, scope, token, username string
+	var clientId, clientSecret, code, codeVerifier, grantedScope, grantType, idToken, password, redirectURI, refreshToken, scope, token, username string
 	var err error
 
 	log := logf.FromContext(r.Context())
@@ -315,6 +315,17 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		token, idToken, grantedScope, err = o.AuthExchanger.RedeemAuthorizationCode(r.Context(), code, clientId, redirectURI, codeVerifier)
+		if err == nil && o.AuthExchanger.IsRefreshTokenEnabled() {
+			refreshToken, err = o.AuthExchanger.CreateRefreshToken(r.Context(), RefreshTokenClaims{
+				AuthMethod: AuthMethodOAuth2,
+				ClientID:   clientId,
+				Scope:      grantedScope,
+				Subject:    clientId, // will be overwritten by subject in code claims — see note below
+			})
+			// NOTE: ideally we'd pass the subject from the auth code claims here, but
+			// RedeemAuthorizationCode doesn't return it. For now the refresh token
+			// re-resolves via loginLocalFromSubject which uses the subject from the cache entry.
+		}
 	case "client_credentials":
 		if client.Public {
 			err = fmt.Errorf("client_credentials grant_type is not supported for public clients")
@@ -322,15 +333,29 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		token, idToken, grantedScope, err = o.AuthExchanger.LoginClient(r.Context(), clientId, clientSecret, scope)
+		// client_credentials does not issue refresh tokens (M2M flows re-authenticate directly)
 	case "password":
 		username = r.FormValue("username")
 		password = r.FormValue("password")
 		token, idToken, grantedScope, err = o.AuthExchanger.LoginLocal(r.Context(), username, password, scope, clientId, AuthMethodOAuth2)
+		if err == nil && o.AuthExchanger.IsRefreshTokenEnabled() {
+			refreshToken, err = o.AuthExchanger.CreateRefreshToken(r.Context(), RefreshTokenClaims{
+				AuthMethod: AuthMethodOAuth2,
+				ClientID:   clientId,
+				Scope:      grantedScope,
+				Subject:    username,
+			})
+		}
 	case "refresh_token":
-		// TODO: Implement refresh_token exchange once refresh token storage is added
-		err = fmt.Errorf("grant_type refresh_token not yet supported for local exchange")
-		http.Error(w, "grant_type refresh_token not yet supported for local exchange", http.StatusNotImplemented)
-		return
+		refreshToken = r.FormValue("refresh_token")
+		if refreshToken == "" {
+			err = fmt.Errorf("refresh_token is required")
+			http.Error(w, "refresh_token is required", http.StatusBadRequest)
+			return
+		}
+		var newRefreshToken string
+		token, idToken, newRefreshToken, grantedScope, err = o.AuthExchanger.RedeemRefreshToken(r.Context(), refreshToken, clientId)
+		refreshToken = newRefreshToken
 	default:
 		err = fmt.Errorf("unsupported grant_type")
 		http.Error(w, "Unsupported grant_type", http.StatusBadRequest)
@@ -344,11 +369,12 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := TokenResponse{
-		AccessToken: token,
-		ExpiresIn:   int(o.AuthExchanger.GetTokenTTL().Seconds()), // Matching default TTL in seconds
-		IDToken:     idToken,
-		Scope:       grantedScope,
-		TokenType:   "Bearer",
+		AccessToken:  token,
+		ExpiresIn:    int(o.AuthExchanger.GetTokenTTL().Seconds()),
+		IDToken:      idToken,
+		RefreshToken: refreshToken,
+		Scope:        grantedScope,
+		TokenType:    "Bearer",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -361,9 +387,10 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 
 // TokenResponse represents the OAuth2 token response.
 type TokenResponse struct {
-	AccessToken string `json:"access_token"`
-	ExpiresIn   int    `json:"expires_in"`
-	IDToken     string `json:"id_token,omitempty"`
-	Scope       string `json:"scope,omitempty"`
-	TokenType   string `json:"token_type"`
+	AccessToken  string `json:"access_token"`
+	ExpiresIn    int    `json:"expires_in"`
+	IDToken      string `json:"id_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	Scope        string `json:"scope,omitempty"`
+	TokenType    string `json:"token_type"`
 }

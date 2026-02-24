@@ -335,9 +335,9 @@ func TestNewExchanger(t *testing.T) {
 			var got *Exchanger
 			var gotErr error
 			if cfg != nil {
-				got, gotErr = NewExchanger(ctx, *cfg, tt.sp)
+				got, gotErr = NewExchanger(ctx, *cfg, cacheManager, tt.sp)
 			} else {
-				got, gotErr = NewExchanger(ctx, Config{}, tt.sp) // Pass an empty config if NewConfig failed
+				got, gotErr = NewExchanger(ctx, Config{}, cacheManager, tt.sp) // Pass an empty config if NewConfig failed
 			}
 			tt.assertions(t, got, gotErr)
 		})
@@ -410,7 +410,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
-				_, gotErr = NewExchanger(ctx, *cfg, scopeProvider)
+				_, gotErr = NewExchanger(ctx, *cfg, cacheManager, scopeProvider)
 				assert.NotNil(t, gotErr)
 				assert.Contains(t, gotErr.Error(), `failed to initialize OIDC provider: Get "http://bad/.well-known/openid-configuration"`)
 			},
@@ -445,7 +445,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
-				_, gotErr = NewExchanger(ctx, *cfg, scopeProvider)
+				_, gotErr = NewExchanger(ctx, *cfg, cacheManager, scopeProvider)
 				assert.Nil(t, gotErr)
 			},
 		},
@@ -479,7 +479,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
-				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
+				ex, gotErr := NewExchanger(ctx, *cfg, cacheManager, scopeProvider)
 				assert.Nil(t, gotErr)
 				url := ex.AuthCodeURL("foo")
 				assert.Contains(t, url, "http://", "client_id=foo", "scope=openid+profile+email", "state=foo")
@@ -516,7 +516,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
-				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
+				ex, gotErr := NewExchanger(ctx, *cfg, cacheManager, scopeProvider)
 				assert.Nil(t, gotErr)
 				url := ex.AuthCodeURL("foo")
 				assert.Contains(t, url, "http://", "client_id=foo", "scope=openid+profile+email+job", "state=foo")
@@ -552,7 +552,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
-				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
+				ex, gotErr := NewExchanger(ctx, *cfg, cacheManager, scopeProvider)
 				assert.Nil(t, gotErr)
 				rawIDToken, err := ex.ExchangeCode(ctx, "foo")
 				claims := jwt.MapClaims{}
@@ -596,7 +596,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
-				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
+				ex, gotErr := NewExchanger(ctx, *cfg, cacheManager, scopeProvider)
 				assert.Nil(t, gotErr)
 				_, err := ex.ExchangeCode(ctx, "fail_exchange")
 				assert.NotNil(t, err)
@@ -633,7 +633,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
-				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
+				ex, gotErr := NewExchanger(ctx, *cfg, cacheManager, scopeProvider)
 				assert.Nil(t, gotErr)
 				_, err := ex.ExchangeCode(ctx, "no_id_token")
 				assert.NotNil(t, err)
@@ -670,7 +670,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
-				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
+				ex, gotErr := NewExchanger(ctx, *cfg, cacheManager, scopeProvider)
 				assert.Nil(t, gotErr)
 				rawIDToken, err := ex.ExchangeCode(ctx, "foo")
 				assert.Nil(t, err)
@@ -710,7 +710,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 				assert.Equal(t, "bar", cfg.OIDC.ClientSecret)
 
 				innerHandler.Handler = MockOIDCProvider(*cfg)
-				ex, gotErr := NewExchanger(ctx, *cfg, scopeProvider)
+				ex, gotErr := NewExchanger(ctx, *cfg, cacheManager, scopeProvider)
 				assert.Nil(t, gotErr)
 				rawIDToken, err := ex.ExchangeCode(ctx, "foo")
 				assert.Nil(t, err)

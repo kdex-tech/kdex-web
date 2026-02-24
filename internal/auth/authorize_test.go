@@ -136,7 +136,7 @@ func TestHostHandler_AuthorizeHandler(t *testing.T) {
 			g.Expect(err).NotTo(G.HaveOccurred())
 			cfg.Signer = *signer
 
-			exchanger, err := NewExchanger(context.Background(), *cfg, nil)
+			exchanger, err := NewExchanger(context.Background(), *cfg, nil, nil)
 			g.Expect(err).NotTo(G.HaveOccurred())
 
 			o := &OAuth2{
