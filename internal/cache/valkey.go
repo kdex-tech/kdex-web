@@ -27,6 +27,21 @@ func (s *ValkeyCache) Class() string {
 	return s.class
 }
 
+func (s *ValkeyCache) Delete(ctx context.Context, key string) error {
+	s.mu.RLock()
+	curr := s.prefix
+	prev := s.prevPrefix
+	s.mu.RUnlock()
+
+	keys := []string{curr + key}
+	if prev != "" {
+		keys = append(keys, prev+key)
+	}
+
+	cmd := s.client.B().Del().Key(keys...).Build()
+	return s.client.Do(ctx, cmd).Error()
+}
+
 func (s *ValkeyCache) Generation() int64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

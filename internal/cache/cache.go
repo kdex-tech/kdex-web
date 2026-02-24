@@ -11,6 +11,7 @@ import (
 
 type Cache interface {
 	Class() string
+	Delete(ctx context.Context, key string) error
 	Generation() int64
 	Get(ctx context.Context, key string) (string, bool, bool, error)
 	Host() string

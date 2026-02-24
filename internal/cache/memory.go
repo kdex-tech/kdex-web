@@ -23,6 +23,16 @@ func (c *InMemoryCache) Class() string {
 	return c.class
 }
 
+func (c *InMemoryCache) Delete(ctx context.Context, key string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, seg := range c.segments {
+		delete(seg, key)
+	}
+	return nil
+}
+
 func (c *InMemoryCache) Generation() int64 {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
