@@ -12,14 +12,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/crds/configuration"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type PackRef struct {
 	client.Client
-	Config            configuration.NexusConfiguration
+	ImageRegistry     kdexv1alpha1.Registry
 	ConfigMap         *corev1.ConfigMap
 	Log               logr.Logger
 	NPMSecretRef      *corev1.LocalObjectReference
@@ -46,7 +45,7 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 		},
 	}
 
-	imageRepo := p.Config.DefaultImageRegistry.Host
+	imageRepo := p.ImageRegistry.Host
 	imageTag := fmt.Sprintf("%d", ipr.Generation)
 	imageURL := fmt.Sprintf("%s/%s:%s", imageRepo, ipr.Name, imageTag)
 
@@ -57,7 +56,7 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 		"--digest-file=/dev/termination-log",
 	}
 
-	if p.Config.DefaultImageRegistry.InSecure {
+	if p.ImageRegistry.Insecure {
 		builderArgs = append(builderArgs, "--insecure")
 	}
 

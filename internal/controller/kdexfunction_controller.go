@@ -569,7 +569,7 @@ func (r *KDexFunctionReconciler) handleSourceAvailable(hc handlerContext) (ctrl.
 	} else {
 		builder := build.Builder{
 			Client:         r.Client,
-			Configuration:  r.Configuration,
+			ImageRegistry:  hc.host.Spec.Registries.ImageRegistry,
 			Scheme:         r.Scheme,
 			ServiceAccount: hc.host.Spec.ServiceAccountRef.Name,
 			Source:         *hc.function.Status.Source,

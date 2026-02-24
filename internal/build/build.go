@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
-	"kdex.dev/crds/configuration"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -17,7 +16,7 @@ import (
 
 type Builder struct {
 	client.Client
-	Configuration  configuration.NexusConfiguration
+	ImageRegistry  kdexv1alpha1.Registry
 	Scheme         *runtime.Scheme
 	ServiceAccount string
 	Source         kdexv1alpha1.Source
@@ -50,9 +49,9 @@ func (b *Builder) GetOrCreateKPackImage(
 				},
 				"subPath": b.Source.Path,
 			},
-			"tag": fmt.Sprintf("%s/%s/%s:latest", b.Configuration.DefaultImageRegistry.Host, function.Spec.HostRef.Name, function.Name),
+			"tag": fmt.Sprintf("%s/%s/%s:latest", b.ImageRegistry, function.Spec.HostRef.Name, function.Name),
 			"additionalTags": []any{
-				fmt.Sprintf("%s/%s/%s:%d", b.Configuration.DefaultImageRegistry.Host, function.Spec.HostRef.Name, function.Name, function.GetGeneration()),
+				fmt.Sprintf("%s/%s/%s:%d", b.ImageRegistry, function.Spec.HostRef.Name, function.Name, function.GetGeneration()),
 			},
 		}
 

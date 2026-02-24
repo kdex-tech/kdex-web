@@ -96,6 +96,11 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 		"Reconciling",
 	)
 
+	internalHost, shouldReturn, r1, err := ResolveHost(ctx, r.Client, &ipr, &ipr.Status.Conditions, &ipr.Spec.HostRef, r.RequeueDelay)
+	if shouldReturn {
+		return r1, err
+	}
+
 	_, configMap, err := r.createOrUpdateJobConfigMap(ctx, &ipr)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
@@ -114,7 +119,7 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 
 	builder := packref.PackRef{
 		Client:            r.Client,
-		Config:            r.Configuration,
+		ImageRegistry:     internalHost.Spec.Registries.ImageRegistry,
 		ConfigMap:         configMap,
 		Log:               log,
 		NPMSecretRef:      ipr.Spec.NPMSecretRef,
@@ -223,7 +228,7 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 		}
 
 		ipr.Status.Attributes["image"] = fmt.Sprintf(
-			"%s/%s@%s", r.Configuration.DefaultImageRegistry.Host, ipr.Name, imageDigest,
+			"%s/%s@%s", internalHost.Spec.Registries.ImageRegistry.Host, ipr.Name, imageDigest,
 		)
 		ipr.Status.Attributes["importmap"] = importmap
 	}
