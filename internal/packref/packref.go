@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/kdex-tech/kdex-host/internal"
-	"github.com/kdex-tech/kdex-host/internal/utils"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -128,9 +127,9 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 			},
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: utils.Ptr(int32(3)),
-			Completions:  utils.Ptr(int32(1)),
-			Parallelism:  utils.Ptr(int32(1)),
+			BackoffLimit: new(int32(3)),
+			Completions:  new(int32(1)),
+			Parallelism:  new(int32(1)),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -138,7 +137,7 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 					},
 				},
 				Spec: corev1.PodSpec{
-					AutomountServiceAccountToken: utils.Ptr(true),
+					AutomountServiceAccountToken: new(true),
 					Containers: []corev1.Container{
 						{
 							Name: "kaniko",

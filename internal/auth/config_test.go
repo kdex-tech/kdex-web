@@ -12,7 +12,6 @@ import (
 	"github.com/kdex-tech/dmapper"
 	"github.com/kdex-tech/kdex-host/internal/cache"
 	"github.com/kdex-tech/kdex-host/internal/keys"
-	"github.com/kdex-tech/kdex-host/internal/utils"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -503,7 +502,7 @@ L51w6mkJ5U6GWpH1eZsXgKm0ZZJKEPsN9wYKe2LXT/WPpa5AwGzo7BLm
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+			cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 			got, gotErr := NewConfig(
 				tt.args.auth,
 				func() (map[string]AuthClient, error) {
@@ -763,7 +762,7 @@ func TestConfig_AddAuthentication(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+			cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 			got, gotErr := NewConfig(
 				tt.args.auth,
 				func() (map[string]AuthClient, error) {
@@ -825,7 +824,7 @@ func TestConfig_OIDC(t *testing.T) {
 			name: "OIDC - constructor, no client id",
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string) {
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				_, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -854,7 +853,7 @@ func TestConfig_OIDC(t *testing.T) {
 			name: "OIDC - constructor, no secret defined",
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string) {
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				_, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -883,7 +882,7 @@ func TestConfig_OIDC(t *testing.T) {
 			name: "OIDC - constructor, secret defined but missing key",
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string) {
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				_, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -912,7 +911,7 @@ func TestConfig_OIDC(t *testing.T) {
 			name: "OIDC - constructor, secret defined, valid key",
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string) {
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -941,7 +940,7 @@ func TestConfig_OIDC(t *testing.T) {
 			name: "OIDC - constructor, client-auth secrets",
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string) {
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{

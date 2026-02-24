@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kdex-tech/kdex-host/internal/utils"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -195,9 +194,9 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 			},
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: utils.Ptr(int32(3)),
-			Completions:  utils.Ptr(int32(1)),
-			Parallelism:  utils.Ptr(int32(1)),
+			BackoffLimit: new(int32(3)),
+			Completions:  new(int32(1)),
+			Parallelism:  new(int32(1)),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -205,7 +204,7 @@ func (d *Deployer) Deploy(ctx context.Context, function *kdexv1alpha1.KDexFuncti
 					},
 				},
 				Spec: corev1.PodSpec{
-					AutomountServiceAccountToken: utils.Ptr(true),
+					AutomountServiceAccountToken: new(true),
 					Containers: []corev1.Container{
 						{
 							Args:    d.FaaSAdaptor.Deployer.Args,
@@ -304,10 +303,10 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 			ConcurrencyPolicy: batchv1.ForbidConcurrent,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
-					Completions: utils.Ptr(int32(1)),
+					Completions: new(int32(1)),
 					Template: corev1.PodTemplateSpec{
 						Spec: corev1.PodSpec{
-							AutomountServiceAccountToken: utils.Ptr(true),
+							AutomountServiceAccountToken: new(true),
 							Containers: []corev1.Container{
 								{
 									Args:    d.FaaSAdaptor.Observer.Args,
@@ -322,11 +321,11 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 							ServiceAccountName: d.ServiceAccount,
 						},
 					},
-					TTLSecondsAfterFinished: utils.Ptr(int32(0)),
+					TTLSecondsAfterFinished: new(int32(0)),
 				},
 			},
 			Schedule:                   d.FaaSAdaptor.Observer.Schedule,
-			SuccessfulJobsHistoryLimit: utils.Ptr(int32(1)),
+			SuccessfulJobsHistoryLimit: new(int32(1)),
 		},
 	}
 

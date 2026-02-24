@@ -919,7 +919,7 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 										},
 										[]string{"*/*"},
 									),
-									Description: openapi.Ptr("Static content"),
+									Description: new("Static content"),
 									Headers: openapi.Headers{
 										"Content-Type": &openapi.HeaderRef{
 											Value: &openapi.Header{
@@ -934,7 +934,7 @@ func (r *KDexInternalHostReconciler) collectInitialPaths(
 									},
 								}),
 								openapi.WithName("404", &openapi.Response{
-									Description: openapi.Ptr("Resource not found"),
+									Description: new("Resource not found"),
 								}),
 							),
 							Summary: "GET " + summary,
@@ -1124,13 +1124,9 @@ func (r *KDexInternalHostReconciler) createOrUpdateIngress(
 		func() error {
 			if ingress.CreationTimestamp.IsZero() {
 				ingress.Annotations = make(map[string]string)
-				for key, value := range internalHost.Annotations {
-					ingress.Annotations[key] = value
-				}
+				maps.Copy(ingress.Annotations, internalHost.Annotations)
 				ingress.Labels = make(map[string]string)
-				for key, value := range internalHost.Labels {
-					ingress.Labels[key] = value
-				}
+				maps.Copy(ingress.Labels, internalHost.Labels)
 
 				ingress.Labels["kdex.dev/ingress"] = ingress.Name
 
@@ -1274,13 +1270,9 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendDeployment(
 		func() error {
 			if deployment.CreationTimestamp.IsZero() {
 				deployment.Annotations = make(map[string]string)
-				for key, value := range internalHost.Annotations {
-					deployment.Annotations[key] = value
-				}
+				maps.Copy(deployment.Annotations, internalHost.Annotations)
 				deployment.Labels = make(map[string]string)
-				for key, value := range internalHost.Labels {
-					deployment.Labels[key] = value
-				}
+				maps.Copy(deployment.Labels, internalHost.Labels)
 
 				deployment.Labels["kdex.dev/type"] = internal.BACKEND
 				deployment.Labels["kdex.dev/backend"] = resolvedBackend.Name
@@ -1451,13 +1443,9 @@ func (r *KDexInternalHostReconciler) createOrUpdateBackendService(
 		func() error {
 			if service.CreationTimestamp.IsZero() {
 				service.Annotations = make(map[string]string)
-				for key, value := range internalHost.Annotations {
-					service.Annotations[key] = value
-				}
+				maps.Copy(service.Annotations, internalHost.Annotations)
 				service.Labels = make(map[string]string)
-				for key, value := range internalHost.Labels {
-					service.Labels[key] = value
-				}
+				maps.Copy(service.Labels, internalHost.Labels)
 
 				service.Labels["kdex.dev/type"] = internal.BACKEND
 				service.Labels["kdex.dev/backend"] = resolvedBackend.Name

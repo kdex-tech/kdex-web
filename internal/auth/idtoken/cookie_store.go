@@ -159,10 +159,7 @@ func (c *CookieIDTokenStore) setSplitCookies(w http.ResponseWriter, r *http.Requ
 
 	for i := 0; i*chunkSize < totalLen; i++ {
 		start := i * chunkSize
-		end := start + chunkSize
-		if end > totalLen {
-			end = totalLen
-		}
+		end := min(start+chunkSize, totalLen)
 
 		chunk := *options
 		chunk.Name = fmt.Sprintf("%s_%d", name, i)

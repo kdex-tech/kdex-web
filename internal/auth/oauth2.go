@@ -77,8 +77,8 @@ func (o *OAuth2) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(authClient.AllowedScopes) > 0 && scope != "" {
-		requestedScopes := strings.Split(scope, " ")
-		for _, s := range requestedScopes {
+		requestedScopes := strings.SplitSeq(scope, " ")
+		for s := range requestedScopes {
 			if s != "" && !slices.Contains(authClient.AllowedScopes, s) {
 				err = fmt.Errorf("scope %s not allowed for this client", s)
 				http.Error(w, "Unauthorized scope", http.StatusUnauthorized)
@@ -209,7 +209,8 @@ func (o *OAuth2) OAuthGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
-	var clientId, clientSecret, code, codeVerifier, grantedScope, grantType, idToken, password, redirectURI, refreshToken, scope, token, username string
+	var clientId, clientSecret, code, codeVerifier, grantType, password, redirectURI, scope, username string
+	var ts TokenSet
 	var err error
 
 	log := logf.FromContext(r.Context())
@@ -222,10 +223,11 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 			"code_verifier", codeVerifier,
 			"error", err,
 			"grant_type", grantType,
-			"id_token", idToken,
+			"id_token", ts.IDToken,
 			"password", password,
 			"redirect_uri", redirectURI,
 			"scope", scope,
+			"subject", ts.Subject,
 			"username", username)
 	}()
 
@@ -245,15 +247,15 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 	clientId, clientSecret, _ = r.BasicAuth()
 
 	/*
-		grant_type			|Client Type	|Required Parameters								|Optional Parameters
-		====================|===============|===================================================|===================
-		authorization_code	|Private		|code, redirect_uri, client_id, client_secret		|state
-							|Public			|code, redirect_uri, client_id, code_verifier		|state
-		client_credentials	|Private		|client_id, client_secret							|scope
-		password			|Private		|username, password, client_id, client_secret		|scope
-							|Public			|username, password, client_id						|scope
-		refresh_token		|Private		|refresh_token, client_id, client_secret			|scope
-							|Public			|refresh_token, client_id							|scope
+		grant_type          |Client Type |Required Parameters                                |Optional Parameters
+		====================|============|===================================================|===================
+		authorization_code  |Private     |code, redirect_uri, client_id, client_secret       |state
+							|Public      |code, redirect_uri, client_id, code_verifier       |state
+		client_credentials  |Private     |client_id, client_secret                           |scope
+		password            |Private     |username, password, client_id, client_secret       |scope
+							|Public      |username, password, client_id                      |scope
+		refresh_token       |Private     |refresh_token, client_id, client_secret            |scope
+							|Public      |refresh_token, client_id                           |scope
 	*/
 
 	if clientId == "" {
@@ -290,8 +292,7 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(client.AllowedScopes) > 0 && scope != "" {
-		requestedScopes := strings.Split(scope, " ")
-		for _, s := range requestedScopes {
+		for s := range strings.SplitSeq(scope, " ") {
 			if s != "" && !slices.Contains(client.AllowedScopes, s) {
 				err = fmt.Errorf("scope %s not allowed for this client", s)
 				http.Error(w, "Unauthorized scope", http.StatusUnauthorized)
@@ -314,48 +315,26 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "redirect_uri is required", http.StatusBadRequest)
 			return
 		}
-		token, idToken, grantedScope, err = o.AuthExchanger.RedeemAuthorizationCode(r.Context(), code, clientId, redirectURI, codeVerifier)
-		if err == nil && o.AuthExchanger.IsRefreshTokenEnabled() {
-			refreshToken, err = o.AuthExchanger.CreateRefreshToken(r.Context(), RefreshTokenClaims{
-				AuthMethod: AuthMethodOAuth2,
-				ClientID:   clientId,
-				Scope:      grantedScope,
-				Subject:    clientId, // will be overwritten by subject in code claims — see note below
-			})
-			// NOTE: ideally we'd pass the subject from the auth code claims here, but
-			// RedeemAuthorizationCode doesn't return it. For now the refresh token
-			// re-resolves via loginLocalFromSubject which uses the subject from the cache entry.
-		}
+		ts, err = o.AuthExchanger.RedeemAuthorizationCode(r.Context(), code, clientId, redirectURI, codeVerifier)
 	case "client_credentials":
 		if client.Public {
 			err = fmt.Errorf("client_credentials grant_type is not supported for public clients")
 			http.Error(w, "client_credentials grant_type is not supported for public clients", http.StatusBadRequest)
 			return
 		}
-		token, idToken, grantedScope, err = o.AuthExchanger.LoginClient(r.Context(), clientId, clientSecret, scope)
-		// client_credentials does not issue refresh tokens (M2M flows re-authenticate directly)
+		ts, err = o.AuthExchanger.LoginClient(r.Context(), clientId, clientSecret, scope)
 	case "password":
 		username = r.FormValue("username")
 		password = r.FormValue("password")
-		token, idToken, grantedScope, err = o.AuthExchanger.LoginLocal(r.Context(), username, password, scope, clientId, AuthMethodOAuth2)
-		if err == nil && o.AuthExchanger.IsRefreshTokenEnabled() {
-			refreshToken, err = o.AuthExchanger.CreateRefreshToken(r.Context(), RefreshTokenClaims{
-				AuthMethod: AuthMethodOAuth2,
-				ClientID:   clientId,
-				Scope:      grantedScope,
-				Subject:    username,
-			})
-		}
+		ts, err = o.AuthExchanger.LoginLocal(r.Context(), username, password, scope, clientId, AuthMethodOAuth2)
 	case "refresh_token":
-		refreshToken = r.FormValue("refresh_token")
-		if refreshToken == "" {
+		tokenID := r.FormValue("refresh_token")
+		if tokenID == "" {
 			err = fmt.Errorf("refresh_token is required")
 			http.Error(w, "refresh_token is required", http.StatusBadRequest)
 			return
 		}
-		var newRefreshToken string
-		token, idToken, newRefreshToken, grantedScope, err = o.AuthExchanger.RedeemRefreshToken(r.Context(), refreshToken, clientId)
-		refreshToken = newRefreshToken
+		ts, err = o.AuthExchanger.RedeemRefreshToken(r.Context(), tokenID, clientId)
 	default:
 		err = fmt.Errorf("unsupported grant_type")
 		http.Error(w, "Unsupported grant_type", http.StatusBadRequest)
@@ -369,11 +348,11 @@ func (o *OAuth2) OAuth2TokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := TokenResponse{
-		AccessToken:  token,
+		AccessToken:  ts.AccessToken,
 		ExpiresIn:    int(o.AuthExchanger.GetTokenTTL().Seconds()),
-		IDToken:      idToken,
-		RefreshToken: refreshToken,
-		Scope:        grantedScope,
+		IDToken:      ts.IDToken,
+		RefreshToken: ts.RefreshToken,
+		Scope:        ts.Scope,
 		TokenType:    "Bearer",
 	}
 

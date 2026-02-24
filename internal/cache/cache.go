@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kdex-tech/kdex-host/internal/utils"
 	"github.com/valkey-io/valkey-go"
 )
 
@@ -32,7 +31,7 @@ type CacheManager interface {
 
 func NewCacheManager(addr, host string, ttl *time.Duration) (CacheManager, error) {
 	if ttl == nil {
-		ttl = utils.Ptr(24 * time.Hour)
+		ttl = new(24 * time.Hour)
 	}
 
 	if addr == "" {

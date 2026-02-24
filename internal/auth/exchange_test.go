@@ -14,7 +14,6 @@ import (
 	"github.com/kdex-tech/dmapper"
 	"github.com/kdex-tech/kdex-host/internal/cache"
 	"github.com/kdex-tech/kdex-host/internal/keys"
-	"github.com/kdex-tech/kdex-host/internal/utils"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"kdex.dev/crds/api/v1alpha1"
@@ -162,8 +161,8 @@ func TestNewExchanger(t *testing.T) {
 			sp:        scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, _, err := got.LoginLocal(context.Background(), "not-allowed", "password", "", "test-client", AuthMethodLocal)
-				assert.Equal(t, "", token)
+				ts, err := got.LoginLocal(context.Background(), "not-allowed", "password", "", "test-client", AuthMethodLocal)
+				assert.Equal(t, "", ts.AccessToken)
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "local auth not configured")
 			},
@@ -176,8 +175,8 @@ func TestNewExchanger(t *testing.T) {
 			sp:         scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, _, err := got.LoginLocal(context.Background(), "not-allowed", "password", "", "test-client", AuthMethodLocal)
-				assert.Equal(t, "", token)
+				ts, err := got.LoginLocal(context.Background(), "not-allowed", "password", "", "test-client", AuthMethodLocal)
+				assert.Equal(t, "", ts.AccessToken)
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "invalid credentials")
 			},
@@ -190,8 +189,8 @@ func TestNewExchanger(t *testing.T) {
 			sp:         scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, _, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", "local")
-				assert.True(t, len(token) > 100)
+				ts, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", "local")
+				assert.True(t, len(ts.AccessToken) > 100)
 				assert.Nil(t, err)
 			},
 		},
@@ -210,13 +209,13 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, _, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", AuthMethodLocal)
-				assert.True(t, len(token) > 100)
+				ts, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", AuthMethodLocal)
+				assert.True(t, len(ts.AccessToken) > 100)
 				assert.Nil(t, err)
 
 				claims := jwt.MapClaims{}
 				parser := new(jwt.Parser)
-				jwtToken, _, err := parser.ParseUnverified(token, claims)
+				jwtToken, _, err := parser.ParseUnverified(ts.AccessToken, claims)
 				assert.Nil(t, err)
 				assert.NotNil(t, jwtToken)
 				assert.Contains(t, jwtToken.Header["kid"], "kdex-dev-")
@@ -241,7 +240,7 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				_, _, _, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", AuthMethodLocal)
+				_, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", AuthMethodLocal)
 				assert.NotNil(t, err)
 				assert.Contains(t, err.Error(), "failed to map claims: failed to eval expression")
 			},
@@ -266,13 +265,13 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, _, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", AuthMethodLocal)
-				assert.True(t, len(token) > 100)
+				ts, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", AuthMethodLocal)
+				assert.True(t, len(ts.AccessToken) > 100)
 				assert.Nil(t, err)
 
 				claims := jwt.MapClaims{}
 				parser := new(jwt.Parser)
-				jwtToken, _, err := parser.ParseUnverified(token, claims)
+				jwtToken, _, err := parser.ParseUnverified(ts.AccessToken, claims)
 				assert.Nil(t, err)
 				assert.NotNil(t, jwtToken)
 				assert.Contains(t, jwtToken.Header["kid"], "kdex-dev-")
@@ -296,13 +295,13 @@ func TestNewExchanger(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, got *Exchanger, goterr error) {
 				assert.NotNil(t, got)
-				token, _, _, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", AuthMethodLocal)
-				assert.True(t, len(token) > 100)
+				ts, err := got.LoginLocal(context.Background(), "joe", "password", "", "test-client", AuthMethodLocal)
+				assert.True(t, len(ts.AccessToken) > 100)
 				assert.Nil(t, err)
 
 				claims := jwt.MapClaims{}
 				parser := new(jwt.Parser)
-				jwtToken, _, err := parser.ParseUnverified(token, claims)
+				jwtToken, _, err := parser.ParseUnverified(ts.AccessToken, claims)
 				assert.Nil(t, err)
 				assert.NotNil(t, jwtToken)
 				assert.Contains(t, jwtToken.Header["kid"], "kdex-dev-")
@@ -313,7 +312,7 @@ func TestNewExchanger(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+			cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 			cfg, err := NewConfig(
 				tt.authConfig,
 				func() (map[string]AuthClient, error) {
@@ -385,7 +384,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp: scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -420,7 +419,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -454,7 +453,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -490,7 +489,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -527,7 +526,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -571,7 +570,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -608,7 +607,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -645,7 +644,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{
@@ -685,7 +684,7 @@ func TestNewExchanger_OIDC(t *testing.T) {
 			sp:   scopeProvider,
 			assertions: func(t *testing.T, serverURL string, innerHandler *IH) {
 				ctx := context.Background()
-				cacheManager, _ := cache.NewCacheManager("", "foo", utils.Ptr(1*time.Hour))
+				cacheManager, _ := cache.NewCacheManager("", "foo", new(1*time.Hour))
 				cfg, gotErr := NewConfig(
 					&v1alpha1.Auth{
 						OIDCProvider: &v1alpha1.OIDCProvider{

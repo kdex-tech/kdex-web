@@ -2,6 +2,7 @@ package page
 
 import (
 	"fmt"
+	"strings"
 )
 
 const (
@@ -64,10 +65,10 @@ func (r *PackedContent) ToHTML(slot string) string {
 		return fmt.Sprintf(rawHTMLTemplate, slot, r.Content)
 	}
 
-	attributes := ""
+	var attributes strings.Builder
 	for k, v := range r.Attributes {
-		attributes += fmt.Sprintf(` %s="%s"`, k, v)
+		fmt.Fprintf(&attributes, ` %s="%s"`, k, v)
 	}
 
-	return fmt.Sprintf(customElementTemplate, r.CustomElementName, slot, r.AppName, r.AppGeneration, attributes, r.CustomElementName)
+	return fmt.Sprintf(customElementTemplate, r.CustomElementName, slot, r.AppName, r.AppGeneration, attributes.String(), r.CustomElementName)
 }

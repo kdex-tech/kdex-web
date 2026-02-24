@@ -78,9 +78,7 @@ func GetLang(r *http.Request, defaultLanguage string, languages []language.Tag) 
 
 	preferredLanguages := []language.Tag{}
 
-	acceptLanguages := strings.Split(r.Header.Get("Accept-Language"), ",")
-
-	for _, acceptLanguage := range acceptLanguages {
+	for acceptLanguage := range strings.SplitSeq(r.Header.Get("Accept-Language"), ",") {
 		acceptLanguage = strings.TrimSpace(acceptLanguage)
 		if acceptLanguage == "" {
 			continue

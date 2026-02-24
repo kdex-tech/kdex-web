@@ -686,8 +686,7 @@ func (s *RequestSniffer) parseRequestIntoAPI(
 		}
 
 		// Split by comma and handle types like application/json;q=0.9
-		types := strings.Split(accept, ",")
-		for _, t := range types {
+		for t := range strings.SplitSeq(accept, ",") {
 			mediaType := strings.TrimSpace(strings.Split(t, ";")[0])
 			if mediaType == "" || mediaType == "*/*" {
 				continue

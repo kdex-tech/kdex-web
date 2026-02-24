@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -17,7 +18,6 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/kdex-tech/dmapper"
 	"github.com/kdex-tech/kdex-host/internal/cache"
-	"github.com/kdex-tech/kdex-host/internal/utils"
 	"golang.org/x/oauth2"
 )
 
@@ -54,6 +54,15 @@ type RefreshTokenClaims struct {
 	Subject    string     `json:"sub"`
 }
 
+// TokenSet is the result of any successful token minting operation.
+type TokenSet struct {
+	AccessToken  string
+	IDToken      string
+	RefreshToken string
+	Scope        string
+	Subject      string
+}
+
 func NewExchanger(
 	ctx context.Context,
 	cfg Config,
@@ -68,7 +77,7 @@ func NewExchanger(
 	}
 	if cacheManager != nil {
 		ex.refreshTokenCache = cacheManager.GetCache("refresh-tokens", cache.CacheOptions{
-			TTL:      utils.Ptr(refreshTokenTTL),
+			TTL:      new(refreshTokenTTL),
 			Uncycled: true,
 		})
 	}
@@ -191,12 +200,20 @@ func (e *Exchanger) ExchangeToken(ctx context.Context, rawIDToken string) (strin
 	return e.config.Signer.Sign(signingContext)
 }
 
-func (e *Exchanger) GetOIDCClientID() string {
-	return e.config.OIDC.ClientID
+func (e *Exchanger) GetClient(clientID string) (AuthClient, bool) {
+	if e == nil {
+		return AuthClient{}, false
+	}
+	// Check M2M clients
+	if e.config.IsM2MEnabled() {
+		client, ok := e.config.Clients[clientID]
+		return client, ok
+	}
+	return AuthClient{}, false
 }
 
-func (e *Exchanger) GetTokenTTL() time.Duration {
-	return e.config.TokenTTL
+func (e *Exchanger) GetOIDCClientID() string {
+	return e.config.OIDC.ClientID
 }
 
 func (e *Exchanger) GetScopesSupported() ([]string, error) {
@@ -210,29 +227,16 @@ func (e *Exchanger) GetScopesSupported() ([]string, error) {
 	return claims.ScopesSupported, nil
 }
 
-func (e *Exchanger) GetClient(clientID string) (AuthClient, bool) {
-	if e == nil {
-		return AuthClient{}, false
-	}
-	// Check M2M clients
-	if e.config.IsM2MEnabled() {
-		client, ok := e.config.Clients[clientID]
-		return client, ok
-	}
-	return AuthClient{}, false
+func (e *Exchanger) GetTokenTTL() time.Duration {
+	return e.config.TokenTTL
 }
 
 func (e *Exchanger) IsRefreshTokenEnabled() bool {
 	return e != nil && e.refreshTokenCache != nil
 }
 
-// CreateRefreshToken mints an opaque refresh token and stores its claims in the cache.
-// Returns the opaque token string to be returned to the client.
-func (e *Exchanger) CreateRefreshToken(ctx context.Context, claims RefreshTokenClaims) (string, error) {
-	if !e.IsRefreshTokenEnabled() {
-		return "", fmt.Errorf("refresh token storage not configured")
-	}
-
+// createRefreshToken is the internal helper that stores a refresh token in the cache.
+func (e *Exchanger) createRefreshToken(ctx context.Context, claims RefreshTokenClaims) (string, error) {
 	now := time.Now()
 	claims.IssuedAt = now.Unix()
 	claims.ExpiresAt = now.Add(e.refreshTokenTTL).Unix()
@@ -250,148 +254,22 @@ func (e *Exchanger) CreateRefreshToken(ctx context.Context, claims RefreshTokenC
 	return tokenID, nil
 }
 
-// RedeemRefreshToken validates and consumes a refresh token (one-time use / rotation),
-// then returns a fresh token set.
-func (e *Exchanger) RedeemRefreshToken(ctx context.Context, tokenID string, clientID string) (accessToken, idToken, newRefreshToken, scope string, err error) {
-	if !e.IsRefreshTokenEnabled() {
-		return "", "", "", "", fmt.Errorf("refresh token storage not configured")
-	}
-
-	raw, found, _, err := e.refreshTokenCache.Get(ctx, tokenID)
-	if err != nil {
-		return "", "", "", "", fmt.Errorf("failed to read refresh token: %w", err)
-	}
-	if !found {
-		return "", "", "", "", fmt.Errorf("refresh token not found or expired")
-	}
-
-	var claims RefreshTokenClaims
-	if err := json.Unmarshal([]byte(raw), &claims); err != nil {
-		return "", "", "", "", fmt.Errorf("failed to parse refresh token: %w", err)
-	}
-
-	// Validate expiry (belt-and-suspenders; cache TTL should cover this).
-	if time.Now().Unix() > claims.ExpiresAt {
-		_ = e.refreshTokenCache.Delete(ctx, tokenID)
-		return "", "", "", "", fmt.Errorf("refresh token expired")
-	}
-
-	// Validate the client matches what was issued.
-	if claims.ClientID != clientID {
-		return "", "", "", "", fmt.Errorf("refresh token was not issued to this client")
-	}
-
-	// Consume the token (one-time use).
-	if err := e.refreshTokenCache.Delete(ctx, tokenID); err != nil {
-		return "", "", "", "", fmt.Errorf("failed to consume refresh token: %w", err)
-	}
-
-	// Mint a fresh token set using existing LoginLocal logic — re-resolves roles/entitlements fresh.
-	accessToken, idToken, scope, err = e.loginLocalFromSubject(claims.Subject, claims.ClientID, claims.Scope, claims.AuthMethod)
-	if err != nil {
-		return "", "", "", "", fmt.Errorf("failed to mint tokens from refresh: %w", err)
-	}
-
-	// Rotate: issue new refresh token.
-	newRefreshToken, err = e.CreateRefreshToken(ctx, RefreshTokenClaims{
-		AuthMethod: claims.AuthMethod,
-		ClientID:   claims.ClientID,
-		Scope:      claims.Scope,
-		Subject:    claims.Subject,
-	})
-	if err != nil {
-		return "", "", "", "", fmt.Errorf("failed to rotate refresh token: %w", err)
-	}
-
-	return accessToken, idToken, newRefreshToken, scope, nil
-}
-
-// loginLocalFromSubject re-mints tokens for a known-authenticated subject (used by refresh flow).
-// It re-resolves roles/entitlements to ensure freshness.
-func (e *Exchanger) loginLocalFromSubject(subject, clientID, scope string, authMethod AuthMethod) (accessToken, idToken, grantedScope string, err error) {
-	roles, entitlements, err := e.sp.FindInternalRolesAndEntitlements(subject)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to resolve roles: %w", err)
-	}
-
-	signingContext := jwt.MapClaims{
-		"auth_method":  string(authMethod),
-		"entitlements": entitlements,
-		"roles":        roles,
-		"sub":          subject,
-	}
-
-	requestedScopes := strings.Split(scope, " ")
-	grantedScopes := []string{}
-	hasScope := func(s string) bool { return slices.Contains(requestedScopes, s) }
-
-	if hasScope("openid") {
-		grantedScopes = append(grantedScopes, "openid")
-	}
-	if hasScope("email") {
-		grantedScopes = append(grantedScopes, "email")
-	}
-	if hasScope("profile") {
-		grantedScopes = append(grantedScopes, "profile")
-	}
-	if hasScope("entitlements") {
-		grantedScopes = append(grantedScopes, "entitlements")
-	} else {
-		delete(signingContext, "entitlements")
-	}
-	if hasScope("roles") {
-		grantedScopes = append(grantedScopes, "roles")
-	} else {
-		delete(signingContext, "roles")
-	}
-	for _, s := range requestedScopes {
-		if s != "" && !slices.Contains(grantedScopes, s) {
-			grantedScopes = append(grantedScopes, s)
-		}
-	}
-
-	grantedScope = strings.Join(grantedScopes, " ")
-	if grantedScope != "" {
-		signingContext["scope"] = grantedScope
-	}
-
-	accessToken, err = e.config.Signer.Sign(signingContext)
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to sign access token: %w", err)
-	}
-
-	if slices.Contains(grantedScopes, "openid") {
-		idCtx := make(jwt.MapClaims, len(signingContext))
-		for k, v := range signingContext {
-			idCtx[k] = v
-		}
-		idCtx["aud"] = clientID
-		delete(idCtx, "scope")
-		idToken, err = e.config.Signer.Sign(idCtx)
-		if err != nil {
-			return "", "", "", fmt.Errorf("failed to sign id token: %w", err)
-		}
-	}
-
-	return accessToken, idToken, grantedScope, nil
-}
-
-func (e *Exchanger) LoginClient(ctx context.Context, clientID, clientSecret string, scope string) (string, string, string, error) {
+func (e *Exchanger) LoginClient(ctx context.Context, clientID, clientSecret, scope string) (TokenSet, error) {
 	if e == nil {
-		return "", "", "", fmt.Errorf("auth not configured")
+		return TokenSet{}, fmt.Errorf("auth not configured")
 	}
 
 	if !e.config.IsM2MEnabled() {
-		return "", "", "", fmt.Errorf("M2M auth not configured")
+		return TokenSet{}, fmt.Errorf("M2M auth not configured")
 	}
 
 	client, ok := e.GetClient(clientID)
 	if !ok {
-		return "", "", "", fmt.Errorf("invalid client_id")
+		return TokenSet{}, fmt.Errorf("invalid client_id")
 	}
 
 	if client.ClientSecret != clientSecret {
-		return "", "", "", fmt.Errorf("invalid client_secret")
+		return TokenSet{}, fmt.Errorf("invalid client_secret")
 	}
 
 	signingContext := jwt.MapClaims{
@@ -409,7 +287,7 @@ func (e *Exchanger) LoginClient(ctx context.Context, clientID, clientSecret stri
 			continue
 		}
 		if len(client.AllowedScopes) > 0 && !slices.Contains(client.AllowedScopes, s) {
-			return "", "", "", fmt.Errorf("scope %s not allowed for this client", s)
+			return TokenSet{}, fmt.Errorf("scope %s not allowed for this client", s)
 		}
 		grantedScopes = append(grantedScopes, s)
 	}
@@ -418,29 +296,27 @@ func (e *Exchanger) LoginClient(ctx context.Context, clientID, clientSecret stri
 		signingContext["scope"] = grantedScopeStr
 	}
 
-	// Determine Audience.
-	// For M2M, the audience is typically the resource server (API).
-	// We'll use the default audience from the signer.
-	// Optionally, if the request contains an 'audience' parameter (not standard but common), we could use it.
-	// For now, rely on Signer's default or if 'aud' claim mechanism in Sign needed updates again.
-	// The Signer.Sign method uses default audience if 'aud' is not in claims.
-
 	accessToken, err := e.config.Signer.Sign(signingContext)
 	if err != nil {
-		return "", "", "", fmt.Errorf("failed to sign access token: %w", err)
+		return TokenSet{}, fmt.Errorf("failed to sign access token: %w", err)
 	}
 
-	return accessToken, "", grantedScopeStr, nil
+	// client_credentials does not issue refresh tokens (M2M flows re-authenticate directly).
+	return TokenSet{
+		AccessToken: accessToken,
+		Scope:       grantedScopeStr,
+		Subject:     clientID,
+	}, nil
 }
 
-func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, scope string, clientID string, authMethod AuthMethod) (string, string, string, error) {
+func (e *Exchanger) LoginLocal(ctx context.Context, username, password, scope, clientID string, authMethod AuthMethod) (TokenSet, error) {
 	if e == nil || !e.config.IsAuthEnabled() {
-		return "", "", "", fmt.Errorf("local auth not configured")
+		return TokenSet{}, fmt.Errorf("local auth not configured")
 	}
 
 	signingContext, err := e.sp.FindInternal(username, password)
 	if err != nil {
-		return "", "", "", err
+		return TokenSet{}, err
 	}
 
 	switch authMethod {
@@ -449,7 +325,7 @@ func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, s
 	case AuthMethodOAuth2:
 		signingContext["auth_method"] = string(AuthMethodOAuth2)
 	default:
-		return "", "", "", fmt.Errorf("unsupported local login auth method: %s", authMethod)
+		return TokenSet{}, fmt.Errorf("unsupported local login auth method: %s", authMethod)
 	}
 
 	// Determine granted scopes and filter claims
@@ -502,8 +378,8 @@ func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, s
 	}
 
 	// Map any remaining identity scopes
-	if scope, ok := signingContext["scope"].(string); ok && scope != "" {
-		for s := range strings.SplitSeq(scope, " ") {
+	if sc, ok := signingContext["scope"].(string); ok && sc != "" {
+		for s := range strings.SplitSeq(sc, " ") {
 			if !slices.Contains(grantedScopes, s) {
 				grantedScopes = append(grantedScopes, s)
 			}
@@ -517,30 +393,171 @@ func (e *Exchanger) LoginLocal(ctx context.Context, username, password string, s
 
 	accessToken, err := e.config.Signer.Sign(signingContext)
 	if err != nil {
-		return "", "", "", fmt.Errorf("failed to sign access token: %w", err)
+		return TokenSet{}, fmt.Errorf("failed to sign access token: %w", err)
 	}
 
 	var idToken string
 	if slices.Contains(grantedScopes, "openid") {
-		// Clone context for ID Token to avoid mutating the original map which might be used elsewhere or if we add more logic later
 		idTokenContext := make(jwt.MapClaims, len(signingContext))
-		for k, v := range signingContext {
-			idTokenContext[k] = v
-		}
-
-		// ID Token Audience must be the Client ID
+		maps.Copy(idTokenContext, signingContext)
 		idTokenContext["aud"] = clientID
-
-		// ID Token should not contain scope
 		delete(idTokenContext, "scope")
-
 		idToken, err = e.config.Signer.Sign(idTokenContext)
 		if err != nil {
-			return "", "", "", fmt.Errorf("failed to sign id token: %w", err)
+			return TokenSet{}, fmt.Errorf("failed to sign id token: %w", err)
 		}
 	}
 
-	return accessToken, idToken, grantedScopeStr, nil
+	ts := TokenSet{
+		AccessToken: accessToken,
+		IDToken:     idToken,
+		Scope:       grantedScopeStr,
+		Subject:     username,
+	}
+
+	if e.IsRefreshTokenEnabled() {
+		ts.RefreshToken, err = e.createRefreshToken(ctx, RefreshTokenClaims{
+			AuthMethod: authMethod,
+			ClientID:   clientID,
+			Scope:      grantedScopeStr,
+			Subject:    username,
+		})
+		if err != nil {
+			return TokenSet{}, fmt.Errorf("failed to create refresh token: %w", err)
+		}
+	}
+
+	return ts, nil
+}
+
+// RedeemAuthorizationCode validates and exchanges an authorization code for a TokenSet.
+func (e *Exchanger) RedeemAuthorizationCode(ctx context.Context, code, clientID, redirectURI, codeVerifier string) (TokenSet, error) {
+	if e == nil {
+		return TokenSet{}, fmt.Errorf("auth not configured")
+	}
+
+	// 1. Parse JWE
+	object, err := jose.ParseEncrypted(code, []jose.KeyAlgorithm{jose.DIRECT}, []jose.ContentEncryption{jose.A256GCM})
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("failed to parse auth code: %w", err)
+	}
+
+	// 2. Derive Key
+	key := sha256.Sum256([]byte(e.config.OIDC.BlockKey))
+
+	// 3. Decrypt
+	decrypted, err := object.Decrypt(key[:])
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("failed to decrypt auth code: %w", err)
+	}
+
+	var claims AuthorizationCodeClaims
+	if err := json.Unmarshal(decrypted, &claims); err != nil {
+		return TokenSet{}, fmt.Errorf("failed to unmarshal auth code claims: %w", err)
+	}
+
+	// 4. Validate
+	if time.Now().Unix() > claims.Exp {
+		return TokenSet{}, fmt.Errorf("authorization code expired")
+	}
+
+	if claims.ClientID != clientID {
+		return TokenSet{}, fmt.Errorf("client_id mismatch")
+	}
+
+	if claims.RedirectURI != redirectURI {
+		return TokenSet{}, fmt.Errorf("redirect_uri mismatch")
+	}
+
+	client, ok := e.GetClient(clientID)
+	if !ok {
+		return TokenSet{}, fmt.Errorf("invalid client_id")
+	}
+
+	// PKCE verification
+	if client.RequirePKCE && claims.CodeChallenge == "" {
+		return TokenSet{}, fmt.Errorf("PKCE is required for this client")
+	}
+
+	if claims.CodeChallenge != "" {
+		if codeVerifier == "" {
+			return TokenSet{}, fmt.Errorf("code_verifier is required for PKCE")
+		}
+
+		switch claims.CodeChallengeMethod {
+		case "S256":
+			h := sha256.Sum256([]byte(codeVerifier))
+			challenge := base64.RawURLEncoding.EncodeToString(h[:])
+			if challenge != claims.CodeChallenge {
+				return TokenSet{}, fmt.Errorf("invalid code_verifier")
+			}
+		case "plain", "":
+			if codeVerifier != claims.CodeChallenge {
+				return TokenSet{}, fmt.Errorf("invalid code_verifier")
+			}
+		default:
+			return TokenSet{}, fmt.Errorf("unsupported code_challenge_method: %s", claims.CodeChallengeMethod)
+		}
+	}
+
+	// 5. Mint tokens — subject is known from the decrypted code claims.
+	return e.mintTokensFromCode(ctx, claims)
+}
+
+// RedeemRefreshToken validates and consumes a refresh token (one-time use / rotation),
+// then returns a fresh TokenSet including a rotated refresh token.
+func (e *Exchanger) RedeemRefreshToken(ctx context.Context, tokenID, clientID string) (TokenSet, error) {
+	if !e.IsRefreshTokenEnabled() {
+		return TokenSet{}, fmt.Errorf("refresh token storage not configured")
+	}
+
+	raw, found, _, err := e.refreshTokenCache.Get(ctx, tokenID)
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("failed to read refresh token: %w", err)
+	}
+	if !found {
+		return TokenSet{}, fmt.Errorf("refresh token not found or expired")
+	}
+
+	var claims RefreshTokenClaims
+	if err := json.Unmarshal([]byte(raw), &claims); err != nil {
+		return TokenSet{}, fmt.Errorf("failed to parse refresh token: %w", err)
+	}
+
+	// Validate expiry (belt-and-suspenders; cache TTL should cover this).
+	if time.Now().Unix() > claims.ExpiresAt {
+		_ = e.refreshTokenCache.Delete(ctx, tokenID)
+		return TokenSet{}, fmt.Errorf("refresh token expired")
+	}
+
+	// Validate the client matches what was issued.
+	if claims.ClientID != clientID {
+		return TokenSet{}, fmt.Errorf("refresh token was not issued to this client")
+	}
+
+	// Consume the token (one-time use).
+	if err := e.refreshTokenCache.Delete(ctx, tokenID); err != nil {
+		return TokenSet{}, fmt.Errorf("failed to consume refresh token: %w", err)
+	}
+
+	// Mint fresh tokens — re-resolves roles/entitlements for freshness.
+	ts, err := e.mintTokensFromSubject(claims.Subject, claims.ClientID, claims.Scope, claims.AuthMethod)
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("failed to mint tokens from refresh: %w", err)
+	}
+
+	// Rotate: issue a new refresh token.
+	ts.RefreshToken, err = e.createRefreshToken(ctx, RefreshTokenClaims{
+		AuthMethod: claims.AuthMethod,
+		ClientID:   claims.ClientID,
+		Scope:      claims.Scope,
+		Subject:    claims.Subject,
+	})
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("failed to rotate refresh token: %w", err)
+	}
+
+	return ts, nil
 }
 
 func (e *Exchanger) verifyIDToken(ctx context.Context, rawIDToken string) (*oidc.IDToken, error) {
@@ -598,134 +615,23 @@ func (e *Exchanger) CreateAuthorizationCode(ctx context.Context, claims Authoriz
 	return object.CompactSerialize()
 }
 
-func (e *Exchanger) RedeemAuthorizationCode(ctx context.Context, code string, clientID string, redirectURI string, codeVerifier string) (string, string, string, error) {
-	if e == nil {
-		return "", "", "", fmt.Errorf("auth not configured")
-	}
-
-	// 1. Parse JWE
-	object, err := jose.ParseEncrypted(code, []jose.KeyAlgorithm{jose.DIRECT}, []jose.ContentEncryption{jose.A256GCM})
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to parse auth code: %w", err)
-	}
-
-	// 2. Derive Key
-	key := sha256.Sum256([]byte(e.config.OIDC.BlockKey))
-
-	// 3. Decrypt
-	decrypted, err := object.Decrypt(key[:])
-	if err != nil {
-		return "", "", "", fmt.Errorf("failed to decrypt auth code: %w", err)
-	}
-
-	var claims AuthorizationCodeClaims
-	if err := json.Unmarshal(decrypted, &claims); err != nil {
-		return "", "", "", fmt.Errorf("failed to unmarshal auth code claims: %w", err)
-	}
-
-	// 4. Validate
-	if time.Now().Unix() > claims.Exp {
-		return "", "", "", fmt.Errorf("authorization code expired")
-	}
-
-	if claims.ClientID != clientID {
-		return "", "", "", fmt.Errorf("client_id mismatch")
-	}
-
-	if claims.RedirectURI != redirectURI {
-		return "", "", "", fmt.Errorf("redirect_uri mismatch")
-	}
-
-	client, ok := e.GetClient(clientID)
-	if !ok {
-		return "", "", "", fmt.Errorf("invalid client_id")
-	}
-
-	// PKCE verification
-	if client.RequirePKCE && claims.CodeChallenge == "" {
-		return "", "", "", fmt.Errorf("PKCE is required for this client")
-	}
-
-	if claims.CodeChallenge != "" {
-		if codeVerifier == "" {
-			return "", "", "", fmt.Errorf("code_verifier is required for PKCE")
-		}
-
-		switch claims.CodeChallengeMethod {
-		case "S256":
-			h := sha256.Sum256([]byte(codeVerifier))
-			challenge := base64.RawURLEncoding.EncodeToString(h[:])
-			if challenge != claims.CodeChallenge {
-				return "", "", "", fmt.Errorf("invalid code_verifier")
-			}
-		case "plain", "":
-			if codeVerifier != claims.CodeChallenge {
-				return "", "", "", fmt.Errorf("invalid code_verifier")
-			}
-		default:
-			return "", "", "", fmt.Errorf("unsupported code_challenge_method: %s", claims.CodeChallengeMethod)
-		}
-	}
-
-	// 5. Mint Tokens
-	// We reuse LoginLocal logic but we need to bypass password check since we already authenticated.
-	// Actually, we should just mint the tokens directly using the claims from the code.
-	// We need to resolve roles/entitlements again to be fresh, or trust what's in the code?
-	// Better to resolve fresh if possible, but we only have `Subject`. LoginLocal does `sp.VerifyLocalIdentity` then resolves.
-	// Here we just have `Subject`. We should assume the user is valid if we issued the code.
-	// We need to fetch the user profile/roles again.
-
-	// We need to get the user's details (roles, entitlements, email, etc)
-	// ScopeProvider interface has `VerifyLocalIdentity` and `ResolveRolesAndEntitlements`.
-	// We might need a `GetUser` method on `ScopeProvider`.
-	// For now, let's call `ResolveRolesAndEntitlements` to get roles.
-	// But `VerifyLocalIdentity` provided the initial claims (email, profile).
-	// If `ScopeProvider` is just a mock or simple interface, we might be missing a way to get profile by ID.
-	// `ResolveRolesAndEntitlements` only returns roles/entitlements.
-
-	// If we look at `LoginLocal`, it calls `VerifyLocalIdentity` which returns `signingContext` with profile data.
-	// We don't have the password here.
-
-	// OPTION: We could have stored the *entire* profile in the JWE.
-	// JWE capacity is large enough for typical claims.
-	// Let's modify AuthorizationCodeClaims to include the full `jwt.MapClaims` or raw profile data?
-	// Or just trust that generating the code was the "authentication" and we mint tokens based on that.
-	// But we need the profile data for the ID Token.
-
-	// Let's assume for now we resolve roles afresh, but we might lose some profile data if not stored.
-	// For `local` auth, the profile is usually static or from DB.
-	// Only `ResolveRolesAndEntitlements` is available on `sp` (ScopeProvider).
-
-	// Let's check ScopeProvider interface.
-	// It is in `exchange.go`? No, likely `authorization.go`.
-
-	// To be safe and simple: Let's assume we can rely on `ResolveRolesAndEntitlements`.
-	// But what about `email`, `name` etc?
-	// VerifyLocalIdentity returns them.
-
-	// I will update `AuthorizationCodeClaims` to include a `Profile map[string]any` field to carry over the user's profile data.
-
-	return e.mintTokensFromCode(claims)
-}
-
-func (e *Exchanger) mintTokensFromCode(claims AuthorizationCodeClaims) (string, string, string, error) {
-	// Reconstruct signing context
+// mintTokensFromCode mints access + id tokens from the claims carried in an authorization code.
+// It also creates a refresh token if storage is configured.
+func (e *Exchanger) mintTokensFromCode(ctx context.Context, claims AuthorizationCodeClaims) (TokenSet, error) {
 	signingContext := jwt.MapClaims{}
 
-	// 1. Add Profile Data if available (we need to add this to struct)
-	// For now, rely on Subject.
 	signingContext["sub"] = claims.Subject
 	signingContext["auth_method"] = claims.AuthMethod
 
-	// 2. Resolve Roles/Entitlements
+	// Resolve Roles/Entitlements fresh.
 	roles, entitlements, err := e.sp.FindInternalRolesAndEntitlements(claims.Subject)
 	if err != nil {
-		return "", "", "", fmt.Errorf("failed to resolve roles: %w", err)
+		return TokenSet{}, fmt.Errorf("failed to resolve roles: %w", err)
 	}
 	signingContext["roles"] = roles
 	signingContext["entitlements"] = entitlements
 
-	// 3. Handle Scopes
+	// Handle Scopes
 	requestedScopes := strings.Split(claims.Scope, " ")
 	grantedScopes := []string{}
 	hasScope := func(s string) bool {
@@ -748,7 +654,7 @@ func (e *Exchanger) mintTokensFromCode(claims AuthorizationCodeClaims) (string, 
 		grantedScopes = append(grantedScopes, "roles")
 	}
 
-	// Add other scopes
+	// Pass through any other requested scopes.
 	for _, s := range requestedScopes {
 		if !slices.Contains(grantedScopes, s) && s != "" {
 			grantedScopes = append(grantedScopes, s)
@@ -760,26 +666,115 @@ func (e *Exchanger) mintTokensFromCode(claims AuthorizationCodeClaims) (string, 
 		signingContext["scope"] = grantedScopeStr
 	}
 
-	// 4. Sign Access Token
 	accessToken, err := e.config.Signer.Sign(signingContext)
 	if err != nil {
-		return "", "", "", fmt.Errorf("failed to sign access token: %w", err)
+		return TokenSet{}, fmt.Errorf("failed to sign access token: %w", err)
 	}
 
-	// 5. Sign ID Token if needed
 	var idToken string
 	if slices.Contains(grantedScopes, "openid") {
 		idTokenContext := make(jwt.MapClaims, len(signingContext))
-		for k, v := range signingContext {
-			idTokenContext[k] = v
-		}
+		maps.Copy(idTokenContext, signingContext)
 		idTokenContext["aud"] = claims.ClientID
 		delete(idTokenContext, "scope")
 		idToken, err = e.config.Signer.Sign(idTokenContext)
 		if err != nil {
-			return "", "", "", fmt.Errorf("failed to sign id token: %w", err)
+			return TokenSet{}, fmt.Errorf("failed to sign id token: %w", err)
 		}
 	}
 
-	return accessToken, idToken, grantedScopeStr, nil
+	ts := TokenSet{
+		AccessToken: accessToken,
+		IDToken:     idToken,
+		Scope:       grantedScopeStr,
+		Subject:     claims.Subject,
+	}
+
+	if e.IsRefreshTokenEnabled() {
+		ts.RefreshToken, err = e.createRefreshToken(ctx, RefreshTokenClaims{
+			AuthMethod: claims.AuthMethod,
+			ClientID:   claims.ClientID,
+			Scope:      grantedScopeStr,
+			Subject:    claims.Subject,
+		})
+		if err != nil {
+			return TokenSet{}, fmt.Errorf("failed to create refresh token: %w", err)
+		}
+	}
+
+	return ts, nil
+}
+
+// mintTokensFromSubject re-mints tokens for a known-authenticated subject (used by the refresh flow).
+// It re-resolves roles/entitlements to ensure freshness.
+func (e *Exchanger) mintTokensFromSubject(subject, clientID, scope string, authMethod AuthMethod) (TokenSet, error) {
+	roles, entitlements, err := e.sp.FindInternalRolesAndEntitlements(subject)
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("failed to resolve roles: %w", err)
+	}
+
+	signingContext := jwt.MapClaims{
+		"auth_method":  string(authMethod),
+		"entitlements": entitlements,
+		"roles":        roles,
+		"sub":          subject,
+	}
+
+	requestedScopes := strings.Split(scope, " ")
+	grantedScopes := []string{}
+	hasScope := func(s string) bool { return slices.Contains(requestedScopes, s) }
+
+	if hasScope("openid") {
+		grantedScopes = append(grantedScopes, "openid")
+	}
+	if hasScope("email") {
+		grantedScopes = append(grantedScopes, "email")
+	}
+	if hasScope("profile") {
+		grantedScopes = append(grantedScopes, "profile")
+	}
+	if hasScope("entitlements") {
+		grantedScopes = append(grantedScopes, "entitlements")
+	} else {
+		delete(signingContext, "entitlements")
+	}
+	if hasScope("roles") {
+		grantedScopes = append(grantedScopes, "roles")
+	} else {
+		delete(signingContext, "roles")
+	}
+	for _, s := range requestedScopes {
+		if s != "" && !slices.Contains(grantedScopes, s) {
+			grantedScopes = append(grantedScopes, s)
+		}
+	}
+
+	grantedScope := strings.Join(grantedScopes, " ")
+	if grantedScope != "" {
+		signingContext["scope"] = grantedScope
+	}
+
+	accessToken, err := e.config.Signer.Sign(signingContext)
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("failed to sign access token: %w", err)
+	}
+
+	var idToken string
+	if slices.Contains(grantedScopes, "openid") {
+		idCtx := make(jwt.MapClaims, len(signingContext))
+		maps.Copy(idCtx, signingContext)
+		idCtx["aud"] = clientID
+		delete(idCtx, "scope")
+		idToken, err = e.config.Signer.Sign(idCtx)
+		if err != nil {
+			return TokenSet{}, fmt.Errorf("failed to sign id token: %w", err)
+		}
+	}
+
+	return TokenSet{
+		AccessToken: accessToken,
+		IDToken:     idToken,
+		Scope:       grantedScope,
+		Subject:     subject,
+	}, nil
 }

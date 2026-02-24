@@ -37,7 +37,7 @@ func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, 
 								},
 							},
 						},
-						Description: openapi.Ptr(fmt.Sprintf("HTML for %s%s%s", l, utils.IfElse(pattern, " (pattern)", ""), utils.IfElse(localized, " (localized)", ""))),
+						Description: new(fmt.Sprintf("HTML for %s%s%s", l, utils.IfElse(pattern, " (pattern)", ""), utils.IfElse(localized, " (localized)", ""))),
 					},
 				}),
 				openapi.WithStatus(303, &openapi.ResponseRef{
@@ -171,7 +171,7 @@ func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[
 									},
 									[]string{"application/json"},
 								),
-								Description: openapi.Ptr("OpenID Configuration"),
+								Description: new("OpenID Configuration"),
 							}),
 							openapi.WithStatus(500, &openapi.ResponseRef{
 								Ref: "#/components/responses/InternalServerError",
@@ -213,7 +213,7 @@ func (hh *HostHandler) discoveryHandler(mux *http.ServeMux, registeredPaths map[
 									},
 									[]string{"application/json"},
 								),
-								Description: openapi.Ptr("OpenID Configuration"),
+								Description: new("OpenID Configuration"),
 							}),
 							openapi.WithStatus(500, &openapi.ResponseRef{
 								Ref: "#/components/responses/InternalServerError",
@@ -251,7 +251,7 @@ func (hh *HostHandler) faviconHandler(mux *http.ServeMux, registeredPaths map[st
 									},
 									[]string{"image/svg+xml"},
 								),
-								Description: openapi.Ptr("SVG Favicon"),
+								Description: new("SVG Favicon"),
 							}),
 							openapi.WithStatus(500, &openapi.ResponseRef{
 								Ref: "#/components/responses/InternalServerError",
@@ -298,7 +298,7 @@ func (hh *HostHandler) jwksHandler(mux *http.ServeMux, registeredPaths map[strin
 									},
 									[]string{"application/json"},
 								),
-								Description: openapi.Ptr("JWKS"),
+								Description: new("JWKS"),
 							}),
 							openapi.WithStatus(500, &openapi.ResponseRef{
 								Ref: "#/components/responses/InternalServerError",
@@ -345,7 +345,7 @@ func (hh *HostHandler) loginHandler(mux *http.ServeMux, registeredPaths map[stri
 									},
 									[]string{"text/html"},
 								),
-								Description: openapi.Ptr("HTML login page"),
+								Description: new("HTML login page"),
 							}),
 							openapi.WithStatus(303, &openapi.ResponseRef{
 								Ref: "#/components/responses/SeeOther",
@@ -442,7 +442,7 @@ func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 									},
 									[]string{"text/html"},
 								),
-								Description: openapi.Ptr("HTML navigation fragment"),
+								Description: new("HTML navigation fragment"),
 							}),
 							openapi.WithStatus(400, &openapi.ResponseRef{
 								Ref: "#/components/responses/BadRequest",
@@ -540,13 +540,13 @@ func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 								Content: openapi.NewContentWithSchema(
 									&openapi.Schema{
 										AdditionalProperties: openapi.AdditionalProperties{
-											Has: openapi.Ptr(true),
+											Has: new(true),
 										},
 										Type: &openapi.Types{openapi.TypeObject},
 									},
 									[]string{"application/json"},
 								),
-								Description: openapi.Ptr("OpenAPI documentation"),
+								Description: new("OpenAPI documentation"),
 							}),
 							openapi.WithStatus(500, &openapi.ResponseRef{
 								Ref: "#/components/responses/InternalServerError",
@@ -589,7 +589,7 @@ func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[str
 									},
 									[]string{"application/json"},
 								),
-								Description: openapi.Ptr("JSONschema fragment"),
+								Description: new("JSONschema fragment"),
 							}),
 							openapi.WithStatus(404, &openapi.ResponseRef{
 								Ref: "#/components/responses/NotFound",
@@ -629,7 +629,7 @@ func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 							},
 							Responses: openapi.NewResponses(
 								openapi.WithName("200", &openapi.Response{
-									Description: openapi.Ptr("Dashboard"),
+									Description: new("Dashboard"),
 									Content: openapi.NewContentWithSchema(
 										&openapi.Schema{
 											Format: "text",
@@ -639,7 +639,7 @@ func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 									),
 								}),
 								openapi.WithName("200", &openapi.Response{
-									Description: openapi.Ptr("Dashboard"),
+									Description: new("Dashboard"),
 									Content: openapi.NewContentWithSchema(
 										&openapi.Schema{
 											Format: "html",
@@ -680,7 +680,7 @@ func (hh *HostHandler) snifferHandler(mux *http.ServeMux, registeredPaths map[st
 							Parameters:  openapi.Parameters{},
 							Responses: openapi.NewResponses(
 								openapi.WithName("200", &openapi.Response{
-									Description: openapi.Ptr("Markdown"),
+									Description: new("Markdown"),
 									Content: openapi.NewContentWithSchema(
 										&openapi.Schema{
 											Format: "markdown",
@@ -739,7 +739,7 @@ func (hh *HostHandler) stateHandler(mux *http.ServeMux, registeredPaths map[stri
 									},
 									[]string{"application/json"},
 								),
-								Description: openapi.Ptr("Current session claims"),
+								Description: new("Current session claims"),
 							}),
 							openapi.WithStatus(401, &openapi.ResponseRef{
 								Ref: "#/components/responses/Unauthorized",
@@ -845,7 +845,7 @@ func (hh *HostHandler) tokenHandler(mux *http.ServeMux, registeredPaths map[stri
 									},
 									[]string{"application/json"},
 								),
-								Description: openapi.Ptr("Token Response"),
+								Description: new("Token Response"),
 							}),
 							openapi.WithStatus(400, &openapi.ResponseRef{
 								Ref: "#/components/responses/BadRequest",
@@ -887,11 +887,11 @@ func (hh *HostHandler) translationHandler(mux *http.ServeMux, registeredPaths ma
 						},
 						Responses: openapi.NewResponses(
 							openapi.WithName("200", &openapi.Response{
-								Description: openapi.Ptr("JSON translation map"),
+								Description: new("JSON translation map"),
 								Content: openapi.NewContentWithSchema(
 									&openapi.Schema{
 										AdditionalProperties: openapi.AdditionalProperties{
-											Has: openapi.Ptr(true),
+											Has: new(true),
 										},
 										Type: &openapi.Types{openapi.TypeObject},
 									},

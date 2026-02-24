@@ -77,7 +77,7 @@ func (hh *HostHandler) LoginPost(w http.ResponseWriter, r *http.Request) {
 
 	// Local login doesn't have a clientID, so we pass empty string
 	// We also don't need the ID Token for cookie-based session
-	token, _, _, err := hh.authExchanger.LoginLocal(r.Context(), username, password, "", "", auth.AuthMethodLocal)
+	ts, err := hh.authExchanger.LoginLocal(r.Context(), username, password, "", "", auth.AuthMethodLocal)
 	if err != nil {
 		// FAILED: 401 Unauthorized / render login page again with error message?
 		// For now simple redirect back to login
@@ -89,7 +89,7 @@ func (hh *HostHandler) LoginPost(w http.ResponseWriter, r *http.Request) {
 	// SUCCESS: Set cookie and redirect
 	http.SetCookie(w, &http.Cookie{
 		Name:     hh.authConfig.CookieName,
-		Value:    token,
+		Value:    ts.AccessToken,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   hh.isSecure(),

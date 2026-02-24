@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kdex-tech/kdex-host/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -224,7 +223,7 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 		{
 			name: "update ttl",
 			args: func(t *testing.T) (string, CacheOptions) {
-				return "test", CacheOptions{TTL: utils.Ptr(100 * time.Millisecond)}
+				return "test", CacheOptions{TTL: new(100 * time.Millisecond)}
 			},
 			assertions: func(t *testing.T, got Cache, cacheManager CacheManager) {
 				assert.NotNil(t, got)
@@ -245,7 +244,7 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 				assert.Equal(t, "test", val)
 
 				// Update TTL
-				got = cacheManager.GetCache("test", CacheOptions{TTL: utils.Ptr(1 * time.Millisecond)})
+				got = cacheManager.GetCache("test", CacheOptions{TTL: new(1 * time.Millisecond)})
 				assert.Equal(t, time.Duration(1*time.Millisecond), got.TTL())
 
 				// preexisting items in the cache still have the old expiry based on previous TTL
@@ -270,7 +269,7 @@ func TestInMemoryCacheManager_GetCache(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cacheManager, err := NewCacheManager("", "foo", utils.Ptr(100*time.Millisecond))
+			cacheManager, err := NewCacheManager("", "foo", new(100*time.Millisecond))
 			assert.NoError(t, err)
 			class, opts := tt.args(t)
 			got := cacheManager.GetCache(class, opts)

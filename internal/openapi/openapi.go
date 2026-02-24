@@ -248,27 +248,27 @@ func (b *Builder) buildOpenAPI(
 		doc.Components.Responses = openapi.ResponseBodies{
 			"BadRequest": &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("Bad Request"),
+					Description: new("Bad Request"),
 				},
 			},
 			"Found": &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("Found"),
+					Description: new("Found"),
 				},
 			},
 			"InternalServerError": &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("Internal Server Error"),
+					Description: new("Internal Server Error"),
 				},
 			},
 			"NotFound": &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("Not Found"),
+					Description: new("Not Found"),
 				},
 			},
 			"SeeOther": &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("See Other"),
+					Description: new("See Other"),
 				},
 			},
 		}
@@ -305,7 +305,7 @@ func (b *Builder) buildOpenAPI(
 		if len(doc.Components.SecuritySchemes) > 0 {
 			doc.Components.Responses["Unauthorized"] = &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("Unauthorized"),
+					Description: new("Unauthorized"),
 				},
 			}
 		}
@@ -320,7 +320,7 @@ func ArrayQueryParam(name string, description string) *openapi.ParameterRef {
 	return &openapi.ParameterRef{
 		Value: &openapi.Parameter{
 			Description: description,
-			Explode:     openapi.Ptr(true),
+			Explode:     new(true),
 			In:          "query",
 			Name:        name,
 			Required:    false,
@@ -385,8 +385,7 @@ func ExtractParameters(routePath string, query string, header http.Header) opena
 		paramCounts := make(map[string]int)
 
 		// Parse query string manually to count occurrences
-		pairs := strings.Split(query, "&")
-		for _, pair := range pairs {
+		for pair := range strings.SplitSeq(query, "&") {
 			if pair == "" {
 				continue
 			}
@@ -425,7 +424,7 @@ func ExtractParameters(routePath string, query string, header http.Header) opena
 			}
 
 			if isArray {
-				param.Explode = openapi.Ptr(true)
+				param.Explode = new(true)
 			}
 
 			params = append(params, &openapi.ParameterRef{

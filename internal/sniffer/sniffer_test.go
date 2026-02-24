@@ -649,7 +649,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.Equal(t, 1, item.Get.Responses.Len())
 				resp := item.Get.Responses.Value("200")
 				assert.NotNil(t, resp)
-				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
+				assert.Equal(t, new("Successful response"), resp.Value.Description)
 				assert.Equal(t, 0, len(resp.Value.Content))
 			},
 		},
@@ -668,7 +668,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.Equal(t, 1, item.Get.Responses.Len())
 				resp := item.Get.Responses.Value("200")
 				assert.NotNil(t, resp)
-				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
+				assert.Equal(t, new("Successful response"), resp.Value.Description)
 				assert.Equal(t, 0, len(resp.Value.Content))
 			},
 		},
@@ -687,7 +687,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.Equal(t, 1, item.Get.Responses.Len())
 				resp := item.Get.Responses.Value("200")
 				assert.NotNil(t, resp)
-				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
+				assert.Equal(t, new("Successful response"), resp.Value.Description)
 				assert.Equal(t, 1, len(resp.Value.Content))
 				assert.Nil(t, resp.Value.Content.Get("application/json").Schema)
 			},
@@ -708,7 +708,7 @@ func TestRequestSniffer_parseRequestIntoAPI(t *testing.T) {
 				assert.Equal(t, 1, item.Get.Responses.Len())
 				resp := item.Get.Responses.Value("200")
 				assert.NotNil(t, resp)
-				assert.Equal(t, openapi.Ptr("Successful response"), resp.Value.Description)
+				assert.Equal(t, new("Successful response"), resp.Value.Description)
 				assert.Equal(t, 1, len(resp.Value.Content))
 				assert.NotNil(t, resp.Value.Content.Get("application/json").Schema)
 				assert.Equal(t, "#/components/schemas/Foo", resp.Value.Content.Get("application/json").Schema.Ref)
@@ -1383,7 +1383,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 							Responses: openapi.NewResponses(
 								openapi.WithStatus(200, &openapi.ResponseRef{
 									Value: &openapi.Response{
-										Description: openapi.Ptr("Successful response"),
+										Description: new("Successful response"),
 										Content: openapi.Content{
 											"application/json": &openapi.MediaType{
 												Schema: &openapi.SchemaRef{
@@ -1471,7 +1471,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 		Responses: openapi.NewResponses(
 			openapi.WithStatus(200, &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("Successful response"),
+					Description: new("Successful response"),
 					Content: openapi.Content{
 						"application/json": &openapi.MediaType{
 							Schema: &openapi.SchemaRef{
@@ -1530,7 +1530,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 		Responses: openapi.NewResponses(
 			openapi.WithStatus(200, &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("Successful response"),
+					Description: new("Successful response"),
 					Content: openapi.Content{
 						"application/json": &openapi.MediaType{
 							Schema: &openapi.SchemaRef{
@@ -1587,7 +1587,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 		Responses: openapi.NewResponses(
 			openapi.WithStatus(200, &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("Successful response"),
+					Description: new("Successful response"),
 				},
 			}),
 		),
@@ -1677,7 +1677,7 @@ func TestRequestSniffer_parseRequestIntoAPI_and_mergeAPIIntoFunction(t *testing.
 		Responses: openapi.NewResponses(
 			openapi.WithStatus(200, &openapi.ResponseRef{
 				Value: &openapi.Response{
-					Description: openapi.Ptr("Successful response"),
+					Description: new("Successful response"),
 					Content: openapi.Content{
 						"application/json": &openapi.MediaType{
 							Schema: &openapi.SchemaRef{
@@ -1743,7 +1743,7 @@ func TestRequestSniffer_sniff_A(t *testing.T) {
 									Responses: openapi.NewResponses(
 										openapi.WithStatus(200, &openapi.ResponseRef{
 											Value: &openapi.Response{
-												Description: openapi.Ptr("Successful response"),
+												Description: new("Successful response"),
 											},
 										}),
 									),
@@ -1835,7 +1835,7 @@ func TestRequestSniffer_sniff_A(t *testing.T) {
 									Responses: openapi.NewResponses(
 										openapi.WithStatus(200, &openapi.ResponseRef{
 											Value: &openapi.Response{
-												Description: openapi.Ptr("Successful response"),
+												Description: new("Successful response"),
 											},
 										}),
 									),
@@ -1902,7 +1902,7 @@ func TestRequestSniffer_sniff_A(t *testing.T) {
 									Responses: openapi.NewResponses(
 										openapi.WithStatus(200, &openapi.ResponseRef{
 											Value: &openapi.Response{
-												Description: openapi.Ptr("Successful response"),
+												Description: new("Successful response"),
 											},
 										}),
 									),
@@ -1986,7 +1986,7 @@ func TestRequestSniffer_sniff_A(t *testing.T) {
 										Responses: openapi.NewResponses(
 											openapi.WithStatus(200, &openapi.ResponseRef{
 												Value: &openapi.Response{
-													Description: openapi.Ptr("Successful response"),
+													Description: new("Successful response"),
 												},
 											}),
 										),
@@ -2033,7 +2033,7 @@ func TestRequestSniffer_sniff_A(t *testing.T) {
 									Responses: openapi.NewResponses(
 										openapi.WithStatus(200, &openapi.ResponseRef{
 											Value: &openapi.Response{
-												Description: openapi.Ptr("Successful response"),
+												Description: new("Successful response"),
 											},
 										}),
 									),
@@ -2082,7 +2082,7 @@ func TestRequestSniffer_sniff_A(t *testing.T) {
 										Responses: openapi.NewResponses(
 											openapi.WithStatus(200, &openapi.ResponseRef{
 												Value: &openapi.Response{
-													Description: openapi.Ptr("Successful response"),
+													Description: new("Successful response"),
 												},
 											}),
 										),
@@ -2129,7 +2129,7 @@ func TestRequestSniffer_sniff_A(t *testing.T) {
 									Responses: openapi.NewResponses(
 										openapi.WithStatus(200, &openapi.ResponseRef{
 											Value: &openapi.Response{
-												Description: openapi.Ptr("Successful response"),
+												Description: new("Successful response"),
 											},
 										}),
 									),

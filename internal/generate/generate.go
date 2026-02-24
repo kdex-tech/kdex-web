@@ -14,7 +14,6 @@ import (
 
 	"github.com/kdex-tech/kdex-host/internal"
 	ko "github.com/kdex-tech/kdex-host/internal/openapi"
-	"github.com/kdex-tech/kdex-host/internal/utils"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -166,9 +165,9 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 			},
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: utils.Ptr(int32(3)),
-			Completions:  utils.Ptr(int32(1)),
-			Parallelism:  utils.Ptr(int32(1)),
+			BackoffLimit: new(int32(3)),
+			Completions:  new(int32(1)),
+			Parallelism:  new(int32(1)),
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -176,7 +175,7 @@ func (g *Generator) GetOrCreateGenerateJob(ctx context.Context, function *kdexv1
 					},
 				},
 				Spec: corev1.PodSpec{
-					AutomountServiceAccountToken: utils.Ptr(true),
+					AutomountServiceAccountToken: new(true),
 					Containers: []corev1.Container{
 						{
 							Name: "results",

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/kdex-tech/kdex-host/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,7 +17,7 @@ func TestNewCacheManager(t *testing.T) {
 		{
 			name: "memory",
 			args: func(t *testing.T) (string, string, *time.Duration, error) {
-				return "", "test", utils.Ptr(10 * time.Millisecond), nil
+				return "", "test", new(10 * time.Millisecond), nil
 			},
 			assertions: func(t *testing.T, got CacheManager, err error) {
 				assert.NoError(t, err)
@@ -56,7 +55,7 @@ func TestNewCacheManager(t *testing.T) {
 					return "", "", nil, err
 				}
 				t.Cleanup(s.Close)
-				return s.Addr(), "test", utils.Ptr(10 * time.Millisecond), nil
+				return s.Addr(), "test", new(10 * time.Millisecond), nil
 			},
 			assertions: func(t *testing.T, got CacheManager, err error) {
 				assert.NoError(t, err)
@@ -66,7 +65,7 @@ func TestNewCacheManager(t *testing.T) {
 		{
 			name: "valkey - no valkey",
 			args: func(t *testing.T) (string, string, *time.Duration, error) {
-				return "localhost:6379", "test", utils.Ptr(10 * time.Millisecond), nil
+				return "localhost:6379", "test", new(10 * time.Millisecond), nil
 			},
 			assertions: func(t *testing.T, got CacheManager, err error) {
 				assert.Error(t, err)
@@ -81,7 +80,7 @@ func TestNewCacheManager(t *testing.T) {
 					return "", "", nil, err
 				}
 				t.Cleanup(s.Close)
-				return s.Addr(), "test", utils.Ptr(10 * time.Millisecond), nil
+				return s.Addr(), "test", new(10 * time.Millisecond), nil
 			},
 			assertions: func(t *testing.T, got CacheManager, err error) {
 				assert.NoError(t, err)
