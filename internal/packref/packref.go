@@ -22,7 +22,6 @@ type PackRef struct {
 	Config            configuration.NexusConfiguration
 	ConfigMap         *corev1.ConfigMap
 	Log               logr.Logger
-	ModulePath        string
 	NPMSecretRef      *corev1.LocalObjectReference
 	Scheme            *runtime.Scheme
 	ServiceAccountRef corev1.LocalObjectReference

@@ -462,7 +462,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	if internalPackageReferences != nil {
 		be := kdexv1alpha1.Backend{
-			IngressPath:           r.Configuration.BackendDefault.ModulePath,
+			IngressPath:           internal.MODULE_PATH,
 			StaticImage:           internalPackageReferences.Status.Attributes["image"],
 			StaticImagePullPolicy: corev1.PullIfNotPresent,
 		}

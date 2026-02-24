@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kdex-tech/kdex-host/internal"
 	kjob "github.com/kdex-tech/kdex-host/internal/job"
 	"github.com/kdex-tech/kdex-host/internal/packref"
 	batchv1 "k8s.io/api/batch/v1"
@@ -95,7 +96,7 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 		"Reconciling",
 	)
 
-	_, configMap, err := r.createOrUpdateJobConfigMap(ctx, r.Configuration.BackendDefault.ModulePath, &ipr)
+	_, configMap, err := r.createOrUpdateJobConfigMap(ctx, &ipr)
 	if err != nil {
 		kdexv1alpha1.SetConditions(
 			&ipr.Status.Conditions,
@@ -116,7 +117,6 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 		Config:            r.Configuration,
 		ConfigMap:         configMap,
 		Log:               log,
-		ModulePath:        r.Configuration.BackendDefault.ModulePath,
 		NPMSecretRef:      ipr.Spec.NPMSecretRef,
 		Scheme:            r.Scheme,
 		ServiceAccountRef: ipr.Spec.ServiceAccountRef,
@@ -309,7 +309,6 @@ func (r *KDexInternalPackageReferencesReconciler) cleanupJobs(ctx context.Contex
 
 func (r *KDexInternalPackageReferencesReconciler) createOrUpdateJobConfigMap(
 	ctx context.Context,
-	modulePath string,
 	ipr *kdexv1alpha1.KDexInternalPackageReferences,
 ) (controllerutil.OperationResult, *corev1.ConfigMap, error) {
 	configmap := &corev1.ConfigMap{
@@ -366,7 +365,7 @@ try {
     console.error('Error:', err);
     process.exit(1);
 }
-`, modulePath)
+`, internal.MODULE_PATH)
 
 			var packageJSON strings.Builder
 			packageJSON.WriteString(`{
