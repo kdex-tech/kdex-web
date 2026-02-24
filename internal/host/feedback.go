@@ -480,7 +480,7 @@ func generateLintHTML(lints []string) string {
 	}
 	var b strings.Builder
 	for _, l := range lints {
-		b.WriteString(fmt.Sprintf(`<div class="lint-item"><span class="lint-icon" style="color: %s">⚠</span> <span>%s</span></div>`, defaultTheme.TextLint, htmlEscape(l)))
+		fmt.Fprintf(&b, `<div class="lint-item"><span class="lint-icon" style="color: %s">⚠</span> <span>%s</span></div>`, defaultTheme.TextLint, htmlEscape(l))
 	}
 	return b.String()
 }
@@ -497,7 +497,7 @@ func renderSpecHTML(spec string) string {
 			break
 		}
 		// We use a separate span for the line number and the content
-		b.WriteString(fmt.Sprintf(`<span class="ln">%d</span><span class="lc">%s</span>`+"\n", i+1, htmlEscape(line)))
+		fmt.Fprintf(&b, `<span class="ln">%d</span><span class="lc">%s</span>`+"\n", i+1, htmlEscape(line))
 	}
 	return b.String()
 }

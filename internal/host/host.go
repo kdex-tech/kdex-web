@@ -86,7 +86,7 @@ func (hh *HostHandler) GetUtilityPageHandler(name kdexv1alpha1.KDexUtilityPageTy
 }
 
 func (hh *HostHandler) HeadScriptToHTML(handler page.PageHandler) string {
-	packageReferences := []kdexv1alpha1.PackageReference{}
+	packageReferences := make([]kdexv1alpha1.PackageReference, 0, len(hh.packageReferences)+len(handler.PackageReferences))
 	packageReferences = append(packageReferences, hh.packageReferences...)
 	packageReferences = append(packageReferences, handler.PackageReferences...)
 
@@ -523,7 +523,7 @@ func (hh *HostHandler) ThemeAssetsToString() string {
 }
 
 func (hh *HostHandler) availableLanguages(translations *Translations) []string {
-	availableLangs := []string{}
+	availableLangs := make([]string, 0, len(translations.Languages()))
 
 	for _, tag := range translations.Languages() {
 		availableLangs = append(availableLangs, tag.String())

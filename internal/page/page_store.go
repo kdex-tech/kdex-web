@@ -54,7 +54,7 @@ func (s *PageStore) List() []PageHandler {
 	s.log.V(3).Info("list")
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	pages := []PageHandler{}
+	pages := make([]PageHandler, 0, len(s.handlers))
 	for _, page := range s.handlers {
 		pages = append(pages, page)
 	}

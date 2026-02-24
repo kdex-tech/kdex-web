@@ -269,7 +269,7 @@ func UniquePackageRefs(packages []kdexv1alpha1.PackageReference) []kdexv1alpha1.
 		packageReferenceMap[pkgRef.Name+"@"+pkgRef.Version] = pkgRef
 	}
 
-	uniquePackageReferences := []kdexv1alpha1.PackageReference{}
+	uniquePackageReferences := make([]kdexv1alpha1.PackageReference, 0, len(packageReferenceMap))
 	for _, pkgRef := range packageReferenceMap {
 		uniquePackageReferences = append(uniquePackageReferences, pkgRef)
 	}

@@ -34,7 +34,7 @@ type JWKSet struct {
 // JWKSHandler creates an HTTP handler that serves the JWKS endpoint.
 // This endpoint exposes the public key(s) used to verify JWT signatures.
 func JWKSHandler(keyPairs *keys.KeyPairs) http.HandlerFunc {
-	keyList := []JWK{}
+	keyList := make([]JWK, 0, len(*keyPairs))
 
 	for _, pair := range *keyPairs {
 		pub := pair.Private.Public()
@@ -55,11 +55,21 @@ func JWKSHandler(keyPairs *keys.KeyPairs) http.HandlerFunc {
 		case *ecdsa.PublicKey:
 			item.Kty = "EC"
 			item.Alg = "ES256"
-			item.Crv = v.Params().Name // Usually "P-256"
-			// ECDSA requires X and Y coordinates padded to the curve size
-			byteSize := (v.Curve.Params().BitSize + 7) / 8
-			item.X = base64.RawURLEncoding.EncodeToString(padBytes(v.X.Bytes(), byteSize))
-			item.Y = base64.RawURLEncoding.EncodeToString(padBytes(v.Y.Bytes(), byteSize))
+			item.Crv = v.Curve.Params().Name
+
+			// Get the uncompressed bytes (0x04 || X || Y)
+			pubBytes, err := v.Bytes()
+			if err != nil {
+				panic(err)
+			}
+
+			// The first byte is the uncompressed point indicator (0x04)
+			// The rest is X and Y concatenated, each taking up half the remaining space
+			coords := pubBytes[1:]
+			mid := len(coords) / 2
+
+			item.X = base64.RawURLEncoding.EncodeToString(coords[:mid])
+			item.Y = base64.RawURLEncoding.EncodeToString(coords[mid:])
 		}
 
 		keyList = append(keyList, item)
@@ -78,14 +88,4 @@ func JWKSHandler(keyPairs *keys.KeyPairs) http.HandlerFunc {
 			return
 		}
 	}
-}
-
-// Helper to ensure ECDSA coordinates are the correct length
-func padBytes(src []byte, size int) []byte {
-	if len(src) >= size {
-		return src
-	}
-	out := make([]byte, size)
-	copy(out[size-len(src):], src)
-	return out
 }

@@ -1024,7 +1024,7 @@ func (r *KDexInternalHostReconciler) createOrUpdatePackageReferences(
 
 	npmSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Annotations["kdex.dev/secret-type"] == "npm" })
 	pullImageSecrets := internalHost.Spec.ServiceAccountSecrets.Filter(func(s corev1.Secret) bool { return s.Type == corev1.SecretTypeDockerConfigJson })
-	pullImageSecretRefs := []corev1.LocalObjectReference{}
+	pullImageSecretRefs := make([]corev1.LocalObjectReference, 0, len(pullImageSecrets))
 	for _, s := range pullImageSecrets {
 		pullImageSecretRefs = append(pullImageSecretRefs, corev1.LocalObjectReference{Name: s.Name})
 	}

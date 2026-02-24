@@ -110,7 +110,7 @@ func (rp *scopeProvider) collectRoles() (*kdexv1alpha1.KDexRoleList, error) {
 }
 
 func (rp *scopeProvider) collectEntitlements(roles []string) []string {
-	scopes := []string{}
+	scopes := make([]string, 0, len(roles))
 	for _, role := range roles {
 		scopes = append(scopes, rp.rolesMap[role]...)
 	}
@@ -118,7 +118,7 @@ func (rp *scopeProvider) collectEntitlements(roles []string) []string {
 }
 
 func (rp *scopeProvider) buildMappingTable(roles *kdexv1alpha1.KDexRoleList) map[string][]string {
-	table := map[string][]string{}
+	table := make(map[string][]string, len(roles.Items))
 
 	for _, role := range roles.Items {
 		table[role.Name] = []string{}

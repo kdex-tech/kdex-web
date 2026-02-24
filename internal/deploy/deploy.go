@@ -265,7 +265,8 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 	}
 
 	// Reuse deployment environment variables where appropriate
-	env := []corev1.EnvVar{
+	env := make([]corev1.EnvVar, 0, 6+len(d.FaaSAdaptor.Observer.Env))
+	env = append(env, []corev1.EnvVar{
 		{
 			Name:  "FUNCTION_BASEPATH",
 			Value: function.Spec.API.BasePath,
@@ -286,7 +287,7 @@ func (d *Deployer) Observe(ctx context.Context, function *kdexv1alpha1.KDexFunct
 			Name:  "FUNCTION_NAMESPACE",
 			Value: function.Namespace,
 		},
-	}
+	}...)
 
 	env = append(env, d.FaaSAdaptor.Observer.Env...)
 
