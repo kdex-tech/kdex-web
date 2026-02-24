@@ -165,21 +165,19 @@ func (r *KDexFunctionReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	var faasAdaptorSpec *kdexv1alpha1.KDexFaaSAdaptorSpec
 
-	if faasAdaptorObj != nil {
-		switch v := faasAdaptorObj.(type) {
-		case *kdexv1alpha1.KDexClusterFaaSAdaptor:
-			faasAdaptorSpec = &v.Spec
-		case *kdexv1alpha1.KDexFaaSAdaptor:
-			faasAdaptorSpec = &v.Spec
-		}
-
-		currentGen := fmt.Sprintf("%d", faasAdaptorObj.GetGeneration())
-		if function.Status.Attributes["faasAdaptor.generation"] != "" && function.Status.Attributes["faasAdaptor.generation"] != currentGen {
-			log.Info("FaaS Adaptor updated, re-reconciling", "oldGen", function.Status.Attributes["faasAdaptor.generation"], "newGen", currentGen)
-			function.Status.State = kdexv1alpha1.KDexFunctionStateOpenAPIValid
-		}
-		function.Status.Attributes["faasAdaptor.generation"] = currentGen
+	switch v := faasAdaptorObj.(type) {
+	case *kdexv1alpha1.KDexClusterFaaSAdaptor:
+		faasAdaptorSpec = &v.Spec
+	case *kdexv1alpha1.KDexFaaSAdaptor:
+		faasAdaptorSpec = &v.Spec
 	}
+
+	currentGen := fmt.Sprintf("%d", faasAdaptorObj.GetGeneration())
+	if function.Status.Attributes["faasAdaptor.generation"] != "" && function.Status.Attributes["faasAdaptor.generation"] != currentGen {
+		log.Info("FaaS Adaptor updated, re-reconciling", "oldGen", function.Status.Attributes["faasAdaptor.generation"], "newGen", currentGen)
+		function.Status.State = kdexv1alpha1.KDexFunctionStateOpenAPIValid
+	}
+	function.Status.Attributes["faasAdaptor.generation"] = currentGen
 
 	hc := handlerContext{
 		ctx:              ctx,
