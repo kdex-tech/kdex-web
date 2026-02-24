@@ -16,27 +16,27 @@ import (
 
 const (
 	primaryTemplate = `<!DOCTYPE html>
-<html lang="{{ .Language }}">
+<html lang="[[ .Language ]]">
 	<head>
-	{{ .Meta }}
-	{{ .Title }}
-	{{ .Theme }}
-	{{ .HeadScript }}
+	[[ .Meta ]]
+	[[ .Title ]]
+	[[ .Theme ]]
+	[[ .HeadScript ]]
 	</head>
 	<body>
 	<header>
-		{{ .Header }}
+		[[ .Header ]]
 	</header>
 	<nav>
-		{{ .Navigation.main }}
+		[[ .Navigation.main ]]
 	</nav>
 	<main>
-		{{ .Content.main }}
+		[[ .Content.main ]]
 	</main>
 	<footer>
-		{{ .Footer }}
+		[[ .Footer ]]
 	</footer>
-	{{ .FootScript }}
+	[[ .FootScript ]]
 	</body>
 </html>`
 )
@@ -87,7 +87,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 					},
 				},
 				Footer: "FOOTER",
-				Header: `{{ l10n "key" }}`,
+				Header: `[[ l10n "key" ]]`,
 				Navigations: map[string]string{
 					"main": "NAV",
 				},
@@ -142,7 +142,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 					},
 				},
 				Footer: "FOOTER",
-				Header: `{{ l10n "key" }}`,
+				Header: `[[ l10n "key" ]]`,
 				Navigations: map[string]string{
 					"main": "NAV",
 				},
@@ -197,7 +197,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 					},
 				},
 				Footer: "FOOTER",
-				Header: `{{ l10n "key" }}`,
+				Header: `[[ l10n "key" ]]`,
 				Navigations: map[string]string{
 					"main": "NAV",
 				},
@@ -238,7 +238,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 					},
 				},
 				Footer: "FOOTER",
-				Header: `{{ l10n "key" }}`,
+				Header: `[[ l10n "key" ]]`,
 				Navigations: map[string]string{
 					"main": "NAV",
 				},
@@ -275,8 +275,8 @@ func TestHostHandler_L10nRender(t *testing.T) {
 						Slot:    "main",
 					},
 				},
-				Footer: `FOOTER {{ .Extra.extra }}`,
-				Header: `{{ l10n "key" }}`,
+				Footer: `FOOTER [[ .Extra.extra ]]`,
+				Header: `[[ l10n "key" ]]`,
 				Navigations: map[string]string{
 					"main": "NAV",
 				},
@@ -351,7 +351,7 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 					},
 				},
 				Footer: "FOOTER",
-				Header: `{{ l10n "key" }}`,
+				Header: `[[ l10n "key" ]]`,
 				Navigations: map[string]string{
 					"main": "NAV",
 				},

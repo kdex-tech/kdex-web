@@ -31,7 +31,7 @@ func TestHostHandler_PageCaching(t *testing.T) {
 				BasePath: "/test",
 			},
 		},
-		MainTemplate: "<html><body>{{ .Title }}</body></html>",
+		MainTemplate: "<html><body>[[ .Title ]]</body></html>",
 	}
 	hh.Pages.Set(ph)
 
@@ -94,7 +94,7 @@ func TestHostHandler_NavigationCaching(t *testing.T) {
 			},
 		},
 		Navigations: map[string]string{
-			"main": "<ul><li>{{ .Title }}</li></ul>",
+			"main": "<ul><li>[[ .Title ]]</li></ul>",
 		},
 	}
 	hh.Pages.Set(ph)

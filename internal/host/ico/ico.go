@@ -27,7 +27,7 @@ const svgTemplateDefault = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
           font-weight="bold"
           fill="white" 
           text-anchor="middle" 
-          dominant-baseline="central">{{ .BrandName | trunc 1 }}</text>
+          dominant-baseline="central">[[ .BrandName | trunc 1 ]]</text>
 </svg>`
 
 type Ico struct {

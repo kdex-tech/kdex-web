@@ -9,7 +9,7 @@ const (
 	customElementTemplate = `<%s id="content-%s" data-app-name="%s" data-app-generation="%s"%s></%s>`
 	navigationTemplate    = `<nav id="navigation-%s">
 <script type="text/javascript">
-fetch('/-/navigation/%s/{{ .Language }}%s')
+fetch('/-/navigation/%s/[[ .Language ]]%s')
   .then(response => response.text())
   .then(data => {
     document.getElementById('navigation-%s').innerHTML = data;
