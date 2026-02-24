@@ -223,19 +223,17 @@ func (e *Exchanger) LoginClient(ctx context.Context, clientID, clientSecret stri
 		"grant_type":  "client_credentials",
 	}
 
-	// Determine granted scopes
-	// For M2M, we can implement a policy here. For now, let's allow all requested scopes
-	// that are configured in the system, or just pass them through if we don't have a rigid list.
-	// A better approach for M2M is to have configured scopes per client, but that requires more complex config.
-	// For this iteration, we will grant what is requested.
-	// TODO: Filter scopes based on client configuration if available.
-
+	// Determine granted scopes, filtered by the client's AllowedScopes if configured.
 	requestedScopes := strings.Split(scope, " ")
 	grantedScopes := []string{}
 	for _, s := range requestedScopes {
-		if s != "" {
-			grantedScopes = append(grantedScopes, s)
+		if s == "" {
+			continue
 		}
+		if len(client.AllowedScopes) > 0 && !slices.Contains(client.AllowedScopes, s) {
+			return "", "", "", fmt.Errorf("scope %s not allowed for this client", s)
+		}
+		grantedScopes = append(grantedScopes, s)
 	}
 	grantedScopeStr := strings.Join(grantedScopes, " ")
 	if grantedScopeStr != "" {

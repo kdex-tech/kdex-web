@@ -87,6 +87,12 @@ func (o *OAuth2) AuthorizeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if authClient.RequirePKCE && codeChallenge == "" {
+		err = fmt.Errorf("PKCE is required for this client")
+		http.Error(w, "PKCE required: missing code_challenge", http.StatusBadRequest)
+		return
+	}
+
 	if !slices.Contains(authClient.RedirectURIs, redirectURI) {
 		err = fmt.Errorf("invalid redirect_uri")
 		http.Error(w, "Invalid redirect_uri", http.StatusBadRequest)
