@@ -96,7 +96,7 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 		"Reconciling",
 	)
 
-	internalHost, shouldReturn, r1, err := ResolveHost(ctx, r.Client, &ipr, &ipr.Status.Conditions, &ipr.Spec.HostRef, r.RequeueDelay)
+	internalHost, shouldReturn, r1, err := ResolveHost(ctx, r.Client, &ipr, &ipr.Status.Conditions, &ipr.Spec.HostRef, r.RequeueDelay, false)
 	if shouldReturn {
 		return r1, err
 	}

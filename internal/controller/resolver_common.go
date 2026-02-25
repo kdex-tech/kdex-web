@@ -80,6 +80,7 @@ func ResolveHost(
 	objectConditions *[]metav1.Condition,
 	hostRef *corev1.LocalObjectReference,
 	requeueDelay time.Duration,
+	checkReady bool,
 ) (*kdexv1alpha1.KDexInternalHost, bool, ctrl.Result, error) {
 	if hostRef == nil {
 		return nil, false, ctrl.Result{}, nil
@@ -109,8 +110,10 @@ func ResolveHost(
 		return nil, true, ctrl.Result{}, err
 	}
 
-	if isReady, r1, err := isReady(&host, &host.Status.Conditions, requeueDelay); !isReady {
-		return nil, true, r1, err
+	if checkReady {
+		if isReady, r1, err := isReady(&host, &host.Status.Conditions, requeueDelay); !isReady {
+			return nil, true, r1, err
+		}
 	}
 
 	return &host, false, ctrl.Result{}, nil
