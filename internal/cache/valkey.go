@@ -88,7 +88,6 @@ func (s *ValkeyCache) Set(ctx context.Context, key string, value string) error {
 	prefix := s.prefix
 	s.mu.RUnlock()
 	cmd := s.client.B().Set().Key(prefix + key).Value(value).Px(s.ttl).Build()
-	defer fmt.Print("TTL:", s.TTL())
 	return s.client.Do(ctx, cmd).Error()
 }
 
