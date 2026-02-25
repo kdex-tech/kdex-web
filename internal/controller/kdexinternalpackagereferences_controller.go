@@ -82,7 +82,7 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 			res = ctrl.Result{}
 		}
 
-		log.V(1).Info("status", "status", ipr.Status, "err", err, "res", res)
+		log.V(3).Info("status", "status", ipr.Status, "err", err, "res", res)
 	}()
 
 	kdexv1alpha1.SetConditions(

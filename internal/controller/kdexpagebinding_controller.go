@@ -86,7 +86,7 @@ func (r *KDexPageBindingReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			r.HostHandler.Pages.Delete(pageBinding.Name)
 		}
 
-		log.V(1).Info("status", "status", pageBinding.Status, "err", err, "res", res)
+		log.V(3).Info("status", "status", pageBinding.Status, "err", err, "res", res)
 	}()
 
 	if pageBinding.DeletionTimestamp.IsZero() {

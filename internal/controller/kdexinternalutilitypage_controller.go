@@ -88,7 +88,7 @@ func (r *KDexInternalUtilityPageReconciler) Reconcile(ctx context.Context, req c
 			r.HostHandler.RemoveUtilityPage(internalUtilityPage.Name)
 		}
 
-		log.V(1).Info("status", "status", internalUtilityPage.Status, "err", err, "res", res)
+		log.V(3).Info("status", "status", internalUtilityPage.Status, "err", err, "res", res)
 	}()
 
 	if internalUtilityPage.DeletionTimestamp.IsZero() {

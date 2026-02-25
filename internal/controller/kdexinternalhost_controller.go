@@ -100,7 +100,7 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			res = ctrl.Result{}
 		}
 
-		log.V(1).Info("status", "status", internalHost.Status, "err", err, "res", res)
+		log.V(3).Info("status", "status", internalHost.Status, "err", err, "res", res)
 	}()
 
 	kdexv1alpha1.SetConditions(

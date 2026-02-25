@@ -72,7 +72,7 @@ func (r *KDexInternalTranslationReconciler) Reconcile(ctx context.Context, req c
 			res = ctrl.Result{}
 		}
 
-		log.V(1).Info("status", "status", translation.Status, "err", err, "res", res)
+		log.V(3).Info("status", "status", translation.Status, "err", err, "res", res)
 	}()
 
 	if translation.DeletionTimestamp.IsZero() {
