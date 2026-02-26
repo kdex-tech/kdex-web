@@ -600,8 +600,8 @@ func (hh *HostHandler) openapiHandler(mux *http.ServeMux, registeredPaths map[st
 }
 
 func (hh *HostHandler) schemaHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {
+	// TODO: Add support to just list all known schemas in an HTML list with links to each schema.
 	const path = "/-/schema/{path...}"
-
 	mux.HandleFunc("GET "+path, hh.SchemaGet)
 
 	// Register the path itself so it appears in the spec
