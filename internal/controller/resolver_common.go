@@ -17,6 +17,7 @@ import (
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 func ResolveContents(
@@ -324,7 +325,9 @@ func ResolveServiceAccountSecrets(ctx context.Context, c client.Client, namespac
 		// corev1.ObjectReference but in ServiceAccount context usually LocalObjectReference semantics but typed as ObjectReference
 		// Check the type: ServiceAccount.Secrets is []ObjectReference.
 		if err := c.Get(ctx, types.NamespacedName{Name: secretRef.Name, Namespace: namespace}, &secret); err != nil {
-			return nil, fmt.Errorf("failed to get secret %s/%s referenced by service account %s: %w", namespace, secretRef.Name, saName, err)
+			// log a warning and skip this secret
+			logf.FromContext(ctx).V(1).Info("failed to get secret", "namespace", namespace, "name", secretRef.Name, "error", err)
+			continue
 		}
 
 		secrets = append(secrets, secret)

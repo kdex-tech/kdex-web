@@ -123,6 +123,7 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 		ConfigMap:         configMap,
 		Log:               log,
 		NPMSecretRef:      ipr.Spec.NPMSecretRef,
+		PackageBuilder:    &r.Configuration.PackageBuilder,
 		Scheme:            r.Scheme,
 		ServiceAccountRef: ipr.Spec.ServiceAccountRef,
 	}
@@ -186,8 +187,8 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 
 		var terminationMessage string
 		for _, containerStatus := range pod.Status.ContainerStatuses {
-			if containerStatus.Name == "kaniko" && containerStatus.State.Terminated != nil {
-				terminationMessage = containerStatus.State.Terminated.Message
+			if containerStatus.Name == "packager" && containerStatus.State.Terminated != nil {
+				terminationMessage = strings.TrimSpace(containerStatus.State.Terminated.Message)
 				break
 			}
 		}
@@ -228,7 +229,7 @@ func (r *KDexInternalPackageReferencesReconciler) Reconcile(ctx context.Context,
 		}
 
 		ipr.Status.Attributes["image"] = fmt.Sprintf(
-			"%s/%s@%s", internalHost.Spec.Registries.ImageRegistry.Host, ipr.Name, imageDigest,
+			"%s/%s/packages:%d@%s", internalHost.Spec.Registries.ImageRegistry.Host, ipr.Name, ipr.Generation, imageDigest,
 		)
 		ipr.Status.Attributes["importmap"] = importmap
 	}

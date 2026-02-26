@@ -15,6 +15,7 @@ import (
 	"github.com/kdex-tech/kdex-host/internal/sniffer"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message/catalog"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -25,8 +26,14 @@ const (
 	data-navigation-endpoint="/-/navigation/{name}/{l10n}/{basePathMinusLeadingSlash...}"
 	data-openapi-endpoint="/-/openapi"
 	data-page-basepath="%s"
-	data-page-patternpath="%s"
+	data-path-check="/-/check"
+	data-path-login="/-/login"
+	data-path-logout="/-/logout"
+	data-path-patternpath="%s"
+	data-path-state="/-/state"
 	data-path-separator="/-/"
+	data-path-translations="/-/translations/{l10n}"
+	data-status="%s"
 	/>
 	`
 )
@@ -47,6 +54,7 @@ type HostHandler struct {
 	authExchanger             *auth.Exchanger
 	cacheManager              cache.CacheManager
 	client                    client.Client
+	conditions                *[]metav1.Condition
 	defaultLanguage           string
 	favicon                   *ico.Ico
 	functions                 []kdexv1alpha1.KDexFunction
@@ -69,6 +77,15 @@ type HostHandler struct {
 	translationResources map[string]kdexv1alpha1.KDexTranslationSpec
 	utilityPages         map[kdexv1alpha1.KDexUtilityPageType]page.PageHandler
 }
+
+type HostStatus string
+
+const (
+	HostStatusInitializing HostStatus = "Initializing"
+	HostStatusReady        HostStatus = "Ready"
+	HostStatusDegraded     HostStatus = "Degraded"
+	HostStatusProgressing  HostStatus = "Progressing"
+)
 
 func NewHostHandler(c client.Client, name string, namespace string, log logr.Logger, cacheManager cache.CacheManager) *HostHandler {
 	hh := &HostHandler{

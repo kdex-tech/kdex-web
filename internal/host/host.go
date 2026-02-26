@@ -21,6 +21,8 @@ import (
 	"github.com/kdex-tech/kdex-host/internal/utils"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	"kdex.dev/crds/render"
 )
@@ -47,10 +49,6 @@ func (hh *HostHandler) AddOrUpdateUtilityPage(ph page.PageHandler) {
 	hh.RebuildMux()
 }
 
-func (hh *HostHandler) GetCacheManager() cache.CacheManager {
-	return hh.cacheManager
-}
-
 func (hh *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	var buffer bytes.Buffer
 	separator := ""
@@ -69,10 +67,33 @@ func (hh *HostHandler) FootScriptToHTML(handler page.PageHandler) string {
 	return buffer.String()
 }
 
+func (hh *HostHandler) GetCacheManager() cache.CacheManager {
+	return hh.cacheManager
+}
+
 func (hh *HostHandler) GetOpenAPIBuilder() *ko.Builder {
 	hh.mu.RLock()
 	defer hh.mu.RUnlock()
 	return &hh.openapiBuilder
+}
+
+func (hh *HostHandler) GetStatus() HostStatus {
+	hh.mu.RLock()
+	defer hh.mu.RUnlock()
+
+	if hh.host != nil {
+		if meta.IsStatusConditionTrue(*hh.conditions, string(kdexv1alpha1.ConditionTypeReady)) {
+			return HostStatusReady
+		}
+		if meta.IsStatusConditionTrue(*hh.conditions, string(kdexv1alpha1.ConditionTypeProgressing)) {
+			return HostStatusProgressing
+		}
+		if meta.IsStatusConditionTrue(*hh.conditions, string(kdexv1alpha1.ConditionTypeDegraded)) {
+			return HostStatusDegraded
+		}
+	}
+
+	return HostStatusInitializing
 }
 
 func (hh *HostHandler) GetUtilityPageHandler(name kdexv1alpha1.KDexUtilityPageType) page.PageHandler {
@@ -133,7 +154,7 @@ func (hh *HostHandler) L10nRender(
 
 	renderer := render.Renderer{
 		BasePath:        handler.BasePath(),
-		BrandName:       hh.host.BrandName,
+		BrandName:       hh.getBrandName(),
 		Contents:        handler.ContentToHTMLMap(),
 		DefaultLanguage: hh.defaultLanguage,
 		Extra:           maps.Clone(extraTemplateData),
@@ -147,7 +168,7 @@ func (hh *HostHandler) L10nRender(
 		MessagePrinter:  hh.messagePrinter(translations, l),
 		Meta:            hh.MetaToString(handler, l),
 		Navigations:     handler.NavigationToHTMLMap(),
-		Organization:    hh.host.Organization,
+		Organization:    hh.getOrganization(),
 		PageMap:         maps.Clone(pageMap),
 		PatternPath:     handler.PatternPath(),
 		TemplateContent: handler.MainTemplate,
@@ -179,7 +200,7 @@ func (hh *HostHandler) L10nRenders(
 func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) string {
 	var buffer bytes.Buffer
 
-	if len(hh.host.Assets) > 0 {
+	if hh.host != nil && len(hh.host.Assets) > 0 {
 		buffer.WriteString(hh.host.Assets.String())
 		buffer.WriteRune('\n')
 	}
@@ -198,11 +219,8 @@ func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 		kdexUIMetaTemplate,
 		basePath,
 		patternPath,
+		hh.GetStatus(),
 	)
-
-	// data-check-batch-endpoint="/-/check/batch"
-	// data-check-single-endpoint="/-/check/single"
-	// data-state-endpoint="/-/state"
 
 	return buffer.String()
 }
@@ -235,43 +253,8 @@ func (hh *HostHandler) RebuildMux() {
 	pageHandlers := hh.Pages.List()
 
 	if len(pageHandlers) == 0 && len(hh.functions) == 0 {
-		handler := func(w http.ResponseWriter, r *http.Request) {
-			l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			if hh.applyCachingHeaders(w, r, nil, hh.reconcileTime) {
-				return
-			}
-
-			rendered := hh.renderUtilityPage(
-
-				kdexv1alpha1.AnnouncementUtilityPageType,
-				l,
-				map[string]any{},
-				&hh.Translations,
-			)
-
-			if rendered == "" {
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-
-			hh.log.V(1).Info("serving announcement page", "language", l.String())
-
-			w.Header().Set("Content-Language", l.String())
-			w.Header().Set("Content-Type", "text/html")
-
-			_, err = w.Write([]byte(rendered))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
-		}
-
-		mux.HandleFunc("GET /{$}", handler)
-		mux.HandleFunc("GET /{l10n}/{$}", handler)
+		mux.HandleFunc("GET /{$}", hh.notReadyHandler)
+		mux.HandleFunc("GET /{l10n}/{$}", hh.notReadyHandler)
 
 		hh.mu.RUnlock()
 		hh.mu.Lock()
@@ -283,7 +266,7 @@ func (hh *HostHandler) RebuildMux() {
 		return
 	}
 
-	renderedPages := []pageRender{}
+	renderedPages := map[string]pageRender{}
 	for _, ph := range pageHandlers {
 		basePath := ph.BasePath()
 
@@ -292,7 +275,7 @@ func (hh *HostHandler) RebuildMux() {
 			continue
 		}
 
-		renderedPages = append(renderedPages, pageRender{ph: ph})
+		renderedPages[basePath] = pageRender{ph: ph}
 	}
 
 	functionHandlers := []functionHandler{}
@@ -418,6 +401,11 @@ func (hh *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	mux := hh.Mux
 	hh.mu.RUnlock()
 
+	if hh.GetStatus() == HostStatusInitializing {
+		hh.notReadyHandler(w, r)
+		return
+	}
+
 	if mux == nil {
 		hh.serveError(w, r, http.StatusNotFound, "not found")
 		return
@@ -431,6 +419,7 @@ func (hh *HostHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (hh *HostHandler) SetHost(
 	ctx context.Context,
 	host *kdexv1alpha1.KDexHostSpec,
+	conditions *[]metav1.Condition,
 	generation int64,
 	packageReferences []kdexv1alpha1.PackageReference,
 	themeAssets []kdexv1alpha1.Asset,
@@ -444,6 +433,7 @@ func (hh *HostHandler) SetHost(
 ) {
 	hh.mu.Lock()
 	hh.host = host
+	hh.conditions = conditions
 	if err := hh.cacheManager.Cycle(generation, true); err != nil {
 		hh.log.Error(err, "failed to cycle cache manager")
 	}
@@ -530,6 +520,20 @@ func (hh *HostHandler) availableLanguages(translations *Translations) []string {
 	}
 
 	return availableLangs
+}
+
+func (hh *HostHandler) getBrandName() string {
+	if hh.host == nil {
+		return ""
+	}
+	return hh.host.BrandName
+}
+
+func (hh *HostHandler) getOrganization() string {
+	if hh.host == nil {
+		return ""
+	}
+	return hh.host.Organization
 }
 
 func (hh *HostHandler) isSecure() bool {

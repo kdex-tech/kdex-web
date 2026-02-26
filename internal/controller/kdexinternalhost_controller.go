@@ -426,8 +426,6 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		},
 	}
 
-	importMap := ""
-
 	if len(uniquePackageRefs) == 0 {
 		log.V(2).Info("deleting host package references", "packageReferences", internalPackageReferences.Name)
 
@@ -457,7 +455,8 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			return r1, err
 		}
 
-		importMap = internalPackageReferences.Status.Attributes["importmap"]
+		internalHost.Status.Attributes["packages.image"] = internalPackageReferences.Status.Attributes["image"]
+		internalHost.Status.Attributes["packages.importmap"] = internalPackageReferences.Status.Attributes["importmap"]
 	}
 
 	if internalPackageReferences != nil {
@@ -482,13 +481,14 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 
 	backendOps := map[string]controllerutil.OperationResult{}
-	deployments := make([]*appsv1.Deployment, len(requiredBackends))
+	deployments := make([]*appsv1.Deployment, 0, len(requiredBackends))
 
-	for i, backend := range requiredBackends {
+	for _, backend := range requiredBackends {
 		keyBase := fmt.Sprintf("%s/%s", strings.ToLower(backend.Kind), backend.Name)
 		name := fmt.Sprintf("%s-%s", internalHost.Name, backend.Name)
 
-		backendOps[keyBase+"/deployment"], deployments[i], err = r.createOrUpdateBackendDeployment(ctx, &internalHost, name, backend)
+		var dep *appsv1.Deployment
+		backendOps[keyBase+"/deployment"], dep, err = r.createOrUpdateBackendDeployment(ctx, &internalHost, name, backend)
 		if err != nil {
 			kdexv1alpha1.SetConditions(
 				&internalHost.Status.Conditions,
@@ -515,6 +515,9 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				err.Error(),
 			)
 			return ctrl.Result{}, err
+		}
+		if dep != nil {
+			deployments = append(deployments, dep)
 		}
 	}
 
@@ -554,25 +557,6 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 				err.Error(),
 			)
 			return ctrl.Result{}, err
-		}
-	}
-
-	for _, dep := range deployments {
-		for _, cond := range dep.Status.Conditions {
-			if cond.Type == appsv1.DeploymentAvailable && cond.Status != corev1.ConditionTrue {
-				kdexv1alpha1.SetConditions(
-					&internalHost.Status.Conditions,
-					kdexv1alpha1.ConditionStatuses{
-						Degraded:    metav1.ConditionFalse,
-						Progressing: metav1.ConditionTrue,
-						Ready:       metav1.ConditionFalse,
-					},
-					kdexv1alpha1.ConditionReasonReconciling,
-					fmt.Sprintf("Waiting for deployment/%s to be ready.", dep.Name),
-				)
-				return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
-			}
-			internalHost.Status.Attributes[dep.Name+".deployment"] = "ready"
 		}
 	}
 
@@ -660,17 +644,51 @@ func (r *KDexInternalHostReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	r.HostHandler.SetHost(
 		ctx,
 		&internalHost.Spec.KDexHostSpec,
+		&internalHost.Status.Conditions,
 		internalHost.Generation,
 		uniquePackageRefs,
 		themeAssets,
 		uniqueScriptDefs,
-		importMap,
+		internalHost.Status.Attributes["packages.importmap"],
 		r.collectInitialPaths(requiredBackends, functions),
 		functions.Items,
 		authExchanger,
 		authConfig,
 		internalHost.Spec.Routing.Scheme,
 	)
+
+	for _, dep := range deployments {
+		if dep == nil {
+			continue
+		}
+		ready := false
+		for _, cond := range dep.Status.Conditions {
+			if cond.Type == appsv1.DeploymentAvailable && cond.Status == corev1.ConditionTrue {
+				ready = true
+			}
+		}
+		if !ready {
+			kdexv1alpha1.SetConditions(
+				&internalHost.Status.Conditions,
+				kdexv1alpha1.ConditionStatuses{
+					Degraded:    metav1.ConditionFalse,
+					Progressing: metav1.ConditionTrue,
+					Ready:       metav1.ConditionFalse,
+				},
+				kdexv1alpha1.ConditionReasonReconciling,
+				fmt.Sprintf("Waiting for deployment/%s to be ready.", dep.Name),
+			)
+
+			log.V(2).Info(
+				"waiting for deployments",
+				"deployment", dep.Name,
+				"conditions", dep.Status.Conditions,
+			)
+
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
+		}
+		internalHost.Status.Attributes[dep.Name+".deployment"] = "ready"
+	}
 
 	kdexv1alpha1.SetConditions(
 		&internalHost.Status.Conditions,

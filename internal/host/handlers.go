@@ -7,8 +7,10 @@ import (
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
 	"github.com/kdex-tech/kdex-host/internal/auth"
+	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
 	ko "github.com/kdex-tech/kdex-host/internal/openapi"
 	"github.com/kdex-tech/kdex-host/internal/utils"
+	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 
 func (hh *HostHandler) addHandlerAndRegister(mux *http.ServeMux, pr pageRender, registeredPaths map[string]ko.PathInfo, translations *Translations) {
@@ -463,6 +465,40 @@ func (hh *HostHandler) navigationHandler(mux *http.ServeMux, registeredPaths map
 		},
 		Type: ko.SystemPathType,
 	}, registeredPaths)
+}
+
+func (hh *HostHandler) notReadyHandler(w http.ResponseWriter, r *http.Request) {
+	l, err := kdexhttp.GetLang(r, hh.defaultLanguage, hh.Translations.Languages())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if hh.applyCachingHeaders(w, r, nil, hh.reconcileTime) {
+		return
+	}
+
+	rendered := hh.renderUtilityPage(
+		kdexv1alpha1.AnnouncementUtilityPageType,
+		l,
+		map[string]any{},
+		&hh.Translations,
+	)
+
+	if rendered == "" {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	hh.log.V(1).Info("serving announcement page", "language", l.String())
+
+	w.Header().Set("Content-Language", l.String())
+	w.Header().Set("Content-Type", "text/html")
+
+	_, err = w.Write([]byte(rendered))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func (hh *HostHandler) oauthHandler(mux *http.ServeMux, registeredPaths map[string]ko.PathInfo) {

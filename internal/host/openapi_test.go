@@ -33,7 +33,7 @@ func TestHostHandler_openapiHandler(t *testing.T) {
 		Routing: kdexv1alpha1.Routing{
 			Domains: []string{"test.example.com"},
 		},
-	}, 0, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
+	}, nil, 0, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
 
 	mux := th.muxWithDefaultsLocked(th.registeredPaths) // registeredPaths is empty, but muxWithDefaultsLocked populates it for defaults
 

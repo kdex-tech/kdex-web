@@ -43,7 +43,7 @@ func NewICO(svgTemplate string, data render.TemplateData) *Ico {
 
 	return &Ico{
 		data:          data,
-		template:      template.Must(template.New("favicon").Funcs(sprig.FuncMap()).Parse(svgTemplate)),
+		template:      template.Must(template.New("favicon").Funcs(sprig.FuncMap()).Delims("[[", "]]").Parse(svgTemplate)),
 		reconcileTime: time.Now(),
 	}
 }

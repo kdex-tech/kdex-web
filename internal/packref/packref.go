@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
+	"kdex.dev/crds/configuration"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -22,6 +23,7 @@ type PackRef struct {
 	ConfigMap         *corev1.ConfigMap
 	Log               logr.Logger
 	NPMSecretRef      *corev1.LocalObjectReference
+	PackageBuilder    *configuration.PackageBuilder
 	Scheme            *runtime.Scheme
 	ServiceAccountRef corev1.LocalObjectReference
 }
@@ -36,27 +38,6 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 	}
 	if !errors.IsNotFound(err) {
 		return nil, err
-	}
-
-	env := []corev1.EnvVar{
-		{
-			Name:  "WORKDIR",
-			Value: internal.WORKDIR,
-		},
-	}
-
-	imageTag := fmt.Sprintf("%d", ipr.Generation)
-	imageURL := fmt.Sprintf("%s/%s:%s", p.ImageRegistry.Host, ipr.Name, imageTag)
-
-	builderArgs := []string{
-		"--dockerfile=/scripts/Dockerfile",
-		"--context=dir://" + internal.WORKDIR,
-		"--destination=" + imageURL,
-		"--digest-file=/dev/termination-log",
-	}
-
-	if p.ImageRegistry.Insecure {
-		builderArgs = append(builderArgs, "--insecure")
 	}
 
 	volumes := []corev1.Volume{
@@ -76,6 +57,20 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 				},
 			},
 		},
+	}
+
+	imagePullSecret := ""
+
+	if len(ipr.Spec.BuilderImagePullSecrets) > 0 {
+		imagePullSecret = ipr.Spec.BuilderImagePullSecrets[0].Name
+		volumes = append(volumes, corev1.Volume{
+			Name: imagePullSecret,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: imagePullSecret,
+				},
+			},
+		})
 	}
 
 	if p.NPMSecretRef != nil {
@@ -101,12 +96,51 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 		},
 	}
 
+	if imagePullSecret != "" {
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      imagePullSecret,
+			MountPath: "/var/run/secrets/image-pull-secrets/" + imagePullSecret,
+			ReadOnly:  true,
+		})
+	}
+
 	if p.NPMSecretRef != nil {
 		volumeMounts = append(volumeMounts, corev1.VolumeMount{
 			Name:      "npmrc",
 			MountPath: internal.WORKDIR + "/.npmrc",
 			SubPath:   ".npmrc",
 			ReadOnly:  true,
+		})
+	}
+
+	imageURL := fmt.Sprintf("%s/%s/packages:%d", p.ImageRegistry.Host, ipr.Name, ipr.Generation)
+
+	env := []corev1.EnvVar{
+		{
+			Name:  "IMAGE_URL",
+			Value: imageURL,
+		},
+		{
+			Name:  "PACKAGING_DIR",
+			Value: internal.WORKDIR + "/node_modules",
+		},
+		{
+			Name:  "WORKDIR",
+			Value: internal.WORKDIR,
+		},
+	}
+
+	if imagePullSecret != "" {
+		env = append(env, corev1.EnvVar{
+			Name:  "IMAGE_PULL_SECRET",
+			Value: "/var/run/secrets/image-pull-secrets/" + imagePullSecret + "/.dockerconfigjson",
+		})
+	}
+
+	if p.ImageRegistry.Insecure {
+		env = append(env, corev1.EnvVar{
+			Name:  "ORAS_ARGS",
+			Value: "--plain-http",
 		})
 	}
 
@@ -137,12 +171,13 @@ func (p *PackRef) GetOrCreatePackRefJob(ctx context.Context, ipr *kdexv1alpha1.K
 					AutomountServiceAccountToken: new(true),
 					Containers: []corev1.Container{
 						{
-							Name: "kaniko",
+							Name: "packager",
 
-							Args:         builderArgs,
-							Env:          env,
-							Image:        "gcr.io/kaniko-project/executor:latest",
-							VolumeMounts: volumeMounts,
+							Command:         []string{"package_image"},
+							Env:             env,
+							Image:           p.PackageBuilder.Image,
+							ImagePullPolicy: p.PackageBuilder.ImagePullPolicy,
+							VolumeMounts:    volumeMounts,
 						},
 					},
 					ImagePullSecrets: ipr.Spec.BuilderImagePullSecrets,

@@ -294,7 +294,7 @@ func TestHostHandler_L10nRender(t *testing.T) {
 
 			cacheManager, _ := cache.NewCacheManager("", "", nil)
 			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard(), cacheManager)
-			th.SetHost(context.Background(), &tt.host.host, 0, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
+			th.SetHost(context.Background(), &tt.host.host, nil, 0, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
 			got, gotErr := th.L10nRender(tt.pageHandler, map[string]any{}, language.Make(tt.lang), tt.extraTemplateData, &th.Translations)
@@ -389,7 +389,7 @@ func TestHostHandler_L10nRenders(t *testing.T) {
 
 			cacheManager, _ := cache.NewCacheManager("", "", nil)
 			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard(), cacheManager)
-			th.SetHost(context.Background(), &tt.host.host, 0, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
+			th.SetHost(context.Background(), &tt.host.host, nil, 0, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
 			got := th.L10nRenders(tt.pageHandler, map[language.Tag]map[string]any{}, &th.Translations)
@@ -475,7 +475,7 @@ func TestHostHandler_AddOrUpdateTranslation(t *testing.T) {
 
 			cacheManager, _ := cache.NewCacheManager("", "", nil)
 			th := NewHostHandler(nil, tt.host.name, "default", logr.Discard(), cacheManager)
-			th.SetHost(context.Background(), &tt.host.host, 0, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
+			th.SetHost(context.Background(), &tt.host.host, nil, 0, nil, nil, nil, "", map[string]ko.PathInfo{}, nil, nil, nil, "http")
 			th.AddOrUpdateTranslation(tt.translationName, tt.translation)
 
 			for lang, expected := range tt.langTests {

@@ -39,7 +39,7 @@ func TestHostHandler_PageCaching(t *testing.T) {
 	hh.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
 		BrandName:   "KDex",
-	}, 0, nil, nil, nil, "", nil, nil, &auth.Exchanger{}, &auth.Config{}, "http")
+	}, nil, 0, nil, nil, nil, "", nil, nil, &auth.Exchanger{}, &auth.Config{}, "http")
 
 	// 1. Initial Request
 	req := httptest.NewRequest("GET", "/test/", nil)
@@ -102,7 +102,7 @@ func TestHostHandler_NavigationCaching(t *testing.T) {
 	hh.SetHost(context.Background(), &kdexv1alpha1.KDexHostSpec{
 		DefaultLang: "en",
 		BrandName:   "KDex",
-	}, 0, nil, nil, nil, "", nil, nil, &auth.Exchanger{}, &auth.Config{}, "http")
+	}, nil, 0, nil, nil, nil, "", nil, nil, &auth.Exchanger{}, &auth.Config{}, "http")
 
 	// 1. Initial Request
 	req := httptest.NewRequest("GET", "/-/navigation/main/en/test", nil)
