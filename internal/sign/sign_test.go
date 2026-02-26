@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/kdex-tech/dmapper"
-	"github.com/kdex-tech/kdex-host/internal/keys"
-	"github.com/kdex-tech/kdex-host/internal/sign"
+	"github.com/kdex-tech/host-manager/internal/keys"
+	"github.com/kdex-tech/host-manager/internal/sign"
 	"github.com/stretchr/testify/assert"
 )
 

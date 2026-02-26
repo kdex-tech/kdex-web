@@ -3,7 +3,7 @@ package utils_test
 import (
 	"testing"
 
-	"github.com/kdex-tech/kdex-host/internal/utils"
+	"github.com/kdex-tech/host-manager/internal/utils"
 	. "github.com/onsi/gomega"
 )
 

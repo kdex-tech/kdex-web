@@ -1,4 +1,4 @@
-module github.com/kdex-tech/kdex-host
+module github.com/kdex-tech/host-manager
 
 go 1.26.0
 

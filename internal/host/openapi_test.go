@@ -9,8 +9,8 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-logr/logr"
-	"github.com/kdex-tech/kdex-host/internal/cache"
-	ko "github.com/kdex-tech/kdex-host/internal/openapi"
+	"github.com/kdex-tech/host-manager/internal/cache"
+	ko "github.com/kdex-tech/host-manager/internal/openapi"
 	G "github.com/onsi/gomega"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )

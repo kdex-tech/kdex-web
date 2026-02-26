@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kdex-tech/kdex-host/internal"
-	kjob "github.com/kdex-tech/kdex-host/internal/job"
-	"github.com/kdex-tech/kdex-host/internal/packref"
+	"github.com/kdex-tech/host-manager/internal"
+	kjob "github.com/kdex-tech/host-manager/internal/job"
+	"github.com/kdex-tech/host-manager/internal/packref"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

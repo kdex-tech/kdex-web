@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kdex-tech/kdex-host/internal/cache"
-	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
-	"github.com/kdex-tech/kdex-host/internal/page"
+	"github.com/kdex-tech/host-manager/internal/cache"
+	kdexhttp "github.com/kdex-tech/host-manager/internal/http"
+	"github.com/kdex-tech/host-manager/internal/page"
 	"golang.org/x/text/language"
 )
 

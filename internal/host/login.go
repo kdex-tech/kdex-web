@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/kdex-tech/kdex-host/internal/auth"
-	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
+	"github.com/kdex-tech/host-manager/internal/auth"
+	kdexhttp "github.com/kdex-tech/host-manager/internal/http"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 

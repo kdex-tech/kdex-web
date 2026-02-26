@@ -50,10 +50,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kdex-tech/kdex-host/internal/cache"
-	"github.com/kdex-tech/kdex-host/internal/controller"
-	"github.com/kdex-tech/kdex-host/internal/host"
-	"github.com/kdex-tech/kdex-host/internal/web/server"
+	"github.com/kdex-tech/host-manager/internal/cache"
+	"github.com/kdex-tech/host-manager/internal/controller"
+	"github.com/kdex-tech/host-manager/internal/host"
+	"github.com/kdex-tech/host-manager/internal/web/server"
 
 	_ "net/http/pprof"
 	// +kubebuilder:scaffold:imports

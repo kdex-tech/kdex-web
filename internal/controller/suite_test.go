@@ -29,8 +29,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kdex-tech/kdex-host/internal/cache"
-	"github.com/kdex-tech/kdex-host/internal/host"
+	"github.com/kdex-tech/host-manager/internal/cache"
+	"github.com/kdex-tech/host-manager/internal/host"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"

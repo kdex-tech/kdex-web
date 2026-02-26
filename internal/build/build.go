@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kdex-tech/kdex-host/internal"
+	"github.com/kdex-tech/host-manager/internal"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"

@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kdex-tech/kdex-host/internal"
+	"github.com/kdex-tech/host-manager/internal"
 	"github.com/oasdiff/yaml"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"

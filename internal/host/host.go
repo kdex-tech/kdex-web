@@ -11,14 +11,14 @@ import (
 	"time"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
-	"github.com/kdex-tech/kdex-host/internal/auth"
-	"github.com/kdex-tech/kdex-host/internal/cache"
-	"github.com/kdex-tech/kdex-host/internal/host/ico"
-	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
-	ko "github.com/kdex-tech/kdex-host/internal/openapi"
-	"github.com/kdex-tech/kdex-host/internal/page"
-	"github.com/kdex-tech/kdex-host/internal/sniffer"
-	"github.com/kdex-tech/kdex-host/internal/utils"
+	"github.com/kdex-tech/host-manager/internal/auth"
+	"github.com/kdex-tech/host-manager/internal/cache"
+	"github.com/kdex-tech/host-manager/internal/host/ico"
+	kdexhttp "github.com/kdex-tech/host-manager/internal/http"
+	ko "github.com/kdex-tech/host-manager/internal/openapi"
+	"github.com/kdex-tech/host-manager/internal/page"
+	"github.com/kdex-tech/host-manager/internal/sniffer"
+	"github.com/kdex-tech/host-manager/internal/utils"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -82,6 +82,10 @@ func (hh *HostHandler) GetStatus() HostStatus {
 	defer hh.mu.RUnlock()
 
 	if hh.host != nil {
+		if hh.conditions == nil {
+			return HostStatusDegraded
+		}
+
 		if meta.IsStatusConditionTrue(*hh.conditions, string(kdexv1alpha1.ConditionTypeReady)) {
 			return HostStatusReady
 		}

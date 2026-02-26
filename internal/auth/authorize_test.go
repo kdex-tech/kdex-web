@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kdex-tech/kdex-host/internal/auth/idtoken"
-	"github.com/kdex-tech/kdex-host/internal/keys"
-	"github.com/kdex-tech/kdex-host/internal/sign"
+	"github.com/kdex-tech/host-manager/internal/auth/idtoken"
+	"github.com/kdex-tech/host-manager/internal/keys"
+	"github.com/kdex-tech/host-manager/internal/sign"
 	G "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )

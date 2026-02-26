@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kdex-tech/kdex-host/internal"
-	"github.com/kdex-tech/kdex-host/internal/host"
+	"github.com/kdex-tech/host-manager/internal"
+	"github.com/kdex-tech/host-manager/internal/host"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"

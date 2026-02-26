@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
-	ko "github.com/kdex-tech/kdex-host/internal/openapi"
+	ko "github.com/kdex-tech/host-manager/internal/openapi"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

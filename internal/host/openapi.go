@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	ko "github.com/kdex-tech/kdex-host/internal/openapi"
+	ko "github.com/kdex-tech/host-manager/internal/openapi"
 )
 
 func (hh *HostHandler) OpenAPIGet(w http.ResponseWriter, r *http.Request) {

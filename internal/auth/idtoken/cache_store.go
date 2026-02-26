@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kdex-tech/kdex-host/internal/cache"
+	"github.com/kdex-tech/host-manager/internal/cache"
 )
 
 type CacheIDTokenStore struct {

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/kdex-tech/kdex-host/internal/keys"
-	"github.com/kdex-tech/kdex-host/internal/sign"
+	"github.com/kdex-tech/host-manager/internal/keys"
+	"github.com/kdex-tech/host-manager/internal/sign"
 	"github.com/stretchr/testify/assert"
 )
 

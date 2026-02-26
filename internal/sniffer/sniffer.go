@@ -13,9 +13,9 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	openapi "github.com/getkin/kin-openapi/openapi3"
-	kh "github.com/kdex-tech/kdex-host/internal/http"
-	"github.com/kdex-tech/kdex-host/internal/mime"
-	ko "github.com/kdex-tech/kdex-host/internal/openapi"
+	kh "github.com/kdex-tech/host-manager/internal/http"
+	"github.com/kdex-tech/host-manager/internal/mime"
+	ko "github.com/kdex-tech/host-manager/internal/openapi"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"

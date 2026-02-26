@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
-	"github.com/kdex-tech/kdex-host/internal/auth"
-	"github.com/kdex-tech/kdex-host/internal/cache"
-	"github.com/kdex-tech/kdex-host/internal/page"
+	"github.com/kdex-tech/host-manager/internal/auth"
+	"github.com/kdex-tech/host-manager/internal/cache"
+	"github.com/kdex-tech/host-manager/internal/page"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"

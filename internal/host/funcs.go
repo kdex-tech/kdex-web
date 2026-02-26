@@ -11,8 +11,8 @@ import (
 	"time"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
-	kh "github.com/kdex-tech/kdex-host/internal/http"
-	ko "github.com/kdex-tech/kdex-host/internal/openapi"
+	kh "github.com/kdex-tech/host-manager/internal/http"
+	ko "github.com/kdex-tech/host-manager/internal/openapi"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 

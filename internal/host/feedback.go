@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	ko "github.com/kdex-tech/kdex-host/internal/openapi"
-	"github.com/kdex-tech/kdex-host/internal/sniffer"
+	ko "github.com/kdex-tech/host-manager/internal/openapi"
+	"github.com/kdex-tech/host-manager/internal/sniffer"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )

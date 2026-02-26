@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	openapi "github.com/getkin/kin-openapi/openapi3"
-	"github.com/kdex-tech/kdex-host/internal/utils"
+	"github.com/kdex-tech/host-manager/internal/utils"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 )
 

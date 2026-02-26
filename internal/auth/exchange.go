@@ -17,7 +17,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/cel-go/cel"
 	"github.com/kdex-tech/dmapper"
-	"github.com/kdex-tech/kdex-host/internal/cache"
+	"github.com/kdex-tech/host-manager/internal/cache"
 	"golang.org/x/oauth2"
 )
 

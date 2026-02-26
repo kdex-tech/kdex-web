@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kdex-tech/kdex-host/internal/page"
+	"github.com/kdex-tech/host-manager/internal/page"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"

@@ -22,8 +22,8 @@ import (
 	"maps"
 	"time"
 
-	"github.com/kdex-tech/kdex-host/internal/host"
-	"github.com/kdex-tech/kdex-host/internal/page"
+	"github.com/kdex-tech/host-manager/internal/host"
+	"github.com/kdex-tech/host-manager/internal/page"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

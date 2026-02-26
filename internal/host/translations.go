@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	kdexhttp "github.com/kdex-tech/kdex-host/internal/http"
+	kdexhttp "github.com/kdex-tech/host-manager/internal/http"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message/catalog"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"

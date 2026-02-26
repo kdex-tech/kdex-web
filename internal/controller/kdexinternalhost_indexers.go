@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kdex-tech/kdex-host/internal"
+	"github.com/kdex-tech/host-manager/internal"
 	kdexv1alpha1 "kdex.dev/crds/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
