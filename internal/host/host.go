@@ -223,7 +223,6 @@ func (hh *HostHandler) MetaToString(handler page.PageHandler, l language.Tag) st
 		kdexUIMetaTemplate,
 		basePath,
 		patternPath,
-		hh.GetStatus(),
 	)
 
 	return buffer.String()

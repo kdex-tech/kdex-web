@@ -33,7 +33,6 @@ const (
 	data-path-state="/-/state"
 	data-path-separator="/-/"
 	data-path-translations="/-/translations/{l10n}"
-	data-status="%s"
 	/>
 	`
 )
